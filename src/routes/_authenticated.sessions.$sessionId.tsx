@@ -153,23 +153,60 @@ function initials(name: string) {
 function VideoTile({
   name, role, color, speaking, muted, isCoach,
 }: { name: string; role: string; color: string; speaking: boolean; muted: boolean; isCoach?: boolean }) {
+  // Idle "breathing" oscillation + speaking waveform handled via CSS keyframes in styles.css
   return (
-    <div className="relative aspect-video border border-ink overflow-hidden bg-ink">
+    <div className={`relative aspect-video border border-ink overflow-hidden bg-ink ${speaking ? "tile-speaking" : ""}`}>
+      {/* soft gradient backdrop when speaking */}
+      <div
+        className="absolute inset-0 transition-opacity duration-500"
+        style={{
+          background: `radial-gradient(circle at 50% 45%, ${color}33 0%, transparent 65%)`,
+          opacity: speaking ? 1 : 0,
+        }}
+      />
       <div className="absolute inset-0 flex items-center justify-center">
-        <div
-          className={`w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-paper flex items-center justify-center text-xl font-medium transition-all ${speaking ? "scale-110" : ""}`}
-          style={{ backgroundColor: color, color: "var(--ink)" }}
-        >
-          {isCoach ? "YOU" : initials(name)}
+        <div className="relative">
+          {/* pulsing rings when speaking */}
+          {speaking && (
+            <>
+              <span className="absolute inset-0 rounded-full animate-ring" style={{ boxShadow: `0 0 0 2px ${color}` }} />
+              <span className="absolute inset-0 rounded-full animate-ring [animation-delay:0.6s]" style={{ boxShadow: `0 0 0 2px ${color}` }} />
+            </>
+          )}
+          <div
+            className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-paper flex items-center justify-center text-xl font-medium ${speaking ? "animate-talk" : "animate-breathe"}`}
+            style={{ backgroundColor: color, color: "var(--ink)" }}
+          >
+            {isCoach ? "YOU" : initials(name)}
+          </div>
         </div>
       </div>
-      {speaking && (
-        <div className="absolute inset-0 ring-4 ring-offset-0 pointer-events-none animate-pulse" style={{ boxShadow: `inset 0 0 0 3px ${color}` }} />
-      )}
-      <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 flex items-center justify-between text-paper text-xs bg-ink/80">
-        <span className="font-medium truncate">{name}</span>
+
+      {/* equalizer waveform along bottom edge */}
+      <div className="absolute bottom-7 left-1/2 -translate-x-1/2 flex items-end gap-[3px] h-5 pointer-events-none">
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+          <span
+            key={i}
+            className={speaking ? "animate-wave" : ""}
+            style={{
+              width: 3,
+              height: speaking ? "100%" : 3,
+              backgroundColor: color,
+              animationDelay: `${i * 0.09}s`,
+              opacity: speaking ? 1 : 0.25,
+              transition: "height 0.2s, opacity 0.3s",
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 flex items-center justify-between text-paper text-xs bg-ink/80 backdrop-blur-sm">
+        <span className="font-medium truncate flex items-center gap-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full ${speaking ? "bg-green-400 animate-pulse" : "bg-paper/40"}`} />
+          {name}
+        </span>
         <span className="opacity-60 truncate ml-2 hidden sm:inline">{role}</span>
-        {muted && <span className="ml-1 text-[10px] uppercase tracking-wider opacity-80">muted</span>}
+        {muted && <span className="ml-1 text-[10px] uppercase tracking-wider opacity-80">● muted</span>}
       </div>
     </div>
   );
