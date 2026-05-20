@@ -156,25 +156,9 @@ ${transcriptText || "(no transcript)"}`;
       .single();
     if (eErr) throw new Error(eErr.message);
 
-    // Run AI-authorship detection in the background of the same request
-    let aiDetection: any = null;
-    try {
-      aiDetection = await runAiAuthorshipCheck({
-        apiKey,
-        framing: s.framing_notes,
-        methodologyRationale: s.methodology_rationale,
-        intervention: s.intervention_recommendation,
-        candidateMessages: (transcript ?? [])
-          .filter((m: any) => m.role === "candidate")
-          .map((m: any) => m.content),
-      });
-      await supabaseAdmin
-        .from("evaluations")
-        .update({ ai_detection: aiDetection })
-        .eq("session_id", data.sessionId);
-    } catch (err) {
-      console.error("AI authorship check failed:", err);
-    }
+    // AI-authorship detection runs as a separate request to keep this one under the worker timeout.
+    const aiDetection: any = null;
+
 
     await supabaseAdmin
       .from("sessions")
