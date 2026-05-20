@@ -44,10 +44,7 @@ function Header() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-3 group">
           <Logo />
-          <div className="flex flex-col leading-none">
-            <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Strategyzer</span>
-            <span className="text-sm font-medium">Coach Certification Simulator</span>
-          </div>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground hidden sm:inline">Simulator</span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">
           <NavLink to="/">Overview</NavLink>
