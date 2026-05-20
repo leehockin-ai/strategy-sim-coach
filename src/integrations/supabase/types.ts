@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       evaluations: {
         Row: {
+          ai_detection: Json | null
           created_at: string
           gaps: string[]
           id: string
@@ -29,6 +30,7 @@ export type Database = {
           strengths: string[]
         }
         Insert: {
+          ai_detection?: Json | null
           created_at?: string
           gaps?: string[]
           id?: string
@@ -42,6 +44,7 @@ export type Database = {
           strengths?: string[]
         }
         Update: {
+          ai_detection?: Json | null
           created_at?: string
           gaps?: string[]
           id?: string
