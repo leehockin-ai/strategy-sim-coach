@@ -304,7 +304,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
 
 function InterventionStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const navigate = useNavigate();
-  const [rec, setRec] = useState(session.intervention_recommendation ?? "");
+  const [rec, setRec] = useState<string>(session.intervention_recommendation ?? "");
   const [decision, setDecision] = useState(session.decision ?? "");
   const save = useServerFn(updateSession);
   const evalFn = useServerFn(generateEvaluation);
