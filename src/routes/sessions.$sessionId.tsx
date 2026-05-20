@@ -120,7 +120,7 @@ function StepShell({ title, hint, children }: { title: string; hint: string; chi
 }
 
 function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [text, setText] = useState(session.framing_notes ?? "");
+  const [text, setText] = useState<string>(session.framing_notes ?? "");
   const save = useServerFn(updateSession);
   const mut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, framingNotes: text, status: "framing" } }),
