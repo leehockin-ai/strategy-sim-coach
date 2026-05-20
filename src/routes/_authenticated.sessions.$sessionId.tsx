@@ -222,7 +222,7 @@ function FramingStep({
       setText("");
       onRefresh();
       const reply = res.stakeholderMessage;
-      if (reply) await playReply(reply.stakeholder_name, reply.content);
+      if (reply?.stakeholder_name) await playReply(reply.stakeholder_name, reply.content);
     },
     onError: (e: any) => toast.error(e?.message ?? "Turn failed"),
   });
