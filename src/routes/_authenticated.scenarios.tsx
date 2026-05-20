@@ -8,7 +8,7 @@ import { listScenarios } from "@/lib/scenarios.functions";
 import { createSession } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
-export const Route = createFileRoute("/scenarios")({
+export const Route = createFileRoute("/_authenticated/scenarios")({
   head: () => ({
     meta: [
       { title: "Scenarios · Strategyzer Coach Certification Simulator" },
