@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { getSession, updateSession, sendStakeholderMessage } from "@/lib/simulator.functions";
 import { generateEvaluation } from "@/lib/evaluation.functions";
+import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
   head: () => ({
@@ -119,7 +120,7 @@ function StepShell({ title, hint, children }: { title: string; hint: string; chi
 }
 
 function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [text, setText] = useState(session.framing_notes ?? "");
+  const [text, setText] = useState<string>(session.framing_notes ?? "");
   const save = useServerFn(updateSession);
   const mut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, framingNotes: text, status: "framing" } }),
@@ -132,16 +133,21 @@ function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }
       title="Frame the problem"
       hint="What's the real problem vs symptom? What assumptions are baked in? What outcome would 'good' look like? Don't prescribe yet."
     >
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={14}
-        placeholder="• What's actually being asked of me?
+      <div className="relative">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={14}
+          placeholder="• What's actually being asked of me?
 • What assumptions are present?
 • What would I want to clarify before agreeing to anything?
 • Where is the ambiguity that matters?"
-        className="w-full border border-ink bg-paper p-4 text-sm leading-relaxed focus:outline-none focus:bg-secondary font-mono"
-      />
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm leading-relaxed focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
       <div className="mt-4 flex justify-end">
         <button onClick={() => mut.mutate()} disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
           {mut.isPending ? "Saving…" : "Save & continue →"}
@@ -152,8 +158,8 @@ function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }
 }
 
 function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [choice, setChoice] = useState(session.methodology_choice ?? "");
-  const [rationale, setRationale] = useState(session.methodology_rationale ?? "");
+  const [choice, setChoice] = useState<string>(session.methodology_choice ?? "");
+  const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
   const save = useServerFn(updateSession);
   const mut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, methodologyChoice: choice, methodologyRationale: rationale, status: "method" } }),
@@ -185,13 +191,18 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         ))}
       </div>
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale</label>
-      <textarea
-        value={rationale}
-        onChange={(e) => setRationale(e.target.value)}
-        rows={5}
-        placeholder="Why this, why now, what would change your mind."
-        className="w-full border border-ink bg-paper p-4 text-sm focus:outline-none focus:bg-secondary font-mono"
-      />
+      <div className="relative">
+        <textarea
+          value={rationale}
+          onChange={(e) => setRationale(e.target.value)}
+          rows={5}
+          placeholder="Why this, why now, what would change your mind."
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setRationale((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
       <div className="mt-4 flex justify-end">
         <button onClick={() => mut.mutate()} disabled={mut.isPending || !choice || !rationale.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
           {mut.isPending ? "Saving…" : "Save & open dialogue →"}
@@ -287,6 +298,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
             placeholder={`Say something to ${target}…`}
             className="flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
           />
+          <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
           <button type="submit" disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">
             Send
           </button>
@@ -298,7 +310,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
 
 function InterventionStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const navigate = useNavigate();
-  const [rec, setRec] = useState(session.intervention_recommendation ?? "");
+  const [rec, setRec] = useState<string>(session.intervention_recommendation ?? "");
   const [decision, setDecision] = useState(session.decision ?? "");
   const save = useServerFn(updateSession);
   const evalFn = useServerFn(generateEvaluation);
@@ -329,13 +341,18 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
       hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Submitting locks the session and triggers AI evaluation."
     >
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Next-best action</label>
-      <textarea
-        value={rec}
-        onChange={(e) => setRec(e.target.value)}
-        rows={8}
-        placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate?"
-        className="w-full border border-ink bg-paper p-4 text-sm focus:outline-none focus:bg-secondary font-mono"
-      />
+      <div className="relative">
+        <textarea
+          value={rec}
+          onChange={(e) => setRec(e.target.value)}
+          rows={8}
+          placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate?"
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setRec((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
 
       <label className="text-xs uppercase tracking-[0.12em] mt-6 mb-2 block">Your call</label>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">

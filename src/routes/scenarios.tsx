@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { listScenarios } from "@/lib/scenarios.functions";
 import { createSession } from "@/lib/simulator.functions";
+import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/scenarios")({
   head: () => ({
@@ -124,12 +125,17 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
         >
           <div>
             <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Candidate name</label>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
-            />
+            <div className="relative">
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full border border-ink bg-paper px-3 py-2 pr-10 text-sm focus:outline-none focus:bg-secondary"
+              />
+              <div className="absolute top-1/2 -translate-y-1/2 right-1.5">
+                <VoiceInput onTranscript={(c) => setName((p) => appendTranscript(p, c))} />
+              </div>
+            </div>
           </div>
           <div>
             <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Email (for reviewer summary)</label>
