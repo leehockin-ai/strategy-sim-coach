@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -110,5 +110,3 @@ export function Logo() {
   );
 }
 
-// silence unused warning for useQuery if tree-shaken
-export const __unused = useQuery;
