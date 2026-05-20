@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { getSession, updateSession, sendStakeholderMessage } from "@/lib/simulator.functions";
 import { generateEvaluation } from "@/lib/evaluation.functions";
+import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/sessions/$sessionId")({
   head: () => ({
