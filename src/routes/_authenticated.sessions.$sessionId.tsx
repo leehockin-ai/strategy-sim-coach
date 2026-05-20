@@ -18,12 +18,13 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   component: SessionPage,
 });
 
-type Step = "framing" | "method" | "dialogue" | "intervention";
+type Step = "framing" | "method" | "dialogue" | "application" | "intervention";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "framing", label: "Framing" },
   { key: "method", label: "Method" },
   { key: "dialogue", label: "Dialogue" },
+  { key: "application", label: "Application" },
   { key: "intervention", label: "Intervention" },
 ];
 
