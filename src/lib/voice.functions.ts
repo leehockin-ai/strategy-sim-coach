@@ -31,9 +31,13 @@ export const synthesizeVoice = createServerFn({ method: "POST" })
     );
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
+      // Graceful fallback for plan/quota/rate-limit errors → client uses browser SpeechSynthesis
+      if (res.status === 402 || res.status === 401 || res.status === 429 || res.status >= 500) {
+        return { audio: null, fallback: true as const, reason: errText.slice(0, 200) };
+      }
       throw new Error(`TTS failed: ${res.status} ${errText.slice(0, 200)}`);
     }
     const buf = await res.arrayBuffer();
     const audio = Buffer.from(buf).toString("base64");
-    return { audio };
+    return { audio, fallback: false as const };
   });
