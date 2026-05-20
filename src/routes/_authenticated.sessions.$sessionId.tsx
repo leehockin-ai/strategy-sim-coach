@@ -716,7 +716,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   const isCustomerOnly = canvas.id === "customer_profile_interviews";
   const isBMC = canvas.id === "competing_on_business_models";
 
-  function CellCard({ cell }: { cell: typeof canvas.cells[number] }) {
+  function CellCard({ cell }: { cell: { key: string; label: string; hint: string; column?: string } }) {
     return (
       <div className="border border-ink p-3 bg-paper">
         <div className="flex items-baseline justify-between gap-2 mb-1">
