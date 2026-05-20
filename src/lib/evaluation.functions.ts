@@ -153,13 +153,120 @@ ${transcriptText || "(no transcript)"}`;
       .single();
     if (eErr) throw new Error(eErr.message);
 
+    // Run AI-authorship detection in the background of the same request
+    let aiDetection: any = null;
+    try {
+      aiDetection = await runAiAuthorshipCheck({
+        apiKey,
+        framing: s.framing_notes,
+        methodologyRationale: s.methodology_rationale,
+        intervention: s.intervention_recommendation,
+        candidateMessages: (transcript ?? [])
+          .filter((m: any) => m.role === "candidate")
+          .map((m: any) => m.content),
+      });
+      await supabaseAdmin
+        .from("evaluations")
+        .update({ ai_detection: aiDetection })
+        .eq("session_id", data.sessionId);
+    } catch (err) {
+      console.error("AI authorship check failed:", err);
+    }
+
     await supabaseAdmin
       .from("sessions")
       .update({ status: "evaluated", completed_at: new Date().toISOString() })
       .eq("id", data.sessionId);
 
-    return { evaluation };
+    return { evaluation: { ...evaluation, ai_detection: aiDetection } };
   });
+
+async function runAiAuthorshipCheck(args: {
+  apiKey: string;
+  framing?: string | null;
+  methodologyRationale?: string | null;
+  intervention?: string | null;
+  candidateMessages: string[];
+}) {
+  const samples = {
+    framing_notes: (args.framing ?? "").trim(),
+    methodology_rationale: (args.methodologyRationale ?? "").trim(),
+    intervention_recommendation: (args.intervention ?? "").trim(),
+    dialogue_messages: args.candidateMessages.join("\n---\n").trim(),
+  };
+
+  const fieldsPayload = Object.entries(samples)
+    .map(([k, v]) => `=== ${k} ===\n${v || "(empty)"}`)
+    .join("\n\n");
+
+  const systemPrompt = `You are a forensic writing analyst. For each candidate-written field, judge how likely the text was produced by a generative AI model (e.g. ChatGPT, Gemini, Claude) rather than written by a human coach in a live exercise.
+
+Look for: uniform sentence rhythm, hedged "as an AI" phrasing, bulletized scaffolding, generic frameworks-language without specifics, list-of-three patterns, glossy transitions ("Moreover", "Furthermore"), low referential specificity, perfect grammar with no personality.
+Human signals: typos, contractions, idiosyncratic shorthand, references to the specific scenario by name, half-finished thoughts, personal voice.
+
+Empty or near-empty fields → likelihood 0 and note "insufficient text".
+Score 0–100 (0 = clearly human, 100 = clearly AI-generated).`;
+
+  const fields = Object.keys(samples);
+
+  const tool = {
+    type: "function",
+    function: {
+      name: "report_ai_likelihood",
+      description: "Return per-field AI-generation likelihood.",
+      parameters: {
+        type: "object",
+        properties: {
+          fields: {
+            type: "object",
+            properties: Object.fromEntries(
+              fields.map((f) => [
+                f,
+                {
+                  type: "object",
+                  properties: {
+                    likelihood: { type: "integer", minimum: 0, maximum: 100 },
+                    verdict: { type: "string", enum: ["likely_human", "uncertain", "likely_ai", "insufficient_text"] },
+                    signals: { type: "string", description: "Specific phrases or patterns observed." },
+                  },
+                  required: ["likelihood", "verdict", "signals"],
+                  additionalProperties: false,
+                },
+              ])
+            ),
+            required: fields,
+            additionalProperties: false,
+          },
+          overall_likelihood: { type: "integer", minimum: 0, maximum: 100 },
+          overall_verdict: { type: "string", enum: ["likely_human", "uncertain", "likely_ai"] },
+          summary: { type: "string", description: "1-2 sentence overall judgment." },
+        },
+        required: ["fields", "overall_likelihood", "overall_verdict", "summary"],
+        additionalProperties: false,
+      },
+    },
+  };
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${args.apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: fieldsPayload },
+      ],
+      tools: [tool],
+      tool_choice: { type: "function", function: { name: "report_ai_likelihood" } },
+    }),
+  });
+
+  if (!res.ok) throw new Error(`AI detector gateway error: ${res.status}`);
+  const json = await res.json();
+  const call = json.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call) throw new Error("AI detector returned no result");
+  return JSON.parse(call.function.arguments);
+}
 
 export const setReviewerDecision = createServerFn({ method: "POST" })
   .inputValidator((d: { sessionId: string; reviewerNotes?: string; reviewerDecision: string }) =>
