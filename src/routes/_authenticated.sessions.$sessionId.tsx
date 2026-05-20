@@ -150,6 +150,21 @@ function initials(name: string) {
   return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
+function speakWithBrowser(text: string, onEnd?: () => void) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+    onEnd?.();
+    return;
+  }
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1; u.pitch = 1; u.lang = "en-US";
+    u.onend = () => onEnd?.();
+    u.onerror = () => onEnd?.();
+    window.speechSynthesis.speak(u);
+  } catch { onEnd?.(); }
+}
+
 function VideoTile({
   name, role, color, speaking, muted, isCoach,
 }: { name: string; role: string; color: string; speaking: boolean; muted: boolean; isCoach?: boolean }) {
