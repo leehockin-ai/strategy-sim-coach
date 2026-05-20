@@ -148,14 +148,18 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Email (for reviewer summary)</label>
+            <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Your email address</label>
             <input
               required
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@company.com"
               className="w-full border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
+            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+              We'll send your post-session evaluation report here once a Strategyzer reviewer scores your performance. This is your email — not the reviewer's.
+            </p>
           </div>
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 border border-ink text-sm rounded-sm">Cancel</button>
