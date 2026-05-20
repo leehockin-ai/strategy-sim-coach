@@ -475,3 +475,118 @@ Return strict JSON:
     try { parsed = JSON.parse(content); } catch { parsed = {}; }
     return { draft: parsed };
   });
+
+// ---------- Application step: AI fills a canvas cell from the team's perspective ----------
+
+import { CANVASES, canvasForPlaybook } from "@/lib/playbooks";
+
+export const suggestCanvasCell = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; cellKey: string }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      cellKey: z.string().min(1).max(80),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("framing_notes, methodology_choice, methodology_rationale, application_canvas, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const canvas = canvasForPlaybook((session as any).methodology_choice);
+    if (!canvas) throw new Error("No canvas mapped — pick a playbook first.");
+    const cell = canvas.cells.find((c) => c.key === data.cellKey);
+    if (!cell) throw new Error(`Unknown cell: ${data.cellKey}`);
+
+    const { data: transcript } = await supabaseAdmin
+      .from("messages")
+      .select("role, stakeholder_name, content, phase")
+      .eq("session_id", data.sessionId)
+      .order("created_at", { ascending: true });
+
+    const convo = (transcript ?? [])
+      .map((m: any) => (m.role === "candidate" ? `Coach: ${m.content}` : `${m.stakeholder_name}: ${m.content}`))
+      .join("\n");
+
+    const scenario: any = (session as any).scenarios;
+    const existing = (session as any).application_canvas ?? {};
+    const existingPretty = Object.entries(existing)
+      .map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+      .join("\n");
+
+    const prompt = `You are a Strategyzer master coach helping the team draft a "${canvas.name}". The coach is asking the team to populate ONE cell: "${cell.label}" — ${cell.hint}
+
+Synthesize what the TEAM would honestly say for this cell, grounded in:
+1. The scenario context
+2. What stakeholders actually said in the scoping call and one-on-one dialogues
+3. Existing canvas cells the team has already filled
+
+Rules:
+- Stay strictly within the definition of this cell. ${cell.label} ≠ any other cell.
+- 3–6 short bullet points OR 2–3 sentences. Plain language. No framework jargon.
+- If the conversation gave NO evidence for this cell, say so explicitly and propose the single question the coach should ask to surface it. Do not fabricate.
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+
+STAKEHOLDERS: ${JSON.stringify(scenario.stakeholders)}
+
+FRAMING NOTES: ${(session as any).framing_notes ?? "(none)"}
+
+CONVERSATION:
+${convo || "(no conversation yet)"}
+
+EXISTING CANVAS CELLS:
+${existingPretty || "(empty)"}
+
+Return strict JSON: {"suggestion": "<the cell content>", "evidence": "<one sentence citing what in the convo supports this, or 'no evidence — ask the team'>"}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { parsed = { suggestion: content }; }
+    return { cellKey: cell.key, ...parsed };
+  });
+
+export const saveCanvas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; canvas: Record<string, string> }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      canvas: z.record(z.string(), z.string().max(4000)),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const { error } = await supabaseAdmin
+      .from("sessions")
+      .update({ application_canvas: data.canvas, status: "application" })
+      .eq("id", data.sessionId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// re-export so the route file has a single import surface
+export { CANVASES as _CANVASES, canvasForPlaybook as _canvasForPlaybook };
+
