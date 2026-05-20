@@ -9,59 +9,61 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ScenariosRouteImport } from './routes/scenarios'
-import { Route as ReviewerRouteImport } from './routes/reviewer'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as SessionsSessionIdReportRouteImport } from './routes/sessions.$sessionId.report'
+import { Route as AuthenticatedScenariosRouteImport } from './routes/_authenticated.scenarios'
+import { Route as AuthenticatedReviewerRouteImport } from './routes/_authenticated.reviewer'
+import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated.sessions.$sessionId'
+import { Route as AuthenticatedSessionsSessionIdReportRouteImport } from './routes/_authenticated.sessions.$sessionId.report'
 
-const ScenariosRoute = ScenariosRouteImport.update({
-  id: '/scenarios',
-  path: '/scenarios',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReviewerRoute = ReviewerRouteImport.update({
-  id: '/reviewer',
-  path: '/reviewer',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
-  id: '/sessions/$sessionId',
-  path: '/sessions/$sessionId',
+const AuthenticatedScenariosRoute = AuthenticatedScenariosRouteImport.update({
+  id: '/_authenticated/scenarios',
+  path: '/scenarios',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SessionsSessionIdReportRoute = SessionsSessionIdReportRouteImport.update({
-  id: '/report',
-  path: '/report',
-  getParentRoute: () => SessionsSessionIdRoute,
+const AuthenticatedReviewerRoute = AuthenticatedReviewerRouteImport.update({
+  id: '/_authenticated/reviewer',
+  path: '/reviewer',
+  getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedSessionsSessionIdRoute =
+  AuthenticatedSessionsSessionIdRouteImport.update({
+    id: '/_authenticated/sessions/$sessionId',
+    path: '/sessions/$sessionId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedSessionsSessionIdReportRoute =
+  AuthenticatedSessionsSessionIdReportRouteImport.update({
+    id: '/report',
+    path: '/report',
+    getParentRoute: () => AuthenticatedSessionsSessionIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/reviewer': typeof ReviewerRoute
-  '/scenarios': typeof ScenariosRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRouteWithChildren
-  '/sessions/$sessionId/report': typeof SessionsSessionIdReportRoute
+  '/reviewer': typeof AuthenticatedReviewerRoute
+  '/scenarios': typeof AuthenticatedScenariosRoute
+  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/reviewer': typeof ReviewerRoute
-  '/scenarios': typeof ScenariosRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRouteWithChildren
-  '/sessions/$sessionId/report': typeof SessionsSessionIdReportRoute
+  '/reviewer': typeof AuthenticatedReviewerRoute
+  '/scenarios': typeof AuthenticatedScenariosRoute
+  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/reviewer': typeof ReviewerRoute
-  '/scenarios': typeof ScenariosRoute
-  '/sessions/$sessionId': typeof SessionsSessionIdRouteWithChildren
-  '/sessions/$sessionId/report': typeof SessionsSessionIdReportRoute
+  '/_authenticated/reviewer': typeof AuthenticatedReviewerRoute
+  '/_authenticated/scenarios': typeof AuthenticatedScenariosRoute
+  '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/_authenticated/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,35 +83,21 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/reviewer'
-    | '/scenarios'
-    | '/sessions/$sessionId'
-    | '/sessions/$sessionId/report'
+    | '/_authenticated/reviewer'
+    | '/_authenticated/scenarios'
+    | '/_authenticated/sessions/$sessionId'
+    | '/_authenticated/sessions/$sessionId/report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ReviewerRoute: typeof ReviewerRoute
-  ScenariosRoute: typeof ScenariosRoute
-  SessionsSessionIdRoute: typeof SessionsSessionIdRouteWithChildren
+  AuthenticatedReviewerRoute: typeof AuthenticatedReviewerRoute
+  AuthenticatedScenariosRoute: typeof AuthenticatedScenariosRoute
+  AuthenticatedSessionsSessionIdRoute: typeof AuthenticatedSessionsSessionIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/scenarios': {
-      id: '/scenarios'
-      path: '/scenarios'
-      fullPath: '/scenarios'
-      preLoaderRoute: typeof ScenariosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reviewer': {
-      id: '/reviewer'
-      path: '/reviewer'
-      fullPath: '/reviewer'
-      preLoaderRoute: typeof ReviewerRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -117,39 +105,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sessions/$sessionId': {
-      id: '/sessions/$sessionId'
-      path: '/sessions/$sessionId'
-      fullPath: '/sessions/$sessionId'
-      preLoaderRoute: typeof SessionsSessionIdRouteImport
+    '/_authenticated/scenarios': {
+      id: '/_authenticated/scenarios'
+      path: '/scenarios'
+      fullPath: '/scenarios'
+      preLoaderRoute: typeof AuthenticatedScenariosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/sessions/$sessionId/report': {
-      id: '/sessions/$sessionId/report'
+    '/_authenticated/reviewer': {
+      id: '/_authenticated/reviewer'
+      path: '/reviewer'
+      fullPath: '/reviewer'
+      preLoaderRoute: typeof AuthenticatedReviewerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/sessions/$sessionId': {
+      id: '/_authenticated/sessions/$sessionId'
+      path: '/sessions/$sessionId'
+      fullPath: '/sessions/$sessionId'
+      preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/sessions/$sessionId/report': {
+      id: '/_authenticated/sessions/$sessionId/report'
       path: '/report'
       fullPath: '/sessions/$sessionId/report'
-      preLoaderRoute: typeof SessionsSessionIdReportRouteImport
-      parentRoute: typeof SessionsSessionIdRoute
+      preLoaderRoute: typeof AuthenticatedSessionsSessionIdReportRouteImport
+      parentRoute: typeof AuthenticatedSessionsSessionIdRoute
     }
   }
 }
 
-interface SessionsSessionIdRouteChildren {
-  SessionsSessionIdReportRoute: typeof SessionsSessionIdReportRoute
+interface AuthenticatedSessionsSessionIdRouteChildren {
+  AuthenticatedSessionsSessionIdReportRoute: typeof AuthenticatedSessionsSessionIdReportRoute
 }
 
-const SessionsSessionIdRouteChildren: SessionsSessionIdRouteChildren = {
-  SessionsSessionIdReportRoute: SessionsSessionIdReportRoute,
-}
+const AuthenticatedSessionsSessionIdRouteChildren: AuthenticatedSessionsSessionIdRouteChildren =
+  {
+    AuthenticatedSessionsSessionIdReportRoute:
+      AuthenticatedSessionsSessionIdReportRoute,
+  }
 
-const SessionsSessionIdRouteWithChildren =
-  SessionsSessionIdRoute._addFileChildren(SessionsSessionIdRouteChildren)
+const AuthenticatedSessionsSessionIdRouteWithChildren =
+  AuthenticatedSessionsSessionIdRoute._addFileChildren(
+    AuthenticatedSessionsSessionIdRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ReviewerRoute: ReviewerRoute,
-  ScenariosRoute: ScenariosRoute,
-  SessionsSessionIdRoute: SessionsSessionIdRouteWithChildren,
+  AuthenticatedReviewerRoute: AuthenticatedReviewerRoute,
+  AuthenticatedScenariosRoute: AuthenticatedScenariosRoute,
+  AuthenticatedSessionsSessionIdRoute:
+    AuthenticatedSessionsSessionIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

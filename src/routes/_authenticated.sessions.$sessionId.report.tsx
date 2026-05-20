@@ -5,7 +5,7 @@ import { Shell } from "@/components/Shell";
 import { getSession } from "@/lib/simulator.functions";
 import { RUBRIC_DIMENSIONS } from "@/lib/evaluation.functions";
 
-export const Route = createFileRoute("/sessions/$sessionId/report")({
+export const Route = createFileRoute("/_authenticated/sessions/$sessionId/report")({
   head: () => ({ meta: [{ title: "Evaluation report · Strategyzer Coach Certification" }] }),
   component: ReportPage,
 });

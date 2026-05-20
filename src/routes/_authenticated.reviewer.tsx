@@ -8,7 +8,7 @@ import { listReviewSessions, setReviewerDecision } from "@/lib/evaluation.functi
 import { getSession } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
-export const Route = createFileRoute("/reviewer")({
+export const Route = createFileRoute("/_authenticated/reviewer")({
   head: () => ({ meta: [{ title: "Reviewer · Strategyzer Coach Certification" }] }),
   component: ReviewerPage,
 });
