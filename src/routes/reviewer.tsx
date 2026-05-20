@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { listReviewSessions, setReviewerDecision } from "@/lib/evaluation.functions";
 import { getSession } from "@/lib/simulator.functions";
+import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/reviewer")({
   head: () => ({ meta: [{ title: "Reviewer · Strategyzer Coach Certification" }] }),
@@ -132,13 +133,18 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
 
           <div>
             <h3 className="text-xs uppercase tracking-[0.12em] mb-2">Reviewer notes</h3>
-            <textarea
-              rows={5}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Override reasoning, calibration notes, developmental feedback…"
-              className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
-            />
+            <div className="relative">
+              <textarea
+                rows={5}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Override reasoning, calibration notes, developmental feedback…"
+                className="w-full border border-ink bg-paper p-3 pr-12 text-sm focus:outline-none focus:bg-secondary"
+              />
+              <div className="absolute top-2 right-2">
+                <VoiceInput onTranscript={(c) => setNotes((p) => appendTranscript(p, c))} />
+              </div>
+            </div>
           </div>
 
           <div>
