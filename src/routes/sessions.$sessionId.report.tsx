@@ -111,6 +111,8 @@ function ReportPage() {
         </div>
       </section>
 
+      {evaluation.ai_detection && <AiDetectionPanel detection={evaluation.ai_detection} />}
+
       <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline">
         <div className="pt-8 flex flex-wrap gap-3">
           <Link to="/scenarios" className="border border-ink px-4 py-2 text-sm">Try another scenario</Link>
@@ -132,6 +134,88 @@ function ScoreBar({ score }: { score: number }) {
         />
       ))}
       <span className="marker-num text-sm ml-2">{score}/5</span>
+    </div>
+  );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  framing_notes: "Framing notes",
+  methodology_rationale: "Methodology rationale",
+  intervention_recommendation: "Intervention recommendation",
+  dialogue_messages: "Dialogue messages",
+};
+
+const VERDICT_META: Record<string, { label: string; color: string; fg?: string }> = {
+  likely_human: { label: "Likely human", color: "var(--brand-lime)" },
+  uncertain: { label: "Uncertain", color: "var(--brand-cyan)" },
+  likely_ai: { label: "Likely AI-generated", color: "var(--brand-red)", fg: "var(--paper)" },
+  insufficient_text: { label: "Insufficient text", color: "var(--secondary)" },
+};
+
+function AiDetectionPanel({ detection }: { detection: any }) {
+  const overall = VERDICT_META[detection.overall_verdict] ?? VERDICT_META.uncertain;
+  return (
+    <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12">
+      <div className="flex flex-wrap items-baseline justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl">AI-authorship check</h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Heuristic estimate of whether the candidate's written responses were drafted by a generative AI model. Signal, not verdict — review before acting.
+          </p>
+        </div>
+        <div
+          className="border border-ink px-5 py-3 flex items-center gap-4"
+          style={{ backgroundColor: overall.color, color: overall.fg ?? "var(--ink)" }}
+        >
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] opacity-80">Overall</div>
+            <div className="text-base font-medium">{overall.label}</div>
+          </div>
+          <div className="marker-num text-2xl">{detection.overall_likelihood}%</div>
+        </div>
+      </div>
+
+      <p className="text-sm leading-relaxed mb-6 max-w-3xl">{detection.summary}</p>
+
+      <div className="grid md:grid-cols-2 gap-px bg-ink border border-ink">
+        {Object.entries(detection.fields ?? {}).map(([key, raw]) => {
+          const f = raw as { likelihood: number; verdict: string; signals: string };
+          const v = VERDICT_META[f.verdict] ?? VERDICT_META.uncertain;
+          return (
+            <div key={key} className="bg-paper p-5">
+              <div className="flex items-baseline justify-between mb-3">
+                <h3 className="text-sm font-medium">{FIELD_LABELS[key] ?? key}</h3>
+                <span
+                  className="text-[10px] uppercase tracking-[0.12em] border border-ink px-2 py-0.5"
+                  style={{ backgroundColor: v.color, color: v.fg ?? "var(--ink)" }}
+                >
+                  {v.label}
+                </span>
+              </div>
+              <LikelihoodBar value={f.likelihood} />
+              <p className="text-xs text-muted-foreground leading-relaxed mt-3">{f.signals}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function LikelihoodBar({ value }: { value: number }) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 h-2 border border-ink relative overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0"
+          style={{
+            width: `${value}%`,
+            backgroundColor:
+              value >= 70 ? "var(--brand-red)" : value >= 40 ? "var(--brand-cyan)" : "var(--brand-lime)",
+          }}
+        />
+      </div>
+      <span className="marker-num text-sm w-12 text-right">{value}%</span>
     </div>
   );
 }
