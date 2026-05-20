@@ -616,7 +616,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
           ))}
         </div>
         <button onClick={onContinue} className="mt-6 w-full border border-ink py-2 text-sm hover:bg-secondary">
-          Move to intervention →
+          Move to application →
         </button>
       </aside>
 
