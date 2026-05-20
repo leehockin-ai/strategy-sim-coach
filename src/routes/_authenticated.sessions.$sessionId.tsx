@@ -49,7 +49,7 @@ function SessionPage() {
       <ScenarioHeader scenario={scenario} session={session} />
       <StepNav step={step} onChange={setStep} />
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        {step === "framing" && <FramingStep session={session} onSaved={() => { refetch(); setStep("method"); }} />}
+        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={() => { refetch(); setStep("method"); }} onRefresh={refetch} />}
         {step === "method" && <MethodStep session={session} onSaved={() => { refetch(); setStep("dialogue"); }} />}
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("intervention")} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={refetch} />}
