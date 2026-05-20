@@ -74,7 +74,14 @@ export const updateSession = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data }) => {
-    const patch: Record<string, unknown> = {};
+    const patch: {
+      framing_notes?: string;
+      methodology_choice?: string;
+      methodology_rationale?: string;
+      intervention_recommendation?: string;
+      decision?: string;
+      status?: string;
+    } = {};
     if (data.framingNotes !== undefined) patch.framing_notes = data.framingNotes;
     if (data.methodologyChoice !== undefined) patch.methodology_choice = data.methodologyChoice;
     if (data.methodologyRationale !== undefined) patch.methodology_rationale = data.methodologyRationale;
