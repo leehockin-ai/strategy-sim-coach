@@ -239,17 +239,23 @@ function FramingStep({
 
   async function playReply(name: string, content: string) {
     const voiceId = voiceForStakeholder(stakeholders, name);
+    setSpeakingName(name);
     try {
-      const { audio } = await tts({ data: { text: content, voiceId } });
-      setSpeakingName(name);
-      const a = new Audio(`data:audio/mpeg;base64,${audio}`);
-      audioRef.current?.pause();
-      audioRef.current = a;
-      a.onended = () => setSpeakingName(null);
-      await a.play();
+      const res = await tts({ data: { text: content, voiceId } });
+      if (res.audio && !res.fallback) {
+        const a = new Audio(`data:audio/mpeg;base64,${res.audio}`);
+        audioRef.current?.pause();
+        audioRef.current = a;
+        a.onended = () => setSpeakingName(null);
+        a.onerror = () => setSpeakingName(null);
+        await a.play();
+        return;
+      }
+      // Fallback: browser SpeechSynthesis
+      speakWithBrowser(content, () => setSpeakingName(null));
     } catch (e: any) {
-      toast.error(e?.message ?? "Voice playback failed");
-      setSpeakingName(null);
+      // Last-resort fallback so the call doesn't break
+      speakWithBrowser(content, () => setSpeakingName(null));
     }
   }
 
