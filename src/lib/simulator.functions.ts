@@ -478,7 +478,7 @@ Return strict JSON:
 
 // ---------- Application step: AI fills a canvas cell from the team's perspective ----------
 
-import { CANVASES, canvasForPlaybook } from "@/lib/playbooks";
+
 
 export const suggestCanvasCell = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
