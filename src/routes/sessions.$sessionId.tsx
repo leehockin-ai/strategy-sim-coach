@@ -133,16 +133,21 @@ function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }
       title="Frame the problem"
       hint="What's the real problem vs symptom? What assumptions are baked in? What outcome would 'good' look like? Don't prescribe yet."
     >
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={14}
-        placeholder="• What's actually being asked of me?
+      <div className="relative">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={14}
+          placeholder="• What's actually being asked of me?
 • What assumptions are present?
 • What would I want to clarify before agreeing to anything?
 • Where is the ambiguity that matters?"
-        className="w-full border border-ink bg-paper p-4 text-sm leading-relaxed focus:outline-none focus:bg-secondary font-mono"
-      />
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm leading-relaxed focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
       <div className="mt-4 flex justify-end">
         <button onClick={() => mut.mutate()} disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
           {mut.isPending ? "Saving…" : "Save & continue →"}
