@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { listScenarios } from "@/lib/scenarios.functions";
@@ -96,8 +96,19 @@ function ScenarioCard({ scenario, index }: { scenario: any; index: number }) {
 function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void }) {
   const navigate = useNavigate();
   const create = useServerFn(createSession);
-  const [name, setName] = useState(() => typeof window !== "undefined" ? localStorage.getItem("candidate_name") ?? "" : "");
-  const [email, setEmail] = useState(() => typeof window !== "undefined" ? localStorage.getItem("candidate_email") ?? "" : "");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    import("@/integrations/supabase/client").then(({ supabase }) =>
+      supabase.auth.getUser().then(({ data }) => {
+        const u = data.user;
+        if (u?.email) setEmail(u.email);
+        const meta = (u?.user_metadata ?? {}) as Record<string, string>;
+        setName(meta.full_name || meta.name || (typeof window !== "undefined" ? localStorage.getItem("candidate_name") ?? "" : ""));
+      })
+    );
+  }, []);
 
   const mut = useMutation({
     mutationFn: async () => {
@@ -106,7 +117,6 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
     },
     onSuccess: (session) => {
       localStorage.setItem("candidate_name", name);
-      localStorage.setItem("candidate_email", email);
       navigate({ to: "/sessions/$sessionId", params: { sessionId: session.id } });
     },
     onError: (e: any) => toast.error(e.message ?? "Could not start session"),
