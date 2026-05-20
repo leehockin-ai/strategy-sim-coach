@@ -156,6 +156,7 @@ export type Database = {
           intervention_recommendation: string | null
           methodology_choice: string | null
           methodology_rationale: string | null
+          owner_id: string | null
           scenario_id: string
           status: string
         }
@@ -170,6 +171,7 @@ export type Database = {
           intervention_recommendation?: string | null
           methodology_choice?: string | null
           methodology_rationale?: string | null
+          owner_id?: string | null
           scenario_id: string
           status?: string
         }
@@ -184,6 +186,7 @@ export type Database = {
           intervention_recommendation?: string | null
           methodology_choice?: string | null
           methodology_rationale?: string | null
+          owner_id?: string | null
           scenario_id?: string
           status?: string
         }

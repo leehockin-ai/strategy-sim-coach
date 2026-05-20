@@ -8,7 +8,7 @@ import { getSession, updateSession, sendStakeholderMessage } from "@/lib/simulat
 import { generateEvaluation } from "@/lib/evaluation.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
-export const Route = createFileRoute("/sessions/$sessionId")({
+export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({
     meta: [{ title: "Session · Strategyzer Coach Certification" }],
   }),

@@ -1,8 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+async function assertSessionOwner(sessionId: string, userId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("sessions")
+    .select("owner_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Session not found");
+  if (data.owner_id !== userId) throw new Error("Forbidden");
+}
 
 export const createSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { scenarioId: string; candidateName: string; candidateEmail: string; framingNotes?: string }) =>
     z.object({
       scenarioId: z.string().uuid(),
@@ -11,7 +24,7 @@ export const createSession = createServerFn({ method: "POST" })
       framingNotes: z.string().max(4000).optional(),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
       .insert({
@@ -20,6 +33,7 @@ export const createSession = createServerFn({ method: "POST" })
         candidate_email: data.candidateEmail,
         framing_notes: data.framingNotes ?? null,
         status: "framing",
+        owner_id: context.userId,
       })
       .select()
       .single();
@@ -27,7 +41,20 @@ export const createSession = createServerFn({ method: "POST" })
     return { session };
   });
 
-export const getSession = createServerFn({ method: "GET" })
+export const listMySessions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await supabaseAdmin
+      .from("sessions")
+      .select("*, scenarios(title, industry, difficulty)")
+      .eq("owner_id", context.userId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return { sessions: data ?? [] };
+  });
+
+export const getSessionForReviewer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
   .handler(async ({ data }) => {
     const { data: session, error } = await supabaseAdmin
@@ -37,6 +64,25 @@ export const getSession = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!session) throw new Error("Session not found");
+    const { data: messages } = await supabaseAdmin
+      .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
+    const { data: evaluation } = await supabaseAdmin
+      .from("evaluations").select("*").eq("session_id", data.sessionId).maybeSingle();
+    return { session, messages: messages ?? [], evaluation };
+  });
+
+export const getSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: session, error } = await supabaseAdmin
+      .from("sessions")
+      .select("*, scenarios(*)")
+      .eq("id", data.sessionId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!session) throw new Error("Session not found");
+    if ((session as any).owner_id !== context.userId) throw new Error("Forbidden");
 
     const { data: messages } = await supabaseAdmin
       .from("messages")
@@ -54,6 +100,7 @@ export const getSession = createServerFn({ method: "GET" })
   });
 
 export const updateSession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: {
     sessionId: string;
     framingNotes?: string;
@@ -73,7 +120,8 @@ export const updateSession = createServerFn({ method: "POST" })
       status: z.string().max(40).optional(),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
     const patch: {
       framing_notes?: string;
       methodology_choice?: string;
@@ -100,6 +148,7 @@ export const updateSession = createServerFn({ method: "POST" })
   });
 
 export const sendStakeholderMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string; stakeholderName: string; candidateMessage: string }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -107,11 +156,11 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
       candidateMessage: z.string().min(1).max(4000),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
-    // Save the candidate message
     await supabaseAdmin.from("messages").insert({
       session_id: data.sessionId,
       role: "candidate",
@@ -119,7 +168,6 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
       content: data.candidateMessage,
     });
 
-    // Load scenario + transcript
     const { data: session, error: sErr } = await supabaseAdmin
       .from("sessions")
       .select("*, scenarios(*)")
