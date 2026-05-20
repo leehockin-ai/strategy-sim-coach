@@ -4,9 +4,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { getSession, updateSession, sendStakeholderMessage } from "@/lib/simulator.functions";
+import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook } from "@/lib/simulator.functions";
 import { generateEvaluation } from "@/lib/evaluation.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
+import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS } from "@/lib/playbooks";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({
@@ -119,85 +120,202 @@ function StepShell({ title, hint, children }: { title: string; hint: string; chi
   );
 }
 
+// ---------- Framing: Strategyzer Scoping Conversation ----------
+
+const SCOPING_FIELDS: { key: string; label: string; hint: string }[] = [
+  { key: "decision", label: "Decision in the next 90 days", hint: "The single decision the team needs to make. E.g. 'Which customer problem should we focus on?'" },
+  { key: "unclear", label: "What is currently unclear?", hint: "Where the ambiguity lives — strategy, customer, value, model." },
+  { key: "tried", label: "What have you already tried?", hint: "Past attempts, frameworks, experiments, conversations." },
+  { key: "nothing", label: "What happens if you do nothing?", hint: "Cost of inaction — surfaces real urgency." },
+  { key: "success", label: "What would success look like after this engagement?", hint: "Concrete artifact, decision, or experiment." },
+];
+
+function parseFraming(raw: string | null): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch { /* legacy plain text */ }
+  return { decision: raw };
+}
+
 function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [text, setText] = useState<string>(session.framing_notes ?? "");
+  const initial = parseFraming(session.framing_notes);
+  const [fields, setFields] = useState<Record<string, string>>(initial);
   const save = useServerFn(updateSession);
   const mut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: text, status: "framing" } }),
-    onSuccess: () => { toast.success("Framing saved"); onSaved(); },
+    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(fields), status: "framing" } }),
+    onSuccess: () => { toast.success("Scoping saved"); onSaved(); },
     onError: (e: any) => toast.error(e.message),
   });
 
+  const filledCount = SCOPING_FIELDS.filter((f) => fields[f.key]?.trim()).length;
+  const canSave = filledCount >= 3 && !!fields.decision?.trim();
+
   return (
     <StepShell
-      title="Frame the problem"
-      hint="What's the real problem vs symptom? What assumptions are baked in? What outcome would 'good' look like? Don't prescribe yet."
+      title="Scoping conversation"
+      hint="The goal of scoping (per Strategyzer): clarify the decision, diagnose the core problem, select the correct playbook, define the engagement outcome. Work through these five prompts as if the team were on the call."
     >
-      <div className="relative">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={14}
-          placeholder="• What's actually being asked of me?
-• What assumptions are present?
-• What would I want to clarify before agreeing to anything?
-• Where is the ambiguity that matters?"
-          className="w-full border border-ink bg-paper p-4 pr-12 text-sm leading-relaxed focus:outline-none focus:bg-secondary font-mono"
-        />
-        <div className="absolute top-2 right-2">
-          <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} />
-        </div>
+      <div className="space-y-5">
+        {SCOPING_FIELDS.map((f, i) => (
+          <div key={f.key}>
+            <label className="flex items-baseline justify-between mb-1">
+              <span className="text-xs uppercase tracking-[0.12em]">
+                <span className="marker-num opacity-60 mr-2">{String(i + 1).padStart(2, "0")}</span>
+                {f.label}
+              </span>
+              {fields[f.key]?.trim() && <span className="chip" style={{ backgroundColor: "var(--brand-yellow)" }}>captured</span>}
+            </label>
+            <p className="text-[11px] text-muted-foreground mb-1.5">{f.hint}</p>
+            <div className="relative">
+              <textarea
+                value={fields[f.key] ?? ""}
+                onChange={(e) => setFields((p) => ({ ...p, [f.key]: e.target.value }))}
+                rows={f.key === "decision" ? 2 : 3}
+                className="w-full border border-ink bg-paper p-3 pr-10 text-sm focus:outline-none focus:bg-secondary"
+              />
+              <div className="absolute top-1.5 right-1.5">
+                <VoiceInput onTranscript={(c) => setFields((p) => ({ ...p, [f.key]: appendTranscript(p[f.key] ?? "", c) }))} />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="mt-4 flex justify-end">
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-          {mut.isPending ? "Saving…" : "Save & continue →"}
+      <div className="mt-6 flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">{filledCount}/5 prompts captured</span>
+        <button onClick={() => mut.mutate()} disabled={mut.isPending || !canSave} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
+          {mut.isPending ? "Saving…" : "Save & diagnose playbook →"}
         </button>
       </div>
     </StepShell>
   );
 }
 
+// ---------- Method: Playbook diagnosis & selection ----------
+
 function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const [choice, setChoice] = useState<string>(session.methodology_choice ?? "");
   const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
+  const [engagement, setEngagement] = useState<string>(ENGAGEMENT_MODELS[0].id);
+  const [suggestion, setSuggestion] = useState<any>(null);
   const save = useServerFn(updateSession);
+  const suggest = useServerFn(suggestPlaybook);
+
+  const suggestMut = useMutation({
+    mutationFn: () => suggest({ data: { sessionId: session.id } }),
+    onSuccess: (res) => setSuggestion(res.suggestion),
+    onError: (e: any) => toast.error(e.message ?? "Could not generate suggestion"),
+  });
+
   const mut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, methodologyChoice: choice, methodologyRationale: rationale, status: "method" } }),
-    onSuccess: () => { toast.success("Approach saved"); onSaved(); },
+    mutationFn: () => save({ data: {
+      sessionId: session.id,
+      methodologyChoice: `${choice}::${engagement}`,
+      methodologyRationale: rationale,
+      status: "method",
+    } }),
+    onSuccess: () => { toast.success("Playbook selected"); onSaved(); },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const options = [
-    "Assumption mapping workshop",
-    "Customer discovery interviews",
-    "Value Proposition Canvas session",
-    "Test card design + experiment plan",
-    "Stakeholder 1:1s before any group session",
-    "Pause / step back / no workshop yet",
-    "Other (write below)",
-  ];
+  const selectedPb = PLAYBOOKS.find((p) => p.id === choice);
 
   return (
     <StepShell
-      title="Choose your first move"
-      hint="What's the lightest, most appropriate intervention right now? Avoid jumping to a big workshop reflexively. Explain WHY."
+      title="Diagnose & select playbook"
+      hint="Strategyzer's scoping logic: every project falls into one dominant category. Pick one primary playbook — don't mix unless the problem clearly shifts."
     >
-      <div className="space-y-2 mb-6">
-        {options.map((o) => (
-          <label key={o} className={`flex items-start gap-3 border border-ink p-3 cursor-pointer ${choice === o ? "bg-ink text-paper" : "hover:bg-secondary"}`}>
-            <input type="radio" name="method" checked={choice === o} onChange={() => setChoice(o)} className="mt-1" />
-            <span className="text-sm">{o}</span>
-          </label>
-        ))}
+      <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
+        <div className="text-sm">
+          <div className="font-medium mb-1">AI diagnostic assist</div>
+          <div className="text-xs opacity-80">Have the AI review your scoping notes and recommend a playbook — then form your own call.</div>
+        </div>
+        <button
+          onClick={() => suggestMut.mutate()}
+          disabled={suggestMut.isPending}
+          className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
+        >
+          {suggestMut.isPending ? "Diagnosing…" : "Suggest playbook"}
+        </button>
       </div>
+
+      {suggestion && (
+        <div className="mb-6 border border-ink p-4 bg-secondary">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI recommendation · confidence {suggestion.confidence ?? "—"}</div>
+          <div className="font-medium mb-1">
+            → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId ?? "(no match)"}
+          </div>
+          <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>
+          {Array.isArray(suggestion.watchouts) && suggestion.watchouts.length > 0 && (
+            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+              {suggestion.watchouts.map((w: string, i: number) => <li key={i}>{w}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-3 mb-6">
+        {PLAYBOOKS.map((p) => {
+          const active = choice === p.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => setChoice(p.id)}
+              className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
+                <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}</span>
+              </div>
+              <div className="font-medium mb-1">{p.name}</div>
+              <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
+              <ul className="text-[11px] opacity-70 space-y-0.5">
+                {p.signals.map((s) => <li key={s}>· {s}</li>)}
+              </ul>
+              <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedPb && (
+        <a
+          href={selectedPb.libraryUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-2 text-xs underline mb-6 hover:opacity-70"
+        >
+          Open "{selectedPb.name}" in Strategyzer playbook library ↗
+        </a>
+      )}
+
+      <label className="text-xs uppercase tracking-[0.12em] mb-2 block">Engagement model</label>
+      <div className="grid md:grid-cols-2 gap-2 mb-6">
+        {ENGAGEMENT_MODELS.map((m) => {
+          const active = engagement === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setEngagement(m.id)}
+              className={`text-left border border-ink p-3 ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+            >
+              <div className="text-sm font-medium mb-1">{m.name}</div>
+              <div className="text-[11px] opacity-80 mb-1"><span className="uppercase tracking-wider opacity-70">Best for:</span> {m.bestFor}</div>
+              <div className="text-[11px] opacity-80"><span className="uppercase tracking-wider opacity-70">Structure:</span> {m.structure}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale</label>
       <div className="relative">
         <textarea
           value={rationale}
           onChange={(e) => setRationale(e.target.value)}
           rows={5}
-          placeholder="Why this, why now, what would change your mind."
-          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
+          placeholder="Why this playbook for this team, right now. What scoping signal pointed here. What would change your mind."
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary"
         />
         <div className="absolute top-2 right-2">
           <VoiceInput onTranscript={(c) => setRationale((p) => appendTranscript(p, c))} />

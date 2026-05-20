@@ -42,6 +42,7 @@
   --color-brand-cyan: var(--brand-cyan);
   --color-brand-lime: var(--brand-lime);
   --color-brand-red: var(--brand-red);
+  --color-brand-yellow: var(--brand-yellow);
   --color-ink: var(--ink);
   --color-paper: var(--paper);
   --color-rule: var(--rule);
@@ -50,12 +51,13 @@
 :root {
   --radius: 0.25rem;
 
-  /* Brand palette (CMYK-sourced) */
+  /* Brand palette (CMYK-sourced, Strategyzer-aligned) */
   --brand-blue: oklch(0.36 0.22 268);    /* deep cobalt */
   --brand-purple: oklch(0.37 0.21 312);  /* electric violet */
   --brand-cyan: oklch(0.79 0.12 210);    /* sky cyan */
   --brand-lime: oklch(0.78 0.20 130);    /* zest lime */
   --brand-red: oklch(0.62 0.24 28);      /* signal red */
+  --brand-yellow: oklch(0.88 0.18 92);   /* Strategyzer yellow */
 
   --paper: oklch(0.99 0.003 90);         /* warm off-white */
   --ink: oklch(0.14 0.01 270);           /* near-black ink */
