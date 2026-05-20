@@ -191,13 +191,18 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         ))}
       </div>
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale</label>
-      <textarea
-        value={rationale}
-        onChange={(e) => setRationale(e.target.value)}
-        rows={5}
-        placeholder="Why this, why now, what would change your mind."
-        className="w-full border border-ink bg-paper p-4 text-sm focus:outline-none focus:bg-secondary font-mono"
-      />
+      <div className="relative">
+        <textarea
+          value={rationale}
+          onChange={(e) => setRationale(e.target.value)}
+          rows={5}
+          placeholder="Why this, why now, what would change your mind."
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setRationale((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
       <div className="mt-4 flex justify-end">
         <button onClick={() => mut.mutate()} disabled={mut.isPending || !choice || !rationale.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
           {mut.isPending ? "Saving…" : "Save & open dialogue →"}
@@ -293,6 +298,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
             placeholder={`Say something to ${target}…`}
             className="flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
           />
+          <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
           <button type="submit" disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">
             Send
           </button>
@@ -335,13 +341,18 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
       hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Submitting locks the session and triggers AI evaluation."
     >
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Next-best action</label>
-      <textarea
-        value={rec}
-        onChange={(e) => setRec(e.target.value)}
-        rows={8}
-        placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate?"
-        className="w-full border border-ink bg-paper p-4 text-sm focus:outline-none focus:bg-secondary font-mono"
-      />
+      <div className="relative">
+        <textarea
+          value={rec}
+          onChange={(e) => setRec(e.target.value)}
+          rows={8}
+          placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate?"
+          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
+        />
+        <div className="absolute top-2 right-2">
+          <VoiceInput onTranscript={(c) => setRec((p) => appendTranscript(p, c))} />
+        </div>
+      </div>
 
       <label className="text-xs uppercase tracking-[0.12em] mt-6 mb-2 block">Your call</label>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
