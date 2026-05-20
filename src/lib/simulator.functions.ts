@@ -296,3 +296,175 @@ The candidate (coach) is currently addressing you directly. Respond in first per
 
     return { message: saved };
   });
+
+// ---------- Scoping call (group video-call simulation) ----------
+
+export const sendScopingTurn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; candidateMessage: string }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      candidateMessage: z.string().min(1).max(4000),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    // Save coach turn
+    const { data: coachMsg } = await supabaseAdmin.from("messages").insert({
+      session_id: data.sessionId,
+      role: "candidate",
+      stakeholder_name: "(group)",
+      content: data.candidateMessage,
+      phase: "scoping",
+    }).select().single();
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("*, scenarios(*)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const { data: transcript } = await supabaseAdmin
+      .from("messages")
+      .select("role, stakeholder_name, content")
+      .eq("session_id", data.sessionId)
+      .eq("phase", "scoping")
+      .order("created_at", { ascending: true });
+
+    const scenario: any = (session as any).scenarios;
+    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
+    const roster = stakeholders.map((s) => `- ${s.name} (${s.role}) — posture: ${s.posture}`).join("\n");
+
+    const systemPrompt = `You are simulating a Strategyzer SCOPING CALL — the first kick-off video meeting between a coach (the user) and a team that hired them.
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+
+TEAM ON THE CALL:
+${roster}
+
+YOUR JOB: pick the ONE most-natural stakeholder to respond to the coach's last message, then speak AS that person. Multiple people don't talk at once.
+
+Selection rule:
+- If the coach addresses someone by name → that person responds.
+- Otherwise pick the person whose role/posture is most relevant to what was just asked.
+- Vary speakers across the call; don't let one person dominate.
+
+Character rules:
+- Stay in character. Real people on a scoping call are messy: they jump ahead, give vague answers, contradict each other, push back, share concerns the coach didn't ask about, mention internal politics. Posture above is your anchor.
+- Replies should feel spoken (1-3 short sentences, contractions, sometimes a single line). Never a bullet list. Never coach the coach. Never mention frameworks.
+- If the coach hasn't earned the answer yet (asked a closed question, too soon, missed context), give a partial / deflecting answer the way a real busy executive would.
+
+Return STRICT JSON only:
+{"speaker": "<exact stakeholder name>", "reply": "<their spoken line>"}`;
+
+    const chatMessages = [
+      { role: "system", content: systemPrompt },
+      ...(transcript ?? []).map((m: any) => ({
+        role: m.role === "candidate" ? "user" : "assistant",
+        content: m.role === "candidate"
+          ? `Coach: ${m.content}`
+          : `${m.stakeholder_name}: ${m.content}`,
+      })),
+    ];
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: chatMessages,
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: { speaker?: string; reply?: string } = {};
+    try { parsed = JSON.parse(content); } catch { /* ignore */ }
+    const speaker = stakeholders.find((s) => s.name === parsed.speaker)?.name ?? stakeholders[0]?.name ?? "Stakeholder";
+    const reply = (parsed.reply ?? "…").toString().slice(0, 1200);
+
+    const { data: stakeholderMsg } = await supabaseAdmin
+      .from("messages")
+      .insert({
+        session_id: data.sessionId,
+        role: "stakeholder",
+        stakeholder_name: speaker,
+        content: reply,
+        phase: "scoping",
+      })
+      .select()
+      .single();
+
+    return { coachMessage: coachMsg, stakeholderMessage: stakeholderMsg };
+  });
+
+export const extractFraming = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const { data: transcript } = await supabaseAdmin
+      .from("messages")
+      .select("role, stakeholder_name, content")
+      .eq("session_id", data.sessionId)
+      .eq("phase", "scoping")
+      .order("created_at", { ascending: true });
+
+    if (!transcript || transcript.length === 0) {
+      throw new Error("No scoping conversation yet — talk to the team first.");
+    }
+
+    const convo = transcript
+      .map((m: any) => (m.role === "candidate" ? `Coach: ${m.content}` : `${m.stakeholder_name}: ${m.content}`))
+      .join("\n");
+
+    const prompt = `You just observed a Strategyzer scoping call between a coach and a client team. Extract the five scoping fields strictly from what the TEAM said (not the coach's own guesses).
+
+If a field was never adequately covered, leave it empty ("") and note it in "gaps".
+
+TRANSCRIPT:
+${convo}
+
+Return strict JSON:
+{
+  "decision": "the single decision the team must make in the next ~90 days",
+  "unclear": "what they said is currently unclear / ambiguous",
+  "tried": "what they've already tried, frameworks, past attempts",
+  "nothing": "what they said happens if they do nothing — cost of inaction",
+  "success": "concrete success criteria for the engagement",
+  "gaps": ["short note for each field the coach failed to surface"]
+}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+    return { draft: parsed };
+  });
