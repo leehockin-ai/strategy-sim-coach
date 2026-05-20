@@ -2,6 +2,63 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PLAYBOOKS } from "@/lib/playbooks";
+
+export const suggestPlaybook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("framing_notes, scenarios(title, context, summary, ambiguity_factors)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const scenario = (session as any).scenarios;
+    const playbookCatalog = PLAYBOOKS.map(
+      (p) => `- ${p.id} — ${p.name} (${p.diagnosis}): "${p.whenToUse}" · Signals: ${p.signals.join("; ")} · Outcome: ${p.outcome}`,
+    ).join("\n");
+
+    const prompt = `You are a Strategyzer master coach evaluating a scoping conversation. Given the scenario and the candidate's framing, recommend ONE primary playbook from the official Strategyzer library. Do not mix playbooks.
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+Ambiguity: ${(scenario.ambiguity_factors ?? []).join(", ")}
+
+CANDIDATE FRAMING:
+${(session as any).framing_notes ?? "(no framing provided)"}
+
+PLAYBOOK OPTIONS:
+${playbookCatalog}
+
+Return strict JSON: {"playbookId": "<id>", "confidence": "low|medium|high", "rationale": "<2-3 sentences citing the scoping signals>", "watchouts": ["<short risk if this playbook is misapplied>", "..."]}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { parsed = { playbookId: null, rationale: content }; }
+    return { suggestion: parsed };
+  });
+
 
 async function assertSessionOwner(sessionId: string, userId: string) {
   const { data, error } = await supabaseAdmin
