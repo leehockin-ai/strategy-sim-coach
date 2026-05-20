@@ -587,6 +587,4 @@ export const saveCanvas = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// re-export so the route file has a single import surface
-export { CANVASES as _CANVASES, canvasForPlaybook as _canvasForPlaybook };
 
