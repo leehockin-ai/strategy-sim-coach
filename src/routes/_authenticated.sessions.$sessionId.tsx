@@ -341,7 +341,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(
-    () => messages.filter((m) => m.stakeholder_name === target),
+    () => messages.filter((m) => m.stakeholder_name === target && m.phase === "intervention"),
     [messages, target]
   );
 
