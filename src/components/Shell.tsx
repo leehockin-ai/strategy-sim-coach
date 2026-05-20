@@ -1,5 +1,7 @@
-import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
@@ -11,10 +13,35 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+function useSessionUser() {
+  const [email, setEmail] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (mounted) setEmail(data.user?.email ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setEmail(session?.user?.email ?? null);
+    });
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
+  }, []);
+  return email;
+}
+
 function Header() {
+  const email = useSessionUser();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    qc.clear();
+    navigate({ to: "/" });
+  }
+
   return (
     <header className="hairline-b">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 h-16 flex items-center justify-between">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10 h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-3 group">
           <Logo />
           <div className="flex flex-col leading-none">
@@ -25,7 +52,22 @@ function Header() {
         <nav className="flex items-center gap-1 text-sm">
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/scenarios">Scenarios</NavLink>
+          {email && <NavLink to="/sessions">My sessions</NavLink>}
           <NavLink to="/reviewer">Reviewer</NavLink>
+          <div className="ml-3 pl-3 border-l border-ink/20 flex items-center gap-2">
+            {email === undefined ? null : email ? (
+              <>
+                <span className="text-xs text-muted-foreground hidden md:inline">{email}</span>
+                <button onClick={signOut} className="text-xs px-2.5 py-1 border border-ink rounded-sm hover:bg-secondary">
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="text-xs px-2.5 py-1 bg-ink text-paper rounded-sm">
+                Sign in
+              </Link>
+            )}
+          </div>
         </nav>
       </div>
     </header>
@@ -67,3 +109,6 @@ export function Logo() {
     </svg>
   );
 }
+
+// silence unused warning for useQuery if tree-shaken
+export const __unused = useQuery;
