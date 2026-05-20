@@ -1,0 +1,2 @@
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS phase text NOT NULL DEFAULT 'intervention';
+CREATE INDEX IF NOT EXISTS idx_messages_session_phase ON public.messages(session_id, phase, created_at);
