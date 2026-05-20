@@ -158,8 +158,8 @@ function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }
 }
 
 function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [choice, setChoice] = useState(session.methodology_choice ?? "");
-  const [rationale, setRationale] = useState(session.methodology_rationale ?? "");
+  const [choice, setChoice] = useState<string>(session.methodology_choice ?? "");
+  const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
   const save = useServerFn(updateSession);
   const mut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, methodologyChoice: choice, methodologyRationale: rationale, status: "method" } }),
