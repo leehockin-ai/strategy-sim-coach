@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const RUBRIC = [
   { key: "problem_framing", label: "Problem Framing" },
@@ -14,8 +15,9 @@ const RUBRIC = [
 export const RUBRIC_DIMENSIONS = RUBRIC;
 
 export const generateEvaluation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
@@ -25,6 +27,7 @@ export const generateEvaluation = createServerFn({ method: "POST" })
       .eq("id", data.sessionId)
       .single();
     if (error || !session) throw new Error("Session not found");
+    if ((session as any).owner_id !== context.userId) throw new Error("Forbidden");
 
     const { data: transcript } = await supabaseAdmin
       .from("messages")
@@ -269,6 +272,7 @@ Score 0–100 (0 = clearly human, 100 = clearly AI-generated).`;
 }
 
 export const setReviewerDecision = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string; reviewerNotes?: string; reviewerDecision: string }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -290,7 +294,9 @@ export const setReviewerDecision = createServerFn({ method: "POST" })
     return { evaluation };
   });
 
-export const listReviewSessions = createServerFn({ method: "GET" }).handler(async () => {
+export const listReviewSessions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
   const { data, error } = await supabaseAdmin
     .from("sessions")
     .select("id, candidate_name, candidate_email, status, created_at, completed_at, scenarios(title, slug), evaluations(recommendation, reviewer_decision)")
