@@ -72,6 +72,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          phase: string
           role: string
           session_id: string
           stakeholder_name: string | null
@@ -80,6 +81,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          phase?: string
           role: string
           session_id: string
           stakeholder_name?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          phase?: string
           role?: string
           session_id?: string
           stakeholder_name?: string | null

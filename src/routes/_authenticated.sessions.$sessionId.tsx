@@ -4,7 +4,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook } from "@/lib/simulator.functions";
+import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming } from "@/lib/simulator.functions";
+import { synthesizeVoice } from "@/lib/voice.functions";
+import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS } from "@/lib/playbooks";
@@ -47,7 +49,7 @@ function SessionPage() {
       <ScenarioHeader scenario={scenario} session={session} />
       <StepNav step={step} onChange={setStep} />
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        {step === "framing" && <FramingStep session={session} onSaved={() => { refetch(); setStep("method"); }} />}
+        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={() => { refetch(); setStep("method"); }} onRefresh={refetch} />}
         {step === "method" && <MethodStep session={session} onSaved={() => { refetch(); setStep("dialogue"); }} />}
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("intervention")} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={refetch} />}
@@ -139,56 +141,240 @@ function parseFraming(raw: string | null): Record<string, string> {
   return { decision: raw };
 }
 
-function FramingStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const initial = parseFraming(session.framing_notes);
-  const [fields, setFields] = useState<Record<string, string>>(initial);
+function stakeholderColor(i: number) {
+  const palette = ["var(--brand-blue)", "var(--brand-yellow)", "var(--brand-lime)", "var(--brand-cyan)", "var(--brand-purple)", "var(--brand-red)"];
+  return palette[i % palette.length];
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function VideoTile({
+  name, role, color, speaking, muted, isCoach,
+}: { name: string; role: string; color: string; speaking: boolean; muted: boolean; isCoach?: boolean }) {
+  return (
+    <div className="relative aspect-video border border-ink overflow-hidden bg-ink">
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className={`w-20 h-20 md:w-24 md:h-24 rounded-full border-2 border-paper flex items-center justify-center text-xl font-medium transition-all ${speaking ? "scale-110" : ""}`}
+          style={{ backgroundColor: color, color: "var(--ink)" }}
+        >
+          {isCoach ? "YOU" : initials(name)}
+        </div>
+      </div>
+      {speaking && (
+        <div className="absolute inset-0 ring-4 ring-offset-0 pointer-events-none animate-pulse" style={{ boxShadow: `inset 0 0 0 3px ${color}` }} />
+      )}
+      <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 flex items-center justify-between text-paper text-xs bg-ink/80">
+        <span className="font-medium truncate">{name}</span>
+        <span className="opacity-60 truncate ml-2 hidden sm:inline">{role}</span>
+        {muted && <span className="ml-1 text-[10px] uppercase tracking-wider opacity-80">muted</span>}
+      </div>
+    </div>
+  );
+}
+
+function FramingStep({
+  session, messages, onSaved, onRefresh,
+}: { session: any; messages: any[]; onSaved: () => void; onRefresh: () => void }) {
+  const scenario = session.scenarios;
+  const stakeholders: Array<{ name: string; role: string; posture: string }> = scenario.stakeholders ?? [];
+  const scopingMessages = useMemo(() => messages.filter((m) => m.phase === "scoping"), [messages]);
+
+  const [text, setText] = useState("");
+  const [speakingName, setSpeakingName] = useState<string | null>(null);
+  const [callEnded, setCallEnded] = useState(!!session.framing_notes);
+  const [draft, setDraft] = useState<Record<string, string> | null>(null);
+  const [gaps, setGaps] = useState<string[]>([]);
+  const [reviewing, setReviewing] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const sendTurn = useServerFn(sendScopingTurn);
+  const tts = useServerFn(synthesizeVoice);
+  const extract = useServerFn(extractFraming);
   const save = useServerFn(updateSession);
-  const mut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(fields), status: "framing" } }),
-    onSuccess: () => { toast.success("Scoping saved"); onSaved(); },
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [scopingMessages.length]);
+
+  async function playReply(name: string, content: string) {
+    const voiceId = voiceForStakeholder(stakeholders, name);
+    try {
+      const { audio } = await tts({ data: { text: content, voiceId } });
+      setSpeakingName(name);
+      const a = new Audio(`data:audio/mpeg;base64,${audio}`);
+      audioRef.current?.pause();
+      audioRef.current = a;
+      a.onended = () => setSpeakingName(null);
+      await a.play();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Voice playback failed");
+      setSpeakingName(null);
+    }
+  }
+
+  const turnMut = useMutation({
+    mutationFn: (msg: string) => sendTurn({ data: { sessionId: session.id, candidateMessage: msg } }),
+    onSuccess: async (res) => {
+      setText("");
+      onRefresh();
+      const reply = res.stakeholderMessage;
+      if (reply?.stakeholder_name) await playReply(reply.stakeholder_name, reply.content);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Turn failed"),
+  });
+
+  const extractMut = useMutation({
+    mutationFn: () => extract({ data: { sessionId: session.id } }),
+    onSuccess: (res) => {
+      const d = res.draft ?? {};
+      setDraft({
+        decision: d.decision ?? "",
+        unclear: d.unclear ?? "",
+        tried: d.tried ?? "",
+        nothing: d.nothing ?? "",
+        success: d.success ?? "",
+      });
+      setGaps(Array.isArray(d.gaps) ? d.gaps : []);
+      setReviewing(true);
+      setCallEnded(true);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Extraction failed"),
+  });
+
+  const saveMut = useMutation({
+    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(draft ?? {}), status: "framing" } }),
+    onSuccess: () => { toast.success("Framing locked"); onSaved(); },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const filledCount = SCOPING_FIELDS.filter((f) => fields[f.key]?.trim()).length;
-  const canSave = filledCount >= 3 && !!fields.decision?.trim();
+  function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    const t = text.trim();
+    if (!t || turnMut.isPending) return;
+    turnMut.mutate(t);
+  }
 
-  return (
-    <StepShell
-      title="Scoping conversation"
-      hint="The goal of scoping (per Strategyzer): clarify the decision, diagnose the core problem, select the correct playbook, define the engagement outcome. Work through these five prompts as if the team were on the call."
-    >
-      <div className="space-y-5">
-        {SCOPING_FIELDS.map((f, i) => (
-          <div key={f.key}>
-            <label className="flex items-baseline justify-between mb-1">
-              <span className="text-xs uppercase tracking-[0.12em]">
-                <span className="marker-num opacity-60 mr-2">{String(i + 1).padStart(2, "0")}</span>
-                {f.label}
-              </span>
-              {fields[f.key]?.trim() && <span className="chip" style={{ backgroundColor: "var(--brand-yellow)" }}>captured</span>}
-            </label>
-            <p className="text-[11px] text-muted-foreground mb-1.5">{f.hint}</p>
-            <div className="relative">
-              <textarea
-                value={fields[f.key] ?? ""}
-                onChange={(e) => setFields((p) => ({ ...p, [f.key]: e.target.value }))}
-                rows={f.key === "decision" ? 2 : 3}
-                className="w-full border border-ink bg-paper p-3 pr-10 text-sm focus:outline-none focus:bg-secondary"
-              />
-              <div className="absolute top-1.5 right-1.5">
-                <VoiceInput onTranscript={(c) => setFields((p) => ({ ...p, [f.key]: appendTranscript(p[f.key] ?? "", c) }))} />
-              </div>
-            </div>
+  // ----- Review screen after extracting framing -----
+  if (reviewing && draft) {
+    return (
+      <StepShell
+        title="Review the framing"
+        hint="The AI drafted these scoping fields from your call. Edit anything that's off, then lock it in. Empty fields mean you didn't surface that in the call — go back and ask if needed."
+      >
+        {gaps.length > 0 && (
+          <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
+            <div className="uppercase tracking-[0.12em] mb-1 font-medium">Coaching note</div>
+            <ul className="list-disc pl-4 space-y-0.5">{gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
           </div>
-        ))}
-      </div>
-      <div className="mt-6 flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{filledCount}/5 prompts captured</span>
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !canSave} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-          {mut.isPending ? "Saving…" : "Save & diagnose playbook →"}
+        )}
+        <div className="space-y-4">
+          {SCOPING_FIELDS.map((f, i) => (
+            <div key={f.key}>
+              <label className="text-xs uppercase tracking-[0.12em] flex items-baseline gap-2">
+                <span className="marker-num opacity-60">{String(i + 1).padStart(2, "0")}</span>
+                {f.label}
+              </label>
+              <p className="text-[11px] text-muted-foreground mb-1.5">{f.hint}</p>
+              <textarea
+                value={draft[f.key] ?? ""}
+                onChange={(e) => setDraft((p) => ({ ...(p ?? {}), [f.key]: e.target.value }))}
+                rows={f.key === "decision" ? 2 : 3}
+                className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="mt-6 flex items-center justify-between">
+          <button onClick={() => setReviewing(false)} className="text-xs underline">← Back to call</button>
+          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !draft.decision?.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
+            {saveMut.isPending ? "Saving…" : "Lock framing & diagnose playbook →"}
+          </button>
+        </div>
+      </StepShell>
+    );
+  }
+
+  // ----- Live call screen -----
+  return (
+    <div className="grid lg:grid-cols-12 gap-6">
+      <div className="lg:col-span-4">
+        <h2 className="text-2xl tracking-tight mb-2">Scoping call</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+          You're on a kick-off video call with the team. <strong>Lead the conversation</strong> — they won't volunteer the framing.
+          Surface the decision, the ambiguity, what they've tried, the cost of inaction, and what success looks like.
+        </p>
+        <div className="border border-ink p-3 text-xs mb-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
+          <div className="uppercase tracking-[0.12em] font-medium mb-1">Five things to surface</div>
+          <ol className="space-y-0.5 list-decimal pl-4">
+            {SCOPING_FIELDS.map((f) => <li key={f.key}>{f.label}</li>)}
+          </ol>
+        </div>
+        <button
+          onClick={() => extractMut.mutate()}
+          disabled={extractMut.isPending || scopingMessages.length < 2}
+          className="w-full bg-ink text-paper py-2 text-sm rounded-sm disabled:opacity-40 mb-2"
+        >
+          {extractMut.isPending ? "Synthesizing call…" : callEnded ? "Re-extract framing draft" : "End call & extract framing →"}
         </button>
+        <p className="text-[11px] text-muted-foreground">{scopingMessages.length} messages exchanged</p>
       </div>
-    </StepShell>
+
+      <div className="lg:col-span-8 space-y-4">
+        {/* Video grid */}
+        <div className="grid grid-cols-2 gap-2">
+          {stakeholders.map((s, i) => (
+            <VideoTile
+              key={s.name}
+              name={s.name}
+              role={s.role}
+              color={stakeholderColor(i)}
+              speaking={speakingName === s.name}
+              muted={false}
+            />
+          ))}
+          <VideoTile name="You (Coach)" role="Strategyzer coach" color="var(--paper)" speaking={false} muted={!!speakingName} isCoach />
+        </div>
+
+        {/* Live transcript */}
+        <div className="border border-ink">
+          <div className="hairline-b px-4 py-2 flex items-center justify-between text-xs">
+            <span className="uppercase tracking-[0.12em] text-muted-foreground">Live transcript</span>
+            <span className="chip">● Recording</span>
+          </div>
+          <div ref={scrollRef} className="px-4 py-3 space-y-2 max-h-[28vh] overflow-y-auto text-sm">
+            {scopingMessages.length === 0 && (
+              <div className="text-muted-foreground italic">Open the call. Start by introducing yourself and asking what brought them to this engagement.</div>
+            )}
+            {scopingMessages.map((m) => (
+              <div key={m.id} className={m.role === "candidate" ? "text-ink" : ""}>
+                <span className="text-[10px] uppercase tracking-[0.12em] opacity-60 mr-2">
+                  {m.role === "candidate" ? "You" : m.stakeholder_name}
+                </span>
+                <span>{m.content}</span>
+              </div>
+            ))}
+            {turnMut.isPending && <div className="text-xs text-muted-foreground italic">Team is responding…</div>}
+          </div>
+          <form onSubmit={handleSend} className="hairline border-t p-2 flex gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Speak or type your next question to the team…"
+              className="flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
+              disabled={turnMut.isPending}
+            />
+            <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
+            <button type="submit" disabled={turnMut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">
+              Send
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -339,7 +525,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(
-    () => messages.filter((m) => m.stakeholder_name === target),
+    () => messages.filter((m) => m.stakeholder_name === target && m.phase === "intervention"),
     [messages, target]
   );
 
