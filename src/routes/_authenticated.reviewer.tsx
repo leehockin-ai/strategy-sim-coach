@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { listReviewSessions, setReviewerDecision } from "@/lib/evaluation.functions";
-import { getSession } from "@/lib/simulator.functions";
+import { getSessionForReviewer } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/_authenticated/reviewer")({
@@ -88,7 +88,7 @@ function RecPill({ rec }: { rec: string }) {
 }
 
 function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
-  const fetchSession = useServerFn(getSession);
+  const fetchSession = useServerFn(getSessionForReviewer);
   const decide = useServerFn(setReviewerDecision);
   const { data, refetch } = useQuery({ queryKey: ["session-review", sessionId], queryFn: () => fetchSession({ data: { sessionId } }) });
   const [notes, setNotes] = useState("");

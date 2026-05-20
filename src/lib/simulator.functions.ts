@@ -53,6 +53,24 @@ export const listMySessions = createServerFn({ method: "GET" })
     return { sessions: data ?? [] };
   });
 
+export const getSessionForReviewer = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: session, error } = await supabaseAdmin
+      .from("sessions")
+      .select("*, scenarios(*)")
+      .eq("id", data.sessionId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!session) throw new Error("Session not found");
+    const { data: messages } = await supabaseAdmin
+      .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
+    const { data: evaluation } = await supabaseAdmin
+      .from("evaluations").select("*").eq("session_id", data.sessionId).maybeSingle();
+    return { session, messages: messages ?? [], evaluation };
+  });
+
 export const getSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
