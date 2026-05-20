@@ -149,6 +149,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          application_canvas: Json | null
           candidate_email: string
           candidate_name: string
           completed_at: string | null
@@ -164,6 +165,7 @@ export type Database = {
           status: string
         }
         Insert: {
+          application_canvas?: Json | null
           candidate_email: string
           candidate_name: string
           completed_at?: string | null
@@ -179,6 +181,7 @@ export type Database = {
           status?: string
         }
         Update: {
+          application_canvas?: Json | null
           candidate_email?: string
           candidate_name?: string
           completed_at?: string | null

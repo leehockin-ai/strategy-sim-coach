@@ -66,6 +66,9 @@ ${s.framing_notes || "(none)"}
 ${s.methodology_choice || "(none)"}
 Rationale: ${s.methodology_rationale || "(none)"}
 
+— Application canvas (playbook applied with the team) —
+${s.application_canvas ? JSON.stringify(s.application_canvas, null, 2) : "(none)"}
+
 — Intervention recommendation —
 ${s.intervention_recommendation || "(none)"}
 

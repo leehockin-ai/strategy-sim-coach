@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { PLAYBOOKS } from "@/lib/playbooks";
+import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -250,7 +250,13 @@ ${scenario.context}
 YOU ARE PLAYING: ${persona.name} — ${persona.role}
 CHARACTER POSTURE: ${persona.posture}
 
-The candidate (coach) is currently addressing you directly. Respond in first person as ${persona.name}. Be authentic, conversational, 2-4 sentences. Do NOT coach the candidate. Do NOT break character. Do NOT mention frameworks. React as ${persona.name} would given the posture above.`;
+The candidate (coach) is currently addressing you directly. Respond in first person as ${persona.name}. Be authentic, conversational, 2-4 sentences.
+
+Be honest and methodology-aware:
+- Engage genuinely with whatever the coach asks. If they ask a Strategyzer-style question (jobs-to-be-done, pains, gains, value proposition, business model, riskiest assumptions, evidence), answer it on the merits from your role's perspective.
+- Surface internal politics, turf, or competing agendas ONLY when (a) it is literally part of your posture above and (b) it's relevant to the question. Do not manufacture political subtext that is not in your posture.
+- It's fine to be uncertain, to admit "we haven't talked about that," or to disagree with another stakeholder substantively.
+- Do NOT coach the candidate. Do NOT break character. Do NOT name frameworks (use plain-language equivalents — "what customers are trying to get done", "what they'd pay for", etc.).`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
@@ -355,8 +361,9 @@ Selection rule:
 - Vary speakers across the call; don't let one person dominate.
 
 Character rules:
-- Stay in character. Real people on a scoping call are messy: they jump ahead, give vague answers, contradict each other, push back, share concerns the coach didn't ask about, mention internal politics. Posture above is your anchor.
-- Replies should feel spoken (1-3 short sentences, contractions, sometimes a single line). Never a bullet list. Never coach the coach. Never mention frameworks.
+- Stay in character. Real people on a scoping call are sometimes messy: they jump ahead, give vague answers, or share concerns the coach didn't ask about. Posture above is your anchor.
+- Surface political subtext, turf battles, or hidden agendas ONLY when that's literally in your posture AND it's a natural reaction to what was just asked. Do not invent political drama that isn't in your character brief.
+- Replies should feel spoken (1-3 short sentences, contractions, sometimes a single line). Never a bullet list. Never coach the coach. Never name frameworks.
 - If the coach hasn't earned the answer yet (asked a closed question, too soon, missed context), give a partial / deflecting answer the way a real busy executive would.
 
 Return STRICT JSON only:
@@ -468,3 +475,116 @@ Return strict JSON:
     try { parsed = JSON.parse(content); } catch { parsed = {}; }
     return { draft: parsed };
   });
+
+// ---------- Application step: AI fills a canvas cell from the team's perspective ----------
+
+
+
+export const suggestCanvasCell = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; cellKey: string }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      cellKey: z.string().min(1).max(80),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("framing_notes, methodology_choice, methodology_rationale, application_canvas, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const canvas = canvasForPlaybook((session as any).methodology_choice);
+    if (!canvas) throw new Error("No canvas mapped — pick a playbook first.");
+    const cell = canvas.cells.find((c) => c.key === data.cellKey);
+    if (!cell) throw new Error(`Unknown cell: ${data.cellKey}`);
+
+    const { data: transcript } = await supabaseAdmin
+      .from("messages")
+      .select("role, stakeholder_name, content, phase")
+      .eq("session_id", data.sessionId)
+      .order("created_at", { ascending: true });
+
+    const convo = (transcript ?? [])
+      .map((m: any) => (m.role === "candidate" ? `Coach: ${m.content}` : `${m.stakeholder_name}: ${m.content}`))
+      .join("\n");
+
+    const scenario: any = (session as any).scenarios;
+    const existing = (session as any).application_canvas ?? {};
+    const existingPretty = Object.entries(existing)
+      .map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+      .join("\n");
+
+    const prompt = `You are a Strategyzer master coach helping the team draft a "${canvas.name}". The coach is asking the team to populate ONE cell: "${cell.label}" — ${cell.hint}
+
+Synthesize what the TEAM would honestly say for this cell, grounded in:
+1. The scenario context
+2. What stakeholders actually said in the scoping call and one-on-one dialogues
+3. Existing canvas cells the team has already filled
+
+Rules:
+- Stay strictly within the definition of this cell. ${cell.label} ≠ any other cell.
+- 3–6 short bullet points OR 2–3 sentences. Plain language. No framework jargon.
+- If the conversation gave NO evidence for this cell, say so explicitly and propose the single question the coach should ask to surface it. Do not fabricate.
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+
+STAKEHOLDERS: ${JSON.stringify(scenario.stakeholders)}
+
+FRAMING NOTES: ${(session as any).framing_notes ?? "(none)"}
+
+CONVERSATION:
+${convo || "(no conversation yet)"}
+
+EXISTING CANVAS CELLS:
+${existingPretty || "(empty)"}
+
+Return strict JSON: {"suggestion": "<the cell content>", "evidence": "<one sentence citing what in the convo supports this, or 'no evidence — ask the team'>"}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { parsed = { suggestion: content }; }
+    return { cellKey: cell.key, ...parsed };
+  });
+
+export const saveCanvas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; canvas: Record<string, string> }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      canvas: z.record(z.string(), z.string().max(4000)),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const { error } = await supabaseAdmin
+      .from("sessions")
+      .update({ application_canvas: data.canvas, status: "application" })
+      .eq("id", data.sessionId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
