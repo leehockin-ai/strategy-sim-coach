@@ -672,6 +672,151 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   );
 }
 
+// ---------- Application: run the playbook canvas with the team ----------
+
+function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+  const canvas = canvasForPlaybook(session.methodology_choice);
+  const initial = (session.application_canvas as Record<string, string> | null) ?? {};
+  const [cells, setCells] = useState<Record<string, string>>(initial);
+  const [evidence, setEvidence] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const suggest = useServerFn(suggestCanvasCell);
+  const save = useServerFn(saveCanvas);
+
+  const saveMut = useMutation({
+    mutationFn: () => save({ data: { sessionId: session.id, canvas: cells } }),
+    onSuccess: () => { toast.success("Canvas saved"); onSaved(); },
+    onError: (e: any) => toast.error(e?.message ?? "Save failed"),
+  });
+
+  async function askTeam(cellKey: string) {
+    setLoading(cellKey);
+    try {
+      const res = await suggest({ data: { sessionId: session.id, cellKey } });
+      setCells((p) => ({ ...p, [cellKey]: res.suggestion ?? "" }));
+      if (res.evidence) setEvidence((p) => ({ ...p, [cellKey]: res.evidence }));
+    } catch (e: any) {
+      toast.error(e?.message ?? "AI suggestion failed");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  if (!canvas) {
+    return (
+      <StepShell title="Pick a playbook first" hint="Application requires a selected playbook. Go back to the Method step.">
+        <p className="text-sm text-muted-foreground">No canvas has been mapped to this session yet.</p>
+      </StepShell>
+    );
+  }
+
+  const cellsByCol = (col: string) => canvas.cells.filter((c) => c.column === col);
+  const isVPC = canvas.id === "strong_value_propositions";
+  const isCustomerOnly = canvas.id === "customer_profile_interviews";
+  const isBMC = canvas.id === "competing_on_business_models";
+
+  function CellCard({ cell }: { cell: typeof canvas.cells[number] }) {
+    return (
+      <div className="border border-ink p-3 bg-paper">
+        <div className="flex items-baseline justify-between gap-2 mb-1">
+          <label className="text-[11px] uppercase tracking-[0.12em] font-medium">{cell.label}</label>
+          <button
+            onClick={() => askTeam(cell.key)}
+            disabled={loading === cell.key}
+            className="text-[10px] uppercase tracking-wider border border-ink px-2 py-0.5 hover:bg-secondary disabled:opacity-50"
+          >
+            {loading === cell.key ? "Asking…" : "Ask team"}
+          </button>
+        </div>
+        <p className="text-[10px] text-muted-foreground mb-2 leading-snug">{cell.hint}</p>
+        <textarea
+          value={cells[cell.key] ?? ""}
+          onChange={(e) => setCells((p) => ({ ...p, [cell.key]: e.target.value }))}
+          rows={5}
+          placeholder="Fill with the team, or click 'Ask team' to draft from the conversation so far."
+          className="w-full border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary font-mono"
+        />
+        {evidence[cell.key] && (
+          <p className="text-[10px] text-muted-foreground italic mt-1.5">Evidence: {evidence[cell.key]}</p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="grid md:grid-cols-12 gap-6 mb-6">
+        <div className="md:col-span-4">
+          <h2 className="text-2xl tracking-tight mb-2">{canvas.name}</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3">{canvas.blurb}</p>
+          <div className="border border-ink p-3 text-xs bg-secondary">
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">How to run this</div>
+            <p className="leading-relaxed">
+              Walk through each cell with the team. Use <strong>Ask team</strong> to have the AI synthesize what
+              stakeholders have already said on that cell — then refine. Empty AI evidence means you need to ask the team a direct question.
+            </p>
+          </div>
+        </div>
+
+        <div className="md:col-span-8">
+          {isVPC && (
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Customer Profile (circle)</div>
+                {cellsByCol("customer").map((c) => <CellCard key={c.key} cell={c} />)}
+              </div>
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Value Map (square)</div>
+                {cellsByCol("value").map((c) => <CellCard key={c.key} cell={c} />)}
+              </div>
+            </div>
+          )}
+
+          {isCustomerOnly && (
+            <div className="space-y-3">
+              {canvas.cells.map((c) => <CellCard key={c.key} cell={c} />)}
+            </div>
+          )}
+
+          {isBMC && (
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Value & customer side</div>
+                {cellsByCol("left").map((c) => <CellCard key={c.key} cell={c} />)}
+              </div>
+              <div className="space-y-3">
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Infrastructure & economics</div>
+                {cellsByCol("right").map((c) => <CellCard key={c.key} cell={c} />)}
+                {cellsByCol("bottom").map((c) => <CellCard key={c.key} cell={c} />)}
+              </div>
+            </div>
+          )}
+
+          {!isVPC && !isCustomerOnly && !isBMC && (
+            <div className="grid md:grid-cols-2 gap-3">
+              {canvas.cells.map((c) => <CellCard key={c.key} cell={c} />)}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-ink pt-4">
+        <a href={STRATEGYZER_LIBRARY_URL} target="_blank" rel="noreferrer" className="text-xs underline self-center mr-auto">
+          Open Strategyzer playbook library ↗
+        </a>
+        <button
+          onClick={() => saveMut.mutate()}
+          disabled={saveMut.isPending}
+          className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
+        >
+          {saveMut.isPending ? "Saving…" : "Save canvas & recommend →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function InterventionStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const navigate = useNavigate();
   const [rec, setRec] = useState<string>(session.intervention_recommendation ?? "");
