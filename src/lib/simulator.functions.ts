@@ -577,10 +577,11 @@ Return strict JSON: {"suggestion": "<the cell content>", "evidence": "<one sente
 
 export const saveCanvas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; canvas: Record<string, string> }) =>
+  .inputValidator((d: { sessionId: string; canvas: Record<string, unknown> }) =>
     z.object({
       sessionId: z.string().uuid(),
-      canvas: z.record(z.string(), z.string().max(4000)),
+      canvas: z.record(z.string(), z.union([z.string().max(8000), z.array(z.string().max(2000)).max(50)])),
+
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
