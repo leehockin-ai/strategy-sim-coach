@@ -1314,8 +1314,8 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
 
   return (
     <StepShell
-      title="Recommend & decide"
-      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Reflect the commitments stakeholders gave you in the dialogue — they're the real currency of your intervention."
+      title="Next-Step Judgment"
+      hint="The intervention has already happened in Live Playbook Facilitation. Now interpret what emerged. What did the session actually reveal? What is realistically true now? What should the team do next — and just as importantly, what should NOT happen yet? Then make the call: continue, pivot, escalate, or stop. Anchor your reasoning in the stakeholder commitments below."
     >
       {commitments && (
         <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
