@@ -7,11 +7,41 @@ import { Shell } from "@/components/Shell";
 import { listReviewSessions, setReviewerDecision, SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { getSessionForReviewer } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
+import { useMyRoles } from "@/hooks/use-my-roles";
 
 export const Route = createFileRoute("/_authenticated/reviewer")({
   head: () => ({ meta: [{ title: "Reviewer · Strategyzer Coach Certification" }] }),
-  component: ReviewerPage,
+  component: ReviewerGate,
 });
+
+function ReviewerGate() {
+  const { isReviewer, isLoading } = useMyRoles();
+  if (isLoading) {
+    return (
+      <Shell>
+        <section className="mx-auto max-w-[1400px] px-6 md:px-10 py-16 text-sm text-muted-foreground">
+          Checking access…
+        </section>
+      </Shell>
+    );
+  }
+  if (!isReviewer) {
+    return (
+      <Shell>
+        <section className="mx-auto max-w-[1400px] px-6 md:px-10 py-16">
+          <span className="chip mb-4 inline-flex">Restricted</span>
+          <h1 className="text-3xl tracking-tight mb-2">Reviewer access only</h1>
+          <p className="text-sm text-muted-foreground max-w-xl">
+            This area is limited to certification reviewers. If you believe you should have access,
+            ask an administrator to grant you the reviewer role.
+          </p>
+        </section>
+      </Shell>
+    );
+  }
+  return <ReviewerPage />;
+}
+
 
 // ────────────────────────────── color tokens ─────────────────────────────
 
