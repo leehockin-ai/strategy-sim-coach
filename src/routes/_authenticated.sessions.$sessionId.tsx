@@ -487,91 +487,158 @@ function FramingStep({
 // ---------- Method: Playbook diagnosis & selection ----------
 
 function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [choice, setChoice] = useState<string>(session.methodology_choice ?? "");
+  // Parse stored "choice::engagement" format. New: choice may also be
+  // "multi:id1,id2" or "none" — restraint is a valid coaching call.
+  const storedRaw: string = session.methodology_choice ?? "";
+  const [storedChoice, storedEngagement] = storedRaw.includes("::") ? storedRaw.split("::") : [storedRaw, ENGAGEMENT_MODELS[0].id];
+
+  const initialMode: "single" | "multi" | "none" =
+    storedChoice === "none" ? "none" : storedChoice.startsWith("multi:") ? "multi" : "single";
+  const initialSingle = initialMode === "single" ? storedChoice : "";
+  const initialMulti = initialMode === "multi" ? storedChoice.replace(/^multi:/, "").split(",").filter(Boolean) : [];
+
+  const [mode, setMode] = useState<"single" | "multi" | "none">(initialMode);
+  const [choice, setChoice] = useState<string>(initialSingle);
+  const [multi, setMulti] = useState<string[]>(initialMulti);
   const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
-  const [engagement, setEngagement] = useState<string>(ENGAGEMENT_MODELS[0].id);
+  const [engagement, setEngagement] = useState<string>(storedEngagement || ENGAGEMENT_MODELS[0].id);
   const [suggestion, setSuggestion] = useState<any>(null);
   const save = useServerFn(updateSession);
   const suggest = useServerFn(suggestPlaybook);
 
   const suggestMut = useMutation({
-    mutationFn: () => suggest({ data: { sessionId: session.id } }),
+    mutationFn: () => suggest({ data: { sessionId: session.id, mode } as any }),
     onSuccess: (res) => setSuggestion(res.suggestion),
     onError: (e: any) => toast.error(e.message ?? "Could not generate suggestion"),
   });
 
+  function encodedChoice(): string {
+    if (mode === "none") return "none";
+    if (mode === "multi") return `multi:${multi.join(",")}`;
+    return choice;
+  }
+
   const mut = useMutation({
     mutationFn: () => save({ data: {
       sessionId: session.id,
-      methodologyChoice: `${choice}::${engagement}`,
+      methodologyChoice: `${encodedChoice()}::${engagement}`,
       methodologyRationale: rationale,
       status: "method",
     } }),
-    onSuccess: () => { toast.success("Playbook selected"); onSaved(); },
+    onSuccess: () => { toast.success("Coaching strategy saved"); onSaved(); },
     onError: (e: any) => toast.error(e.message),
   });
 
+  const canSave =
+    rationale.trim().length > 0 &&
+    (mode === "none" || (mode === "single" && choice) || (mode === "multi" && multi.length > 0));
+
   const selectedPb = PLAYBOOKS.find((p) => p.id === choice);
+
+  function toggleMulti(id: string) {
+    setMulti((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
 
   return (
     <StepShell
-      title="Diagnose & select playbook"
-      hint="Strategyzer's scoping logic: every project falls into one dominant category. Pick one primary playbook — don't mix unless the problem clearly shifts."
+      title="Choose your coaching strategy"
+      hint="Methodology is an intervention, not an obligation. Pick the smallest sufficient response: one playbook, a sequenced combination, or none yet if you need more evidence first. The point is restraint and fit, not framework coverage."
     >
+      {/* Mode selector — single / multi / none */}
+      <div className="grid md:grid-cols-3 gap-2 mb-6">
+        {[
+          { id: "single", label: "One playbook", sub: "A single primary intervention" },
+          { id: "multi", label: "Sequenced combination", sub: "A short orchestration of playbooks" },
+          { id: "none", label: "No playbook yet", sub: "Gather more evidence first" },
+        ].map((m) => {
+          const active = mode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id as any)}
+              className={`text-left p-3 border border-ink ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+            >
+              <div className="text-sm font-medium">{m.label}</div>
+              <div className="text-[11px] opacity-80 mt-0.5">{m.sub}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
-          <div className="font-medium mb-1">AI diagnostic assist</div>
-          <div className="text-xs opacity-80">Have the AI review your scoping notes and recommend a playbook — then form your own call.</div>
+          <div className="font-medium mb-1">AI second opinion</div>
+          <div className="text-xs opacity-80">{mode === "none" ? "Ask the AI which evidence-gathering moves it would prioritize before any playbook." : "Have the AI review your scoping notes and propose a fit — then form your own call."}</div>
         </div>
         <button
           onClick={() => suggestMut.mutate()}
           disabled={suggestMut.isPending}
           className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
         >
-          {suggestMut.isPending ? "Diagnosing…" : "Suggest playbook"}
+          {suggestMut.isPending ? "Thinking…" : mode === "none" ? "Suggest evidence moves" : "Suggest playbook"}
         </button>
       </div>
 
       {suggestion && (
         <div className="mb-6 border border-ink p-4 bg-secondary">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI recommendation · confidence {suggestion.confidence ?? "—"}</div>
-          <div className="font-medium mb-1">
-            → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId ?? "(no match)"}
-          </div>
-          <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI suggestion · confidence {suggestion.confidence ?? "—"}</div>
+          {suggestion.playbookId && (
+            <div className="font-medium mb-1">
+              → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
+            </div>
+          )}
+          {suggestion.rationale && <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>}
+          {Array.isArray(suggestion.evidence_moves) && suggestion.evidence_moves.length > 0 && (
+            <ul className="text-sm list-disc pl-4 space-y-0.5">
+              {suggestion.evidence_moves.map((m: string, i: number) => <li key={i}>{m}</li>)}
+            </ul>
+          )}
           {Array.isArray(suggestion.watchouts) && suggestion.watchouts.length > 0 && (
-            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">
               {suggestion.watchouts.map((w: string, i: number) => <li key={i}>{w}</li>)}
             </ul>
           )}
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-3 mb-6">
-        {PLAYBOOKS.map((p) => {
-          const active = choice === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => setChoice(p.id)}
-              className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
-                <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}</span>
-              </div>
-              <div className="font-medium mb-1">{p.name}</div>
-              <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
-              <ul className="text-[11px] opacity-70 space-y-0.5">
-                {p.signals.map((s) => <li key={s}>· {s}</li>)}
-              </ul>
-              <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
-            </button>
-          );
-        })}
-      </div>
+      {mode !== "none" && (
+        <div className="grid md:grid-cols-2 gap-3 mb-6">
+          {PLAYBOOKS.map((p) => {
+            const active = mode === "single" ? choice === p.id : multi.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => mode === "single" ? setChoice(p.id) : toggleMulti(p.id)}
+                className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
+                  <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}{mode === "multi" && active ? ` · #${multi.indexOf(p.id) + 1}` : ""}</span>
+                </div>
+                <div className="font-medium mb-1">{p.name}</div>
+                <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
+                <ul className="text-[11px] opacity-70 space-y-0.5">
+                  {p.signals.map((s) => <li key={s}>· {s}</li>)}
+                </ul>
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {selectedPb && (
+      {mode === "none" && (
+        <div className="border border-ink p-4 mb-6" style={{ backgroundColor: "var(--brand-lime)" }}>
+          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-1">Restraint is a coaching move</div>
+          <p className="text-sm leading-relaxed">
+            Reaching for a playbook before the team has shared evidence is a common failure mode. Document what evidence
+            you need first, who would generate it, and what would trigger you to commit to a methodology. The simulator
+            will reward this decision if your rationale shows judgment, not avoidance.
+          </p>
+        </div>
+      )}
+
+      {selectedPb && mode === "single" && (
         <a
           href={selectedPb.libraryUrl}
           target="_blank"
@@ -600,13 +667,15 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         })}
       </div>
 
-      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale</label>
+      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale — sequencing, scope, evidence focus, restraint</label>
       <div className="relative">
         <textarea
           value={rationale}
           onChange={(e) => setRationale(e.target.value)}
           rows={5}
-          placeholder="Why this playbook for this team, right now. What scoping signal pointed here. What would change your mind."
+          placeholder={mode === "none"
+            ? "What evidence are you missing? Who would generate it, by when? What would have to be true to commit to a playbook?"
+            : "Why this approach for this team right now. What sequencing or restraint matters. What would change your mind."}
           className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary"
         />
         <div className="absolute top-2 right-2">
@@ -614,8 +683,8 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         </div>
       </div>
       <div className="mt-4 flex justify-end">
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !choice || !rationale.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-          {mut.isPending ? "Saving…" : "Save & open dialogue →"}
+        <button onClick={() => mut.mutate()} disabled={mut.isPending || !canSave} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
+          {mut.isPending ? "Saving…" : "Save coaching strategy"}
         </button>
       </div>
     </StepShell>
