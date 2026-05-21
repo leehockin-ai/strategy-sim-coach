@@ -873,9 +873,24 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   }
 
   if (!canvas) {
+    const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
-      <StepShell title="Pick a playbook first" hint="Application requires a selected playbook. Go back to the Method step.">
-        <p className="text-sm text-muted-foreground">No canvas has been mapped to this session yet.</p>
+      <StepShell
+        title="Working Session Design"
+        hint="Artifacts are tools, not deliverables. The point is to facilitate Strategyzer thinking — sometimes the right move is no canvas at all."
+      >
+        {mode === "none" ? (
+          <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
+            <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
+            <p className="text-sm leading-relaxed">
+              You chose to gather more evidence before committing to a playbook. Stay here while you work the
+              Stakeholder Workspace, then return to Coaching Strategy when you're ready. The evaluator rewards
+              this kind of restraint when your rationale shows it was deliberate, not avoidant.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Strategy if you'd like to commit to a playbook.</p>
+        )}
       </StepShell>
     );
   }
