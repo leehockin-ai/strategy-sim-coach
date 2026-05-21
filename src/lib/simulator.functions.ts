@@ -6,7 +6,7 @@ import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
+  .inputValidator((d: { sessionId: string; mode?: string }) => z.object({ sessionId: z.string().uuid(), mode: z.string().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
