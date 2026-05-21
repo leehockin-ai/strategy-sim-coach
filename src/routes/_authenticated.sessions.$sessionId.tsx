@@ -761,9 +761,10 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
               </button>
             ))}
           </div>
-          <button onClick={onContinue} className="mt-6 w-full border border-ink py-2 text-sm hover:bg-secondary">
-            Move to application →
-          </button>
+          <p className="mt-6 text-[11px] text-muted-foreground leading-relaxed">
+            This workspace stays open across the whole session. Switch sections from the top nav at any time —
+            nothing here is locked or "completed".
+          </p>
         </aside>
 
         <div className="md:col-span-6 border border-ink flex flex-col min-h-[60vh]">
