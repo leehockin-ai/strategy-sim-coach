@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useMyRoles } from "@/hooks/use-my-roles";
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
