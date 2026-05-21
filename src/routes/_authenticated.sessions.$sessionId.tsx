@@ -92,6 +92,31 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
         </div>
         <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
         <p className="max-w-3xl opacity-90 leading-relaxed">{scenario.context}</p>
+
+        {(scenario.success_definition || scenario.success_pressure) && (
+          <div className="mt-6 grid md:grid-cols-2 gap-4 max-w-4xl">
+            {scenario.success_definition && (
+              <div className="border border-paper/40 p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">What the team believes success looks like</div>
+                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_definition}</p>
+              </div>
+            )}
+            {scenario.success_pressure && (
+              <div className="border border-paper/40 p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Pressure shaping that belief</div>
+                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_pressure}</p>
+              </div>
+            )}
+            {Array.isArray(scenario.unrealistic_aspects) && scenario.unrealistic_aspects.length > 0 && (
+              <div className="md:col-span-2 border border-paper/40 p-4" style={{ backgroundColor: "rgba(0,0,0,0.18)" }}>
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Where their success picture may be off — for you to surface, not assume</div>
+                <ul className="text-sm opacity-90 leading-relaxed list-disc pl-4 space-y-0.5">
+                  {scenario.unrealistic_aspects.map((u: string, i: number) => <li key={i}>{u}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         <div className="mt-6 grid md:grid-cols-3 gap-4">
           {(scenario.stakeholders as any[]).map((s) => (
             <div key={s.name} className="border border-paper/40 p-4">
