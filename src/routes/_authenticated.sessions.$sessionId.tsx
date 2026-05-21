@@ -1144,6 +1144,34 @@ function PlaybookStep({ session, messages, onSaved }: { session: any; messages: 
   );
 }
 
+// ---------- Strategyzer-style visual artifacts ----------
+
+function toLines(s: string): string[] {
+  return (s ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+}
+
+function StickyNotes({ items, color, max = 8 }: { items: string[]; color: string; max?: number }) {
+  if (items.length === 0) {
+    return <div className="text-[10px] text-muted-foreground italic">No notes yet — add one per line below.</div>;
+  }
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.slice(0, max).map((t, i) => (
+        <div
+          key={i}
+          className="text-[10px] leading-snug px-2 py-1.5 border border-ink shadow-[2px_2px_0_var(--ink)] max-w-[140px] break-words"
+          style={{ backgroundColor: color, transform: `rotate(${(i % 3 - 1) * 1.2}deg)` }}
+        >
+          {t}
+        </div>
+      ))}
+      {items.length > max && (
+        <div className="text-[10px] text-muted-foreground self-center">+{items.length - max} more</div>
+      )}
+    </div>
+  );
+}
+
 function EcosystemArtifact({
   categories,
   value,
@@ -1153,22 +1181,73 @@ function EcosystemArtifact({
   value: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
 }) {
+  const palette = ["var(--brand-yellow)", "var(--brand-lime)", "var(--brand-cyan)", "var(--brand-purple)", "var(--brand-blue)", "var(--brand-red)"];
+  const [focus, setFocus] = useState<string>(categories[0]?.key ?? "");
+  const focused = categories.find((c) => c.key === focus) ?? categories[0];
+  const colorFor = (key: string) => palette[categories.findIndex((c) => c.key === key) % palette.length];
+
   return (
-    <div className="border border-ink p-3 bg-paper space-y-3 max-h-[640px] overflow-y-auto">
-      <div className="text-xs font-medium">Customer ecosystem map</div>
-      {categories.map((c) => (
-        <div key={c.key}>
-          <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">{c.label}</label>
-          <div className="text-[10px] text-muted-foreground italic mb-1">{c.description}</div>
-          <textarea
-            value={value[c.key] ?? ""}
-            onChange={(e) => onChange({ ...value, [c.key]: e.target.value })}
-            rows={2}
-            placeholder="One per line"
-            className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
-          />
+    <div className="border border-ink bg-paper">
+      {/* Ringed map */}
+      <div className="relative aspect-square w-full bg-secondary border-b border-ink overflow-hidden">
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 200" preserveAspectRatio="none">
+          <circle cx="100" cy="100" r="92" fill="none" stroke="var(--ink)" strokeWidth="0.5" strokeDasharray="2 2" />
+          <circle cx="100" cy="100" r="64" fill="none" stroke="var(--ink)" strokeWidth="0.5" strokeDasharray="2 2" />
+          <circle cx="100" cy="100" r="32" fill="var(--ink)" />
+          <text x="100" y="98" textAnchor="middle" fill="var(--paper)" fontSize="6" fontWeight="500" style={{ letterSpacing: "0.1em" }}>CUSTOMER</text>
+          <text x="100" y="106" textAnchor="middle" fill="var(--paper)" fontSize="4.5" opacity="0.7">in their ecosystem</text>
+        </svg>
+        {categories.map((c, i) => {
+          const angle = (i / categories.length) * Math.PI * 2 - Math.PI / 2;
+          const r = 38; // % from center
+          const x = 50 + Math.cos(angle) * r;
+          const y = 50 + Math.sin(angle) * r;
+          const items = toLines(value[c.key] ?? "");
+          const isFocus = focus === c.key;
+          return (
+            <button
+              key={c.key}
+              onClick={() => setFocus(c.key)}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 border border-ink p-1.5 w-[26%] text-left transition-all ${isFocus ? "ring-2 ring-ink z-10" : "hover:z-10"}`}
+              style={{ left: `${x}%`, top: `${y}%`, backgroundColor: colorFor(c.key) }}
+            >
+              <div className="text-[8px] uppercase tracking-[0.1em] font-medium leading-tight">{c.label}</div>
+              <div className="text-[8px] mt-0.5 leading-tight opacity-80">
+                {items.length === 0 ? "empty" : `${items.length} note${items.length === 1 ? "" : "s"}`}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Editor for focused category */}
+      <div className="p-3 space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.12em] font-medium">{focused.label}</div>
+            <div className="text-[10px] text-muted-foreground italic">{focused.description}</div>
+          </div>
+          <div className="flex gap-1">
+            {categories.map((c) => (
+              <button
+                key={c.key}
+                onClick={() => setFocus(c.key)}
+                aria-label={c.label}
+                className={`w-3 h-3 border border-ink ${focus === c.key ? "ring-1 ring-ink ring-offset-1" : ""}`}
+                style={{ backgroundColor: colorFor(c.key) }}
+              />
+            ))}
+          </div>
         </div>
-      ))}
+        <StickyNotes items={toLines(value[focused.key] ?? "")} color={colorFor(focused.key)} />
+        <textarea
+          value={value[focused.key] ?? ""}
+          onChange={(e) => onChange({ ...value, [focused.key]: e.target.value })}
+          rows={3}
+          placeholder="One actor per line — e.g. 'In-house IT team'"
+          className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+        />
+      </div>
     </div>
   );
 }
@@ -1182,31 +1261,105 @@ function CustomerProfileArtifact({
   value: { segmentName: string; jobs: string; pains: string; gains: string };
   onChange: (next: { segmentName: string; jobs: string; pains: string; gains: string }) => void;
 }) {
+  const colors: Record<"jobs" | "pains" | "gains", string> = {
+    jobs: "var(--brand-yellow)",
+    pains: "var(--brand-red)",
+    gains: "var(--brand-lime)",
+  };
+  const [focus, setFocus] = useState<"jobs" | "pains" | "gains">("jobs");
+  const focused = quadrants.find((q) => q.key === focus)!;
+
+
   return (
-    <div className="border border-ink p-3 bg-paper space-y-3">
-      <div>
-        <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">Customer segment name</label>
+    <div className="border border-ink bg-paper">
+      {/* Segment name strip */}
+      <div className="p-2 border-b border-ink bg-secondary">
+        <label className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground block">Customer segment</label>
         <input
           value={value.segmentName}
           onChange={(e) => onChange({ ...value, segmentName: e.target.value })}
-          placeholder="e.g. Two-person legal practices in the EU"
-          className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+          placeholder="Name the segment you're profiling…"
+          className="w-full bg-transparent text-sm font-medium focus:outline-none"
         />
       </div>
-      {quadrants.map((q) => (
-        <div key={q.key}>
-          <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">{q.label}</label>
-          <div className="text-[10px] text-muted-foreground italic mb-1">{q.hint}</div>
-          <textarea
-            value={value[q.key] ?? ""}
-            onChange={(e) => onChange({ ...value, [q.key]: e.target.value })}
-            rows={4}
-            placeholder="One per line"
-            className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
-          />
+
+      {/* The circle */}
+      <div className="relative aspect-square w-full bg-paper border-b border-ink">
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 200 200">
+          {/* outer circle */}
+          <circle cx="100" cy="100" r="96" fill="var(--paper)" stroke="var(--ink)" strokeWidth="1.5" />
+          {/* Jobs (top half) divider — horizontal line */}
+          <line x1="4" y1="100" x2="196" y2="100" stroke="var(--ink)" strokeWidth="1" />
+          {/* Pains/Gains divider — vertical line in bottom half only */}
+          <line x1="100" y1="100" x2="100" y2="196" stroke="var(--ink)" strokeWidth="1" />
+          {/* Tinted fills */}
+          <path d="M 100,100 L 4,100 A 96,96 0 0 1 196,100 Z" fill={colors.jobs} fillOpacity="0.35" />
+          <path d="M 100,100 L 4,100 A 96,96 0 0 0 100,196 Z" fill={colors.pains} fillOpacity="0.3" />
+          <path d="M 100,100 L 100,196 A 96,96 0 0 0 196,100 Z" fill={colors.gains} fillOpacity="0.3" />
+          {/* Sector labels */}
+          <text x="100" y="22" textAnchor="middle" fontSize="7" fontWeight="600" style={{ letterSpacing: "0.18em" }}>CUSTOMER JOBS</text>
+          <text x="44" y="186" textAnchor="middle" fontSize="7" fontWeight="600" style={{ letterSpacing: "0.18em" }}>PAINS</text>
+          <text x="156" y="186" textAnchor="middle" fontSize="7" fontWeight="600" style={{ letterSpacing: "0.18em" }}>GAINS</text>
+        </svg>
+
+        {/* Sticky-note overlays per sector */}
+        <button
+          onClick={() => setFocus("jobs")}
+          className={`absolute left-1/2 top-[8%] -translate-x-1/2 w-[78%] max-h-[36%] overflow-hidden p-2 text-left ${focus === "jobs" ? "ring-2 ring-ink" : ""}`}
+        >
+          <StickyNotes items={toLines(value.jobs)} color={colors.jobs} max={5} />
+        </button>
+        <button
+          onClick={() => setFocus("pains")}
+          className={`absolute left-[3%] top-[54%] w-[44%] max-h-[40%] overflow-hidden p-2 text-left ${focus === "pains" ? "ring-2 ring-ink" : ""}`}
+        >
+          <StickyNotes items={toLines(value.pains)} color={colors.pains} max={4} />
+        </button>
+        <button
+          onClick={() => setFocus("gains")}
+          className={`absolute right-[3%] top-[54%] w-[44%] max-h-[40%] overflow-hidden p-2 text-left ${focus === "gains" ? "ring-2 ring-ink" : ""}`}
+        >
+          <StickyNotes items={toLines(value.gains)} color={colors.gains} max={4} />
+        </button>
+      </div>
+
+      {/* Editor for focused quadrant */}
+      <div className="p-3 space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.12em] font-medium flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 border border-ink" style={{ backgroundColor: colors[focus] }} />
+              {focused.label}
+            </div>
+            <div className="text-[10px] text-muted-foreground italic">{focused.hint}</div>
+          </div>
+          <div className="flex gap-1">
+            {(["jobs", "pains", "gains"] as const).map((k) => (
+              <button
+                key={k}
+                onClick={() => setFocus(k)}
+                aria-label={k}
+                className={`w-3 h-3 border border-ink ${focus === k ? "ring-1 ring-ink ring-offset-1" : ""}`}
+                style={{ backgroundColor: colors[k] }}
+              />
+            ))}
+          </div>
         </div>
-      ))}
+        <textarea
+          value={value[focus]}
+          onChange={(e) => onChange({ ...value, [focus]: e.target.value })}
+          rows={4}
+          placeholder={`One ${focus === "jobs" ? "job" : focus === "pains" ? "pain" : "gain"} per line — what the team is actually hearing.`}
+          className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+        />
+        <div className="grid grid-cols-3 gap-1 text-[9px] uppercase tracking-[0.1em] text-muted-foreground">
+          <div>Jobs: {toLines(value.jobs).length}</div>
+          <div>Pains: {toLines(value.pains).length}</div>
+          <div>Gains: {toLines(value.gains).length}</div>
+        </div>
+      </div>
     </div>
   );
 }
+
 
