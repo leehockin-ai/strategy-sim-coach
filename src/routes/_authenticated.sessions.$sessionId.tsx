@@ -732,16 +732,17 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
     <div className="space-y-6">
       {/* Purpose framing */}
       <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Why you're here</div>
+        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — open whenever you need it</div>
         <p className="text-sm leading-relaxed">
-          One-on-ones with each stakeholder to <strong>gain clarity on how to guide their playbook</strong>: surface
-          context the group call didn't, test your read of the situation, and earn small concrete commitments
-          (a 15-min pitch, access to a customer, a pilot slot) that will shape your intervention and how you run the
-          canvas with the team.
+          One-on-ones live here for the full session. Use them to clarify assumptions, surface resistance, negotiate scope,
+          challenge unrealistic success definitions, validate readiness, or earn small concrete commitments (a 15-min pitch,
+          access to a customer, a pilot slot). Stakeholders remember the full transcript — they will resist, evolve, and
+          sometimes contradict themselves under pressure, just like real ones.
         </p>
         <p className="text-sm leading-relaxed mt-2">
-          <strong>Output:</strong> a short list of what each stakeholder said, agreed to, or pushed back on — captured
-          in <em>Commitments &amp; decisions</em> on the right. You can come back to this step any time to ask more questions.
+          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These feed your
+          working session design, your intervention call, and your engagement pathway. No need to "finish" this section —
+          come back whenever a later step surfaces a new question for a stakeholder.
         </p>
       </div>
 
