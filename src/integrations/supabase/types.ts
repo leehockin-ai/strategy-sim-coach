@@ -115,9 +115,12 @@ export type Database = {
           industry: string
           slug: string
           stakeholders: Json
+          success_definition: string
+          success_pressure: string
           summary: string
           system_prompt: string
           title: string
+          unrealistic_aspects: string[]
         }
         Insert: {
           ambiguity_factors?: string[]
@@ -128,9 +131,12 @@ export type Database = {
           industry: string
           slug: string
           stakeholders?: Json
+          success_definition?: string
+          success_pressure?: string
           summary: string
           system_prompt: string
           title: string
+          unrealistic_aspects?: string[]
         }
         Update: {
           ambiguity_factors?: string[]
@@ -141,9 +147,12 @@ export type Database = {
           industry?: string
           slug?: string
           stakeholders?: Json
+          success_definition?: string
+          success_pressure?: string
           summary?: string
           system_prompt?: string
           title?: string
+          unrealistic_aspects?: string[]
         }
         Relationships: []
       }
