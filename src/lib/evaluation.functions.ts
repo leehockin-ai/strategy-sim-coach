@@ -210,11 +210,26 @@ Final decision: ${s.decision || "(none)"}`;
           type: "string",
           enum: ["exemplary", "strong", "competent", "developing", "insufficient"],
         },
+        confidence: { type: "string", enum: ["low", "medium", "high"] },
+        reviewer_flag: { type: "boolean", description: "True if a human reviewer should pay extra attention to this section." },
         evidence: { type: "string", description: "Cite specific observable behavior or quote artifact text." },
         strengths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 },
         gaps: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 },
       },
-      required: ["score", "verdict", "evidence", "strengths", "gaps"],
+      required: ["score", "verdict", "confidence", "reviewer_flag", "evidence", "strengths", "gaps"],
+      additionalProperties: false,
+    };
+
+    const skillItemSchema = {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        label: { type: "string" },
+        rating: { type: "string", enum: ["strength", "mixed", "concern"] },
+        explanation: { type: "string" },
+        evidence: { type: "string", description: "Quote or paraphrase a specific moment from transcript or artifact." },
+      },
+      required: ["key", "label", "rating", "explanation", "evidence"],
       additionalProperties: false,
     };
 
@@ -222,7 +237,7 @@ Final decision: ${s.decision || "(none)"}`;
       type: "function",
       function: {
         name: "submit_evaluation",
-        description: "Return per-section rubric evaluations and a final assessment.",
+        description: "Return per-section rubric, soft skills, methodology skills, and a final assessment.",
         parameters: {
           type: "object",
           properties: {
@@ -232,21 +247,46 @@ Final decision: ${s.decision || "(none)"}`;
               required: SECTION_RUBRIC.map((sec) => sec.key),
               additionalProperties: false,
             },
+            soft_skills: {
+              type: "array",
+              minItems: 6,
+              maxItems: 8,
+              description: "Cover: active_listening, open_questioning, psychological_safety, stakeholder_empathy, neutrality, handling_resistance, avoiding_dominating, redirecting_ownership. Flag concerns like overly directive tone, missed emotional cues, ignored resistance, excessive explaining, premature advice-giving.",
+              items: skillItemSchema,
+            },
+            methodology_skills: {
+              type: "array",
+              minItems: 6,
+              maxItems: 9,
+              description: "Cover: strategyzer_fluency, playbook_selection, playbook_sequencing, vpc_bmc_understanding, jobs_pains_gains_quality, evidence_rigor, assumption_identification, tool_facilitation, restraint_when_not_to_playbook. Flag concerns like weak customer specificity, confusing jobs with solutions, vague pains/gains, treating assumptions as evidence, forcing a playbook prematurely, over-completing artifacts, generic consulting recommendations.",
+              items: skillItemSchema,
+            },
             overall_summary: { type: "string" },
             top_strengths: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
             top_gaps: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
             calibration_notes: { type: "string", description: "What a human reviewer should double-check." },
-            recommendation: { type: "string", enum: ["certify", "conditional", "not_yet"] },
+            reviewer_focus: { type: "string", description: "1-2 sentences guiding the human reviewer where to spend attention." },
+            confidence: { type: "string", enum: ["low", "medium", "high"] },
+            recommendation: { type: "string", enum: ["pass", "conditional_pass", "human_review_required", "retry_recommended", "not_yet_certified"] },
             recommendation_rationale: { type: "string" },
+            coach_feedback_draft: {
+              type: "string",
+              description: "Constructive, developmental coach-facing feedback. Use headings: What you did well / Where to improve / Methodology guidance / Facilitation guidance / Recommended next step. Specific, grounded in observable behavior, not harsh.",
+            },
           },
           required: [
             "sections",
+            "soft_skills",
+            "methodology_skills",
             "overall_summary",
             "top_strengths",
             "top_gaps",
             "calibration_notes",
+            "reviewer_focus",
+            "confidence",
             "recommendation",
             "recommendation_rationale",
+            "coach_feedback_draft",
           ],
           additionalProperties: false,
         },
@@ -278,8 +318,6 @@ Final decision: ${s.decision || "(none)"}`;
     if (!call) throw new Error("AI did not return an evaluation");
     const parsed = JSON.parse(call.function.arguments);
 
-    // Flatten per-section scores into the legacy `scores` jsonb shape so older
-    // consumers keep working, and stash the full structured payload alongside.
     const flatScores: Record<string, { score: number; evidence: string }> = {};
     for (const sec of SECTION_RUBRIC) {
       const sx = parsed.sections?.[sec.key];
@@ -296,6 +334,9 @@ Final decision: ${s.decision || "(none)"}`;
           gaps: parsed.top_gaps,
           recommendation: parsed.recommendation,
           overall_summary: parsed.overall_summary,
+          soft_skills: parsed.soft_skills,
+          methodology_skills: parsed.methodology_skills,
+          coach_feedback: parsed.coach_feedback_draft,
           raw_response: parsed,
         },
         { onConflict: "session_id" }
@@ -314,24 +355,53 @@ Final decision: ${s.decision || "(none)"}`;
 
 export const setReviewerDecision = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; reviewerNotes?: string; reviewerDecision: string }) =>
+  .inputValidator((d: {
+    sessionId: string;
+    reviewerName?: string;
+    reviewerNotes?: string;
+    internalNotes?: string;
+    coachFeedback?: string;
+    reviewerDecision: string;
+  }) =>
     z.object({
       sessionId: z.string().uuid(),
+      reviewerName: z.string().max(200).optional(),
       reviewerNotes: z.string().max(8000).optional(),
-      reviewerDecision: z.enum(["certify", "conditional", "not_yet"]),
+      internalNotes: z.string().max(8000).optional(),
+      coachFeedback: z.string().max(16000).optional(),
+      reviewerDecision: z.enum([
+        "approved",
+        "conditional_approval",
+        "retry_required",
+        "not_approved",
+        "escalate",
+      ]),
     }).parse(d)
   )
   .handler(async ({ data }) => {
     const { data: evaluation, error } = await supabaseAdmin
       .from("evaluations")
       .update({
+        reviewer_name: data.reviewerName ?? null,
         reviewer_notes: data.reviewerNotes ?? null,
+        internal_notes: data.internalNotes ?? null,
+        coach_feedback: data.coachFeedback ?? null,
         reviewer_decision: data.reviewerDecision,
+        reviewed_at: new Date().toISOString(),
       })
       .eq("session_id", data.sessionId)
       .select()
       .single();
     if (error) throw new Error(error.message);
+
+    const sessionStatus =
+      data.reviewerDecision === "approved" ? "approved"
+      : data.reviewerDecision === "conditional_approval" ? "conditional"
+      : data.reviewerDecision === "retry_required" ? "retry"
+      : data.reviewerDecision === "escalate" ? "escalated"
+      : "not_approved";
+    await supabaseAdmin.from("sessions").update({ status: sessionStatus }).eq("id", data.sessionId);
+
     return { evaluation };
   });
 
@@ -341,10 +411,10 @@ export const listReviewSessions = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("sessions")
       .select(
-        "id, candidate_name, candidate_email, status, created_at, completed_at, scenarios(title, slug), evaluations(recommendation, reviewer_decision)"
+        "id, candidate_name, candidate_email, status, created_at, completed_at, scenarios(title, slug, difficulty, industry), evaluations(recommendation, reviewer_decision, reviewer_name, reviewed_at)"
       )
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(200);
     if (error) throw new Error(error.message);
     return { sessions: data ?? [] };
   });
