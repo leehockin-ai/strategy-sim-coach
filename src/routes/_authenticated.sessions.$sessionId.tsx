@@ -977,20 +977,20 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
     const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
       <StepShell
-        title="Facilitated Working Session"
-        hint="Sometimes the right move is no canvas at all. Restraint scores above forced facilitation."
+        title="Live Playbook Facilitation"
+        hint="You're in the room with the team now. Sometimes the right move is no canvas at all — restraint scores above forced facilitation."
       >
         {mode === "none" ? (
           <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
             <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
             <p className="text-sm leading-relaxed">
-              You chose to gather more evidence before committing to a playbook. Stay here while you work the
-              Stakeholder Workspace, then return to Coaching Strategy when you're ready. Knowing when NOT to
-              facilitate deeper playbook work is itself rewarded.
+              You chose to gather more evidence before activating a playbook. Stay here while you work the
+              Stakeholder Workspace, then return to Coaching Approach when you're ready to commit. Knowing when NOT
+              to run a playbook is itself rewarded.
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Strategy if you'd like to commit to a playbook.</p>
+          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Approach if you'd like to commit to a playbook.</p>
         )}
       </StepShell>
     );
