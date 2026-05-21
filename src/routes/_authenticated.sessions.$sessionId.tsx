@@ -65,7 +65,7 @@ function SessionPage() {
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
         {step === "application" && <ApplicationStep session={session} onSaved={refreshOnly} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={refreshOnly} />}
-        {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
+        {step === "playbook" && <EngagementPathwayStep session={session} onSaved={refetch} />}
       </div>
       {step !== "dialogue" && step !== "framing" && (
         <button
@@ -1150,56 +1150,75 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
 }
 
 
-// ---------- Playbook Application: run the built-in playbook with the simulated team ----------
+// ---------- Engagement Pathway: orchestrate Strategyzer methodology over time ----------
 
 type PBMessage = { id: string; role: string; stakeholder_name: string | null; content: string; phase: string; created_at: string };
 
-function PlaybookStep({ session, messages, onSaved }: { session: any; messages: PBMessage[]; onSaved: () => void }) {
-  const navigate = useNavigate();
-  const playbook = BUILTIN_PLAYBOOK;
-  const [activeKey, setActiveKey] = useState<string>(playbook.activities[0].key);
-  const activity = playbook.activities.find((a) => a.key === activeKey)!;
+const PATHWAY_SECTIONS: { key: string; n: string; label: string; placeholder: string; hint: string }[] = [
+  {
+    key: "situation_summary",
+    n: "01",
+    label: "Current Situation Summary",
+    placeholder:
+      "What is actually happening? Key ambiguity, stakeholder reality, evidence quality, readiness level. Keep it short and prioritized.",
+    hint: "Reward: simplification, clarity, prioritization. Avoid: jargon, exhaustive consulting summaries.",
+  },
+  {
+    key: "immediate_intervention",
+    n: "02",
+    label: "Recommended Immediate Intervention",
+    placeholder:
+      "The ONE next move. May legitimately be: alignment session, evidence sprint, sponsor clarification, narrowed scope, or 'no playbook yet — pause/stop'. Justify it.",
+    hint: "Reward: restraint. Sometimes the right answer is alignment first, evidence first, or stop.",
+  },
+  {
+    key: "pathway",
+    n: "03",
+    label: "Recommended Engagement Pathway",
+    placeholder:
+      "Sequence interventions over time. For each step: what happens, who participates, what evidence/decision it produces, what it unblocks next. Lightweight. Realistic cadence.",
+    hint: "Reward: sequencing coherence, evidence progression, executable workshops. Penalize: framework stacking, bloated multi-week plans.",
+  },
+  {
+    key: "risks",
+    n: "04",
+    label: "Risk Factors",
+    placeholder:
+      "Stakeholder/sponsor risks, evidence gaps, organizational friction, unrealistic expectations, sequencing risks. What could quietly derail this?",
+    hint: "Strong coaches surface hidden blockers and readiness problems.",
+  },
+  {
+    key: "success_criteria",
+    n: "05",
+    label: "Success Criteria",
+    placeholder:
+      "Realistic, evidence-anchored definition of meaningful progress. Reframe unrealistic ambitions into learning/evidence milestones.",
+    hint: "Reward: reframing overpromised success into evidence-based movement.",
+  },
+];
 
+function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+  const navigate = useNavigate();
   const initialApp = (session.playbook_application as Record<string, any> | null) ?? {};
-  const [artifact, setArtifact] = useState<Record<string, any>>(initialApp);
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const s of PATHWAY_SECTIONS) out[s.key] = typeof initialApp[s.key] === "string" ? initialApp[s.key] : "";
+    return out;
+  });
+  const [activeKey, setActiveKey] = useState<string>(PATHWAY_SECTIONS[0].key);
+  const active = PATHWAY_SECTIONS.find((s) => s.key === activeKey)!;
 
   const saveApp = useServerFn(savePlaybookApplication);
   const evalFn = useServerFn(generateEvaluation);
-  const sendTurn = useServerFn(sendPlaybookTeamTurn);
 
-  const phase = `playbook:${activeKey}`;
-  const turnMessages = messages.filter((m) => m.phase === phase);
-
-  const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
-
-  async function handleSend() {
-    if (!draft.trim() || sending) return;
-    setSending(true);
-    try {
-      await sendTurn({ data: { sessionId: session.id, activityKey: activeKey, coachMessage: draft.trim() } });
-      setDraft("");
-      onSaved();
-    } catch (e: any) {
-      toast.error(e?.message ?? "Team didn't respond");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // Stringify artifact for save (everything as Record<string, string>)
-  function persist(next: Record<string, any>) {
-    setArtifact(next);
-    const flat: Record<string, string> = {};
-    for (const [k, v] of Object.entries(next)) flat[k] = typeof v === "string" ? v : JSON.stringify(v);
-    saveApp({ data: { sessionId: session.id, application: flat } }).catch(() => {});
+  function persist(next: Record<string, string>) {
+    setValues(next);
+    saveApp({ data: { sessionId: session.id, application: next } }).catch(() => {});
   }
 
   const submit = useMutation({
     mutationFn: async () => {
-      const flat: Record<string, string> = {};
-      for (const [k, v] of Object.entries(artifact)) flat[k] = typeof v === "string" ? v : JSON.stringify(v);
-      await saveApp({ data: { sessionId: session.id, application: flat } });
+      await saveApp({ data: { sessionId: session.id, application: values } });
       await evalFn({ data: { sessionId: session.id } });
     },
     onSuccess: () => {
@@ -1210,122 +1229,100 @@ function PlaybookStep({ session, messages, onSaved }: { session: any; messages: 
     onError: (e: any) => toast.error(e?.message ?? "Evaluation failed"),
   });
 
+  const filledCount = PATHWAY_SECTIONS.filter((s) => (values[s.key] ?? "").trim().length > 0).length;
+
   return (
     <div>
-      {/* Playbook header */}
       <div className="border border-ink p-5 bg-secondary mb-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">{playbook.source}</div>
-            <h2 className="text-2xl tracking-tight">{playbook.name}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">{playbook.overview}</p>
-          </div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Final stage · Strategyzer engagement orchestration</div>
+        <h2 className="text-2xl tracking-tight">Design the engagement pathway</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">
+          Orchestrate Strategyzer methodology over time. Think in terms of facilitated working
+          sessions, evidence-generating activities, and lightweight interventions — not abstract
+          consulting recommendations. The minimum structured intervention that creates meaningful
+          progress beats the biggest engagement design.
+        </p>
+        <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-3">
+          {filledCount} / {PATHWAY_SECTIONS.length} sections drafted
         </div>
       </div>
 
-      {/* Activity tabs */}
-      <div className="flex gap-2 mb-6 border-b border-ink">
-        {playbook.activities.map((a) => (
-          <button
-            key={a.key}
-            onClick={() => setActiveKey(a.key)}
-            className={`px-4 py-2 text-xs uppercase tracking-[0.12em] -mb-px border-b-2 ${
-              a.key === activeKey ? "border-ink font-medium" : "border-transparent text-muted-foreground hover:text-ink"
-            }`}
-          >
-            {String(a.number).padStart(2, "0")} · {a.title}
-          </button>
-        ))}
-      </div>
-
       <div className="grid lg:grid-cols-12 gap-6">
-        {/* Left: facilitator brief */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="border border-ink p-4 bg-paper">
-            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Activity {activity.number} · {activity.duration}</div>
-            <h3 className="text-lg font-medium mb-2">{activity.title}</h3>
-            <p className="text-xs text-muted-foreground italic mb-3">{activity.objective}</p>
-            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">Why this asset matters</div>
-            <p className="text-xs leading-relaxed mb-3">{activity.whyItMatters}</p>
-            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">How to facilitate</div>
-            <ol className="text-xs leading-relaxed list-decimal pl-4 space-y-1 mb-3">
-              {activity.facilitatorSteps.map((s, i) => <li key={i}>{s}</li>)}
-            </ol>
-            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">Prompts you can ask the team</div>
-            <ul className="text-xs leading-relaxed list-disc pl-4 space-y-0.5">
-              {activity.promptsForTeam.map((p, i) => <li key={i}>{p}</li>)}
+        {/* Section nav */}
+        <div className="lg:col-span-4 space-y-2">
+          {PATHWAY_SECTIONS.map((s) => {
+            const filled = (values[s.key] ?? "").trim().length > 0;
+            const isActive = s.key === activeKey;
+            return (
+              <button
+                key={s.key}
+                onClick={() => setActiveKey(s.key)}
+                className={`w-full text-left border border-ink p-3 transition ${
+                  isActive ? "bg-ink text-paper" : "bg-paper hover:bg-secondary"
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="text-[10px] uppercase tracking-[0.14em] opacity-70">{s.n}</div>
+                  <div
+                    className={`w-2 h-2 border ${isActive ? "border-paper" : "border-ink"}`}
+                    style={{ backgroundColor: filled ? "var(--brand-lime)" : "transparent" }}
+                  />
+                </div>
+                <div className="text-sm font-medium mt-1 leading-tight">{s.label}</div>
+              </button>
+            );
+          })}
+
+          <div className="border border-ink p-3 bg-paper mt-4">
+            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-2">Orchestration principles</div>
+            <ul className="text-[11px] leading-relaxed list-disc pl-4 space-y-1 text-muted-foreground">
+              <li>Smallest sufficient intervention &gt; biggest engagement.</li>
+              <li>"No playbook yet" is a valid recommendation.</li>
+              <li>Sequence so each step unblocks the next.</li>
+              <li>Multiple valid pathways exist — coherence matters more than picking the "right" one.</li>
+              <li>Reframe unrealistic success into evidence milestones.</li>
             </ul>
           </div>
         </div>
 
-        {/* Middle: working chat with the team */}
-        <div className="lg:col-span-4 flex flex-col">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">Working session with the team</div>
-          <div className="border border-ink bg-paper flex-1 min-h-[400px] max-h-[600px] overflow-y-auto p-3 space-y-2">
-            {turnMessages.length === 0 && (
-              <div className="text-xs text-muted-foreground italic p-2">
-                Open the activity with the team. Explain what you're about to do and why this asset matters before asking the first question.
+        {/* Active section editor */}
+        <div className="lg:col-span-8">
+          <div className="border border-ink bg-paper p-4">
+            <div className="flex items-baseline justify-between gap-4 mb-2">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{active.n}</div>
+                <h3 className="text-lg font-medium">{active.label}</h3>
               </div>
-            )}
-            {turnMessages.map((m) => (
-              <div key={m.id} className={`text-xs ${m.role === "candidate" ? "text-right" : "text-left"}`}>
-                <div className={`inline-block max-w-[90%] px-3 py-2 ${m.role === "candidate" ? "bg-ink text-paper" : "bg-secondary border border-ink"}`}>
-                  <div className="text-[9px] uppercase tracking-[0.12em] opacity-70 mb-0.5">
-                    {m.role === "candidate" ? "Coach" : (m.stakeholder_name ?? "Team")}
-                  </div>
-                  <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
-                </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground italic mb-3">{active.hint}</p>
+            <div className="relative">
+              <textarea
+                value={values[active.key] ?? ""}
+                onChange={(e) => setValues({ ...values, [active.key]: e.target.value })}
+                onBlur={() => persist(values)}
+                rows={14}
+                placeholder={active.placeholder}
+                className="w-full border border-ink bg-paper p-3 pr-12 text-sm font-mono leading-relaxed focus:outline-none focus:bg-secondary"
+              />
+              <div className="absolute top-2 right-2">
+                <VoiceInput onTranscript={(c) => setValues((p) => ({ ...p, [active.key]: appendTranscript(p[active.key] ?? "", c) }))} />
               </div>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2 items-end">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend(); }}
-              rows={3}
-              placeholder="What do you say to the team next? (⌘/Ctrl+Enter to send)"
-              className="flex-1 border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary"
-            />
-            <div className="flex flex-col gap-1">
-              <VoiceInput onTranscript={(c) => setDraft((p) => appendTranscript(p, c))} />
-              <button
-                onClick={handleSend}
-                disabled={!draft.trim() || sending}
-                className="bg-ink text-paper px-3 py-2 text-xs rounded-sm disabled:opacity-50"
-              >
-                {sending ? "…" : "Send"}
-              </button>
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-2">
+              Autosaves on blur · {(values[active.key] ?? "").length} chars
             </div>
           </div>
-        </div>
-
-        {/* Right: the artifact the team is filling */}
-        <div className="lg:col-span-4">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">The asset</div>
-          {activity.artifact.kind === "ecosystem" ? (
-            <EcosystemArtifact
-              categories={activity.artifact.categories}
-              value={artifact[activity.key] ?? {}}
-              onChange={(next) => persist({ ...artifact, [activity.key]: next })}
-            />
-          ) : (
-            <CustomerProfileArtifact
-              quadrants={activity.artifact.quadrants}
-              value={artifact[activity.key] ?? { segmentName: "", jobs: "", pains: "", gains: "" }}
-              onChange={(next) => persist({ ...artifact, [activity.key]: next })}
-            />
-          )}
         </div>
       </div>
 
       <div className="flex justify-between items-center gap-2 border-t border-ink pt-4 mt-6">
-        <div className="text-xs text-muted-foreground">
-          Complete both activities, then submit for evaluation. The evaluator sees the chat and the artifacts.
+        <div className="text-xs text-muted-foreground max-w-xl">
+          The evaluator reads this pathway as your orchestration artifact. Restraint, sequencing
+          coherence, and operational realism score above polished consulting language.
         </div>
         <button
           onClick={() => submit.mutate()}
-          disabled={submit.isPending}
+          disabled={submit.isPending || filledCount === 0}
           className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
         >
           {submit.isPending ? "Generating evaluation…" : "Submit & generate evaluation →"}
@@ -1334,6 +1331,7 @@ function PlaybookStep({ session, messages, onSaved }: { session: any; messages: 
     </div>
   );
 }
+
 
 // ---------- Strategyzer-style visual artifacts ----------
 

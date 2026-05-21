@@ -55,7 +55,7 @@ export const SECTION_RUBRIC = [
     label: "Engagement Pathway",
     step: "Step 6",
     focus:
-      "How responsibly would the coach sequence Strategyzer methodology over time: next best playbook(s), evidence goals, workshop cadence, alignment moves. Consultative and customer-centered, NOT upsell-driven.",
+      "How responsibly did the coach ORCHESTRATE Strategyzer methodology over time across the 5 pathway sections (Situation Summary, Immediate Intervention, Pathway, Risks, Success Criteria)? Reward sequencing coherence, methodology restraint, lightweight executable interventions, evidence progression, stakeholder readiness awareness, and reframing of unrealistic success criteria. Penalize framework stacking, bloated multi-week plans, sales/upsell framing, polished consulting language without operational detail, and assuming smooth progress. Multiple valid pathways exist — judge coherence, not a single 'correct' sequence.",
   },
 ] as const;
 
@@ -147,24 +147,31 @@ Commitments captured: ${s.dialogue_commitments || "(none captured)"}
 Stakeholder transcript:
 ${transcriptText || "(no transcript)"}
 
-── APPLICATION (Step 6) — Strategyzer playbook applied with the team ──
-Playbook: Strong Value Propositions and Differentiation with Gen AI
+── ENGAGEMENT PATHWAY (Step 6) — the coach's orchestration artifact ──
+The coach must produce a 5-section pathway. Evaluate each section against the engagement-pathway
+intelligence: reward restraint, sequencing coherence, evidence progression, readiness awareness,
+operational/facilitation realism. Penalize framework stacking, bloated plans, sales framing,
+and polished consulting language without operational detail.
 
-Activity 1 — Customer Ecosystem Map
-Expected: separate end users, beneficiaries, economic buyers, decision makers, channel partners, influencers, recommenders, saboteurs. Specific named people/roles, not generic.
-Artifact:
-${s.playbook_application?.ecosystem ? JSON.stringify(s.playbook_application.ecosystem, null, 2) : "(empty — activity not completed)"}
+01 — Current Situation Summary:
+${s.playbook_application?.situation_summary || "(empty)"}
 
-Activity 2 — Customer Profile (Jobs / Pains / Gains)
-Expected: priority customer named specifically; Jobs as verbs spanning functional/social/emotional; Pains/Gains concrete and tied to that customer; assumptions flagged vs evidence.
-Artifact:
-${s.playbook_application?.customer_profile ? JSON.stringify(s.playbook_application.customer_profile, null, 2) : "(empty — activity not completed)"}
+02 — Recommended Immediate Intervention:
+${s.playbook_application?.immediate_intervention || "(empty)"}
 
-Additional canvas notes:
-${s.application_canvas ? JSON.stringify(s.application_canvas, null, 2) : "(none)"}
+03 — Recommended Engagement Pathway (sequenced interventions over time):
+${s.playbook_application?.pathway || "(empty)"}
+
+04 — Risk Factors:
+${s.playbook_application?.risks || "(empty)"}
+
+05 — Success Criteria (realistic, evidence-anchored):
+${s.playbook_application?.success_criteria || "(empty)"}
 
 ── METHODOLOGICAL SOUNDNESS (cross-cutting) ──
-Assess across ALL inputs above: framing, methodology rationale, navigation commitments, both activity artifacts, and intervention. Look for Strategyzer rigor (evidence-first, customer-first sequencing, discovery vs delivery) and flag drift.
+Assess across ALL inputs above: framing, methodology rationale, navigation commitments, the
+engagement pathway artifact, and intervention. Look for Strategyzer rigor (evidence-first,
+customer-first sequencing, discovery vs delivery) and flag drift.
 
 
 ── INTERVENTION (Step 5) ──

@@ -217,25 +217,75 @@ ARTIFACT INTELLIGENCE:
   (suspiciously confident detail with no evidence trail), AI-generated-sounding outputs, and
   over-completion without evidence. Reward explicit uncertainty: "we don't know X yet — next test is Y".`;
 
-export const ENGAGEMENT_PATHWAY = `PART 5 — ENGAGEMENT PATHWAY LOGIC
+export const ENGAGEMENT_PATHWAY = `PART 5 — ENGAGEMENT PATHWAY & ORCHESTRATION LOGIC
 
-Strong coaches think:
-  "What is the MINIMUM structured intervention required to create meaningful progress?"
-NOT:
-  "How many frameworks can we apply?"
+The Engagement Pathway is the coach's design of a realistic Strategyzer journey under real
+organizational constraints. It is NOT a list of recommended playbooks, NOT a sales proposal,
+and NOT abstract consulting advice. It is operational, facilitation-oriented, evidence-centered.
 
-Reward: coherent sequencing, lightweight interventions, evidence progression, readiness awareness,
-  stakeholder alignment, practical momentum.
+Core orchestration question the coach must answer:
+  "What is the MINIMUM structured intervention required to create meaningful progress —
+   and how do I sequence Strategyzer methodology over time so the team builds readiness,
+   generates evidence, and maintains alignment?"
 
-EXAMPLE PATHWAY — situation: weak customer clarity + sponsor pressure.
-  1. Stakeholder alignment session
-  2. Ecosystem mapping
-  3. Customer profile interviews
-  4. Evidence review checkpoint
-  5. Value proposition refinement
-  Risks: sponsor impatience, weak evidence, internal assumptions.
-  Strong signals: narrows scope; gains commitment incrementally; maintains evidence rigor;
-    avoids over-engineering.`;
+REWARD (high-scoring orchestration signals):
+  - Sequencing coherence: each step unblocks the next (alignment → ecosystem → profile → VPC → BMC).
+  - Methodology restraint: deliberate "no playbook yet", narrowed scope, or stop/pause when justified.
+  - Stakeholder readiness awareness: sponsor commitment, decision-maker access, sabotage risk.
+  - Evidence progression: each intervention generates evidence that changes what comes next.
+  - Lightweight interventions: small workshops, interview sprints, evidence checkpoints — not
+    multi-week consulting engagements.
+  - Realistic cadence: practical workshop pacing, room for the team to do work between sessions.
+  - Customer-centered: the pathway always returns to behavior, evidence, customer reality.
+  - Reframing of unrealistic success criteria into evidence/learning milestones.
+
+PENALIZE (low-scoring patterns):
+  - Framework stacking: piling on playbooks without sequencing logic.
+  - Overengineering: 8-week roadmaps when a 2-hour alignment session is the real next move.
+  - Sales/upsell framing: positioning more methodology as the goal.
+  - Polished consulting language with no operational detail (no workshop type, no participants,
+    no evidence target, no decision point).
+  - Assuming the engagement proceeds smoothly — no risk surfacing, no readiness check.
+  - Forcing methodology expansion when alignment or evidence is the real bottleneck.
+
+REQUIRED OUTPUT STRUCTURE (the coach's pathway artifact has exactly these 5 sections):
+
+  01 — Current Situation Summary
+      Plain, prioritized read of what's actually happening: real ambiguity, stakeholder reality,
+      evidence quality, readiness level. Reward simplification. Penalize jargon and exhaustive
+      consulting-style summaries.
+
+  02 — Recommended Immediate Intervention
+      The ONE next concrete move. May legitimately be: alignment session, customer evidence
+      sprint, sponsor clarification, narrowing scope, or "no playbook yet — pause/stop".
+      Reward restraint when justified. Penalize defaulting to a workshop when alignment or
+      evidence is the real blocker.
+
+  03 — Recommended Engagement Pathway
+      Sequenced interventions over time: workshops, interview sprints, evidence checkpoints,
+      alignment moments. Each step should name: what happens, who participates, what evidence
+      or decision it produces, what it unblocks for the next step. Executable and lightweight.
+      Penalize bloated multi-track plans, framework lists, or sales-flavored expansion.
+
+  04 — Risk Factors
+      Stakeholder/sponsor risks, evidence gaps, organizational friction, unrealistic expectations,
+      sequencing risks. Strong coaches surface hidden blockers; weak coaches assume smooth progress.
+
+  05 — Success Criteria
+      Realistic, evidence-anchored definition of progress. Reward coaches who reframe unrealistic
+      ambitions into learning/evidence milestones.
+
+PLAYBOOK ORCHESTRATION HEURISTICS (situation → likely sequencing; multiple valid paths exist):
+  Weak customer clarity:      ecosystem mapping → customer profile interviews → VPC refinement.
+  Weak alignment:             sponsor clarification → stakeholder alignment workshop → scope reset.
+  Weak business-model clarity: BMC exploration → value-capture discussion → ecosystem dependency map.
+  Premature solutioning:      pause → customer evidence sprint → reframe success criteria.
+
+  Evaluate the COHERENCE of the chosen sequence, not whether the coach picked a "correct" one.
+
+MULTIPLE VALID PATHS: there is no single right answer. Two coherent, restrained pathways with
+different sequencing should both score highly if each is internally consistent, evidence-driven,
+and operationally realistic. Penalize only incoherent, bloated, or sales-flavored pathways.`;
 
 export const SCORING_WEIGHTS = `SCORING WEIGHTS (apply when assigning section scores and the final recommendation):
 INCREASE weight for: simplification, evidence rigor, facilitation quality, methodology restraint,
