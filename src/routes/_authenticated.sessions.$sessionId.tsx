@@ -23,13 +23,13 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
 
 type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: "framing", label: "Framing" },
-  { key: "method", label: "Method" },
-  { key: "dialogue", label: "Dialogue" },
-  { key: "application", label: "Canvas" },
-  { key: "intervention", label: "Intervention" },
-  { key: "playbook", label: "Playbook Application" },
+const STEPS: { key: Step; label: string; sub: string }[] = [
+  { key: "framing",      label: "Situation Framing",      sub: "Ambiguity, evidence, success expectations" },
+  { key: "method",       label: "Coaching Strategy",      sub: "Approach, sequencing, methodology restraint" },
+  { key: "dialogue",     label: "Stakeholder Workspace",  sub: "Persistent — return any time" },
+  { key: "application",  label: "Working Session Design", sub: "Facilitate Strategyzer thinking — fidelity is a choice" },
+  { key: "intervention", label: "Intervention Decision",  sub: "Continue · Pivot · Escalate · Stop" },
+  { key: "playbook",     label: "Engagement Pathway",     sub: "How would you sequence this responsibly" },
 ];
 
 function SessionPage() {
@@ -49,18 +49,33 @@ function SessionPage() {
   const session: any = data.session;
   const scenario = session.scenarios;
 
+  // Free navigation by design. Saving never auto-advances — the coach chooses
+  // when to move on, or to return to a prior section. Stakeholder Workspace is
+  // always one click away via the StepNav and the floating "Revisit
+  // stakeholders" affordance below.
+  const refreshOnly = () => { refetch(); };
+
   return (
     <Shell>
       <ScenarioHeader scenario={scenario} session={session} />
       <StepNav step={step} onChange={setStep} />
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={() => { refetch(); setStep("method"); }} onRefresh={refetch} />}
-        {step === "method" && <MethodStep session={session} onSaved={() => { refetch(); setStep("dialogue"); }} />}
-        {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("application")} />}
-        {step === "application" && <ApplicationStep session={session} onSaved={() => { refetch(); setStep("intervention"); }} />}
-        {step === "intervention" && <InterventionStep session={session} onSaved={() => { refetch(); setStep("playbook"); }} />}
+        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
+        {step === "method" && <MethodStep session={session} onSaved={refreshOnly} />}
+        {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
+        {step === "application" && <ApplicationStep session={session} onSaved={refreshOnly} />}
+        {step === "intervention" && <InterventionStep session={session} onSaved={refreshOnly} />}
         {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
       </div>
+      {step !== "dialogue" && step !== "framing" && (
+        <button
+          onClick={() => setStep("dialogue")}
+          className="fixed bottom-6 right-6 z-40 bg-ink text-paper px-4 py-3 text-xs uppercase tracking-[0.12em] rounded-sm shadow-[3px_3px_0_var(--ink)] border border-ink hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_var(--ink)] transition-transform"
+          title="Stakeholder dialogue is persistent — return any time to clarify, negotiate scope, or surface resistance"
+        >
+          ↩ Revisit stakeholders
+        </button>
+      )}
     </Shell>
   );
 }
@@ -77,6 +92,31 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
         </div>
         <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
         <p className="max-w-3xl opacity-90 leading-relaxed">{scenario.context}</p>
+
+        {(scenario.success_definition || scenario.success_pressure) && (
+          <div className="mt-6 grid md:grid-cols-2 gap-4 max-w-4xl">
+            {scenario.success_definition && (
+              <div className="border border-paper/40 p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">What the team believes success looks like</div>
+                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_definition}</p>
+              </div>
+            )}
+            {scenario.success_pressure && (
+              <div className="border border-paper/40 p-4">
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Pressure shaping that belief</div>
+                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_pressure}</p>
+              </div>
+            )}
+            {Array.isArray(scenario.unrealistic_aspects) && scenario.unrealistic_aspects.length > 0 && (
+              <div className="md:col-span-2 border border-paper/40 p-4" style={{ backgroundColor: "rgba(0,0,0,0.18)" }}>
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Where their success picture may be off — for you to surface, not assume</div>
+                <ul className="text-sm opacity-90 leading-relaxed list-disc pl-4 space-y-0.5">
+                  {scenario.unrealistic_aspects.map((u: string, i: number) => <li key={i}>{u}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         <div className="mt-6 grid md:grid-cols-3 gap-4">
           {(scenario.stakeholders as any[]).map((s) => (
             <div key={s.name} className="border border-paper/40 p-4">
@@ -108,6 +148,7 @@ function StepNav({ step, onChange }: { step: Step; onChange: (s: Step) => void }
                   <span className="marker-num text-xs opacity-70">{String(i + 1).padStart(2, "0")}</span>
                   <span className="text-sm font-medium">{s.label}</span>
                 </div>
+                <div className={`text-[10px] mt-1 ml-7 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{s.sub}</div>
               </button>
             );
           })}
@@ -446,91 +487,158 @@ function FramingStep({
 // ---------- Method: Playbook diagnosis & selection ----------
 
 function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const [choice, setChoice] = useState<string>(session.methodology_choice ?? "");
+  // Parse stored "choice::engagement" format. New: choice may also be
+  // "multi:id1,id2" or "none" — restraint is a valid coaching call.
+  const storedRaw: string = session.methodology_choice ?? "";
+  const [storedChoice, storedEngagement] = storedRaw.includes("::") ? storedRaw.split("::") : [storedRaw, ENGAGEMENT_MODELS[0].id];
+
+  const initialMode: "single" | "multi" | "none" =
+    storedChoice === "none" ? "none" : storedChoice.startsWith("multi:") ? "multi" : "single";
+  const initialSingle = initialMode === "single" ? storedChoice : "";
+  const initialMulti = initialMode === "multi" ? storedChoice.replace(/^multi:/, "").split(",").filter(Boolean) : [];
+
+  const [mode, setMode] = useState<"single" | "multi" | "none">(initialMode);
+  const [choice, setChoice] = useState<string>(initialSingle);
+  const [multi, setMulti] = useState<string[]>(initialMulti);
   const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
-  const [engagement, setEngagement] = useState<string>(ENGAGEMENT_MODELS[0].id);
+  const [engagement, setEngagement] = useState<string>(storedEngagement || ENGAGEMENT_MODELS[0].id);
   const [suggestion, setSuggestion] = useState<any>(null);
   const save = useServerFn(updateSession);
   const suggest = useServerFn(suggestPlaybook);
 
   const suggestMut = useMutation({
-    mutationFn: () => suggest({ data: { sessionId: session.id } }),
+    mutationFn: () => suggest({ data: { sessionId: session.id, mode } as any }),
     onSuccess: (res) => setSuggestion(res.suggestion),
     onError: (e: any) => toast.error(e.message ?? "Could not generate suggestion"),
   });
 
+  function encodedChoice(): string {
+    if (mode === "none") return "none";
+    if (mode === "multi") return `multi:${multi.join(",")}`;
+    return choice;
+  }
+
   const mut = useMutation({
     mutationFn: () => save({ data: {
       sessionId: session.id,
-      methodologyChoice: `${choice}::${engagement}`,
+      methodologyChoice: `${encodedChoice()}::${engagement}`,
       methodologyRationale: rationale,
       status: "method",
     } }),
-    onSuccess: () => { toast.success("Playbook selected"); onSaved(); },
+    onSuccess: () => { toast.success("Coaching strategy saved"); onSaved(); },
     onError: (e: any) => toast.error(e.message),
   });
 
+  const canSave =
+    rationale.trim().length > 0 &&
+    (mode === "none" || (mode === "single" && choice) || (mode === "multi" && multi.length > 0));
+
   const selectedPb = PLAYBOOKS.find((p) => p.id === choice);
+
+  function toggleMulti(id: string) {
+    setMulti((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
 
   return (
     <StepShell
-      title="Diagnose & select playbook"
-      hint="Strategyzer's scoping logic: every project falls into one dominant category. Pick one primary playbook — don't mix unless the problem clearly shifts."
+      title="Choose your coaching strategy"
+      hint="Methodology is an intervention, not an obligation. Pick the smallest sufficient response: one playbook, a sequenced combination, or none yet if you need more evidence first. The point is restraint and fit, not framework coverage."
     >
+      {/* Mode selector — single / multi / none */}
+      <div className="grid md:grid-cols-3 gap-2 mb-6">
+        {[
+          { id: "single", label: "One playbook", sub: "A single primary intervention" },
+          { id: "multi", label: "Sequenced combination", sub: "A short orchestration of playbooks" },
+          { id: "none", label: "No playbook yet", sub: "Gather more evidence first" },
+        ].map((m) => {
+          const active = mode === m.id;
+          return (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id as any)}
+              className={`text-left p-3 border border-ink ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+            >
+              <div className="text-sm font-medium">{m.label}</div>
+              <div className="text-[11px] opacity-80 mt-0.5">{m.sub}</div>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
-          <div className="font-medium mb-1">AI diagnostic assist</div>
-          <div className="text-xs opacity-80">Have the AI review your scoping notes and recommend a playbook — then form your own call.</div>
+          <div className="font-medium mb-1">AI second opinion</div>
+          <div className="text-xs opacity-80">{mode === "none" ? "Ask the AI which evidence-gathering moves it would prioritize before any playbook." : "Have the AI review your scoping notes and propose a fit — then form your own call."}</div>
         </div>
         <button
           onClick={() => suggestMut.mutate()}
           disabled={suggestMut.isPending}
           className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
         >
-          {suggestMut.isPending ? "Diagnosing…" : "Suggest playbook"}
+          {suggestMut.isPending ? "Thinking…" : mode === "none" ? "Suggest evidence moves" : "Suggest playbook"}
         </button>
       </div>
 
       {suggestion && (
         <div className="mb-6 border border-ink p-4 bg-secondary">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI recommendation · confidence {suggestion.confidence ?? "—"}</div>
-          <div className="font-medium mb-1">
-            → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId ?? "(no match)"}
-          </div>
-          <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI suggestion · confidence {suggestion.confidence ?? "—"}</div>
+          {suggestion.playbookId && (
+            <div className="font-medium mb-1">
+              → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
+            </div>
+          )}
+          {suggestion.rationale && <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>}
+          {Array.isArray(suggestion.evidence_moves) && suggestion.evidence_moves.length > 0 && (
+            <ul className="text-sm list-disc pl-4 space-y-0.5">
+              {suggestion.evidence_moves.map((m: string, i: number) => <li key={i}>{m}</li>)}
+            </ul>
+          )}
           {Array.isArray(suggestion.watchouts) && suggestion.watchouts.length > 0 && (
-            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5">
+            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">
               {suggestion.watchouts.map((w: string, i: number) => <li key={i}>{w}</li>)}
             </ul>
           )}
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-3 mb-6">
-        {PLAYBOOKS.map((p) => {
-          const active = choice === p.id;
-          return (
-            <button
-              key={p.id}
-              onClick={() => setChoice(p.id)}
-              className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
-                <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}</span>
-              </div>
-              <div className="font-medium mb-1">{p.name}</div>
-              <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
-              <ul className="text-[11px] opacity-70 space-y-0.5">
-                {p.signals.map((s) => <li key={s}>· {s}</li>)}
-              </ul>
-              <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
-            </button>
-          );
-        })}
-      </div>
+      {mode !== "none" && (
+        <div className="grid md:grid-cols-2 gap-3 mb-6">
+          {PLAYBOOKS.map((p) => {
+            const active = mode === "single" ? choice === p.id : multi.includes(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => mode === "single" ? setChoice(p.id) : toggleMulti(p.id)}
+                className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
+                  <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}{mode === "multi" && active ? ` · #${multi.indexOf(p.id) + 1}` : ""}</span>
+                </div>
+                <div className="font-medium mb-1">{p.name}</div>
+                <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
+                <ul className="text-[11px] opacity-70 space-y-0.5">
+                  {p.signals.map((s) => <li key={s}>· {s}</li>)}
+                </ul>
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-      {selectedPb && (
+      {mode === "none" && (
+        <div className="border border-ink p-4 mb-6" style={{ backgroundColor: "var(--brand-lime)" }}>
+          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-1">Restraint is a coaching move</div>
+          <p className="text-sm leading-relaxed">
+            Reaching for a playbook before the team has shared evidence is a common failure mode. Document what evidence
+            you need first, who would generate it, and what would trigger you to commit to a methodology. The simulator
+            will reward this decision if your rationale shows judgment, not avoidance.
+          </p>
+        </div>
+      )}
+
+      {selectedPb && mode === "single" && (
         <a
           href={selectedPb.libraryUrl}
           target="_blank"
@@ -559,13 +667,15 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         })}
       </div>
 
-      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale</label>
+      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale — sequencing, scope, evidence focus, restraint</label>
       <div className="relative">
         <textarea
           value={rationale}
           onChange={(e) => setRationale(e.target.value)}
           rows={5}
-          placeholder="Why this playbook for this team, right now. What scoping signal pointed here. What would change your mind."
+          placeholder={mode === "none"
+            ? "What evidence are you missing? Who would generate it, by when? What would have to be true to commit to a playbook?"
+            : "Why this approach for this team right now. What sequencing or restraint matters. What would change your mind."}
           className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary"
         />
         <div className="absolute top-2 right-2">
@@ -573,8 +683,8 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         </div>
       </div>
       <div className="mt-4 flex justify-end">
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !choice || !rationale.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-          {mut.isPending ? "Saving…" : "Save & open dialogue →"}
+        <button onClick={() => mut.mutate()} disabled={mut.isPending || !canSave} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
+          {mut.isPending ? "Saving…" : "Save coaching strategy"}
         </button>
       </div>
     </StepShell>
@@ -622,16 +732,17 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
     <div className="space-y-6">
       {/* Purpose framing */}
       <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Why you're here</div>
+        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — open whenever you need it</div>
         <p className="text-sm leading-relaxed">
-          One-on-ones with each stakeholder to <strong>gain clarity on how to guide their playbook</strong>: surface
-          context the group call didn't, test your read of the situation, and earn small concrete commitments
-          (a 15-min pitch, access to a customer, a pilot slot) that will shape your intervention and how you run the
-          canvas with the team.
+          One-on-ones live here for the full session. Use them to clarify assumptions, surface resistance, negotiate scope,
+          challenge unrealistic success definitions, validate readiness, or earn small concrete commitments (a 15-min pitch,
+          access to a customer, a pilot slot). Stakeholders remember the full transcript — they will resist, evolve, and
+          sometimes contradict themselves under pressure, just like real ones.
         </p>
         <p className="text-sm leading-relaxed mt-2">
-          <strong>Output:</strong> a short list of what each stakeholder said, agreed to, or pushed back on — captured
-          in <em>Commitments &amp; decisions</em> on the right. You can come back to this step any time to ask more questions.
+          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These feed your
+          working session design, your intervention call, and your engagement pathway. No need to "finish" this section —
+          come back whenever a later step surfaces a new question for a stakeholder.
         </p>
       </div>
 
@@ -650,9 +761,10 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
               </button>
             ))}
           </div>
-          <button onClick={onContinue} className="mt-6 w-full border border-ink py-2 text-sm hover:bg-secondary">
-            Move to application →
-          </button>
+          <p className="mt-6 text-[11px] text-muted-foreground leading-relaxed">
+            This workspace stays open across the whole session. Switch sections from the top nav at any time —
+            nothing here is locked or "completed".
+          </p>
         </aside>
 
         <div className="md:col-span-6 border border-ink flex flex-col min-h-[60vh]">
@@ -761,9 +873,24 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   }
 
   if (!canvas) {
+    const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
-      <StepShell title="Pick a playbook first" hint="Application requires a selected playbook. Go back to the Method step.">
-        <p className="text-sm text-muted-foreground">No canvas has been mapped to this session yet.</p>
+      <StepShell
+        title="Working Session Design"
+        hint="Artifacts are tools, not deliverables. The point is to facilitate Strategyzer thinking — sometimes the right move is no canvas at all."
+      >
+        {mode === "none" ? (
+          <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
+            <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
+            <p className="text-sm leading-relaxed">
+              You chose to gather more evidence before committing to a playbook. Stay here while you work the
+              Stakeholder Workspace, then return to Coaching Strategy when you're ready. The evaluator rewards
+              this kind of restraint when your rationale shows it was deliberate, not avoidant.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Strategy if you'd like to commit to a playbook.</p>
+        )}
       </StepShell>
     );
   }
