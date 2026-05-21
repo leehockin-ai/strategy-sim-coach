@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useMyRoles } from "@/hooks/use-my-roles";
 
 export function Shell({ children }: { children: ReactNode }) {
   return (
@@ -30,6 +31,7 @@ function useSessionUser() {
 
 function Header() {
   const email = useSessionUser();
+  const { isReviewer } = useMyRoles();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -50,7 +52,7 @@ function Header() {
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/scenarios">Scenarios</NavLink>
           {email && <NavLink to="/sessions">My sessions</NavLink>}
-          <NavLink to="/reviewer">Reviewer</NavLink>
+          {isReviewer && <NavLink to="/reviewer">Reviewer</NavLink>}
           <div className="ml-3 pl-3 border-l border-ink/20 flex items-center gap-2">
             {email === undefined ? null : email ? (
               <>
