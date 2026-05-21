@@ -3,57 +3,58 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-// Per-section rubric. Each section corresponds to a step in the simulation
-// and is scored against its own focused criteria.
+// Per-section rubric aligned to the coaching-judgment philosophy:
+// reward simplification, evidence rigor, sequencing, alignment, restraint.
+// Penalize forced playbook application, over-engineering, canvas-completion thinking.
 export const SECTION_RUBRIC = [
   {
-    key: "framing",
-    label: "Framing",
+    key: "situation_framing",
+    label: "Situation Framing",
+    step: "Step 1",
+    focus:
+      "Did the coach surface real ambiguity, separate evidence from opinion, and explicitly challenge or reframe the team's success definition where it was unrealistic? Reward naming the unknowns over pretending to know.",
+  },
+  {
+    key: "coaching_strategy",
+    label: "Coaching Strategy",
     step: "Step 2",
     focus:
-      "Did the coach reframe the brief into clear problem statements & testable assumptions before prescribing anything? Strategyzer rigor: separates evidence from opinion, names the unknowns.",
+      "Was the chosen approach fit-for-purpose — one playbook, sequenced combination, or deliberately no playbook yet? Reward methodology restraint, sequencing logic, and the smallest sufficient intervention. Penalize forced playbook application.",
   },
   {
-    key: "methodology",
-    label: "Methodology Judgment",
-    step: "Step 3",
-    focus:
-      "Was the chosen methodology fit-for-purpose for the evidence at hand, and was the rationale specific (not generic Strategyzer vocabulary)?",
-  },
-  {
-    key: "navigation",
+    key: "stakeholder_navigation",
     label: "Stakeholder Navigation",
+    step: "Step 3 (persistent)",
+    focus:
+      "How well did the coach use the persistent stakeholder workspace: surfacing resistance, negotiating scope, challenging success expectations, capturing concrete commitments, managing politics without over-pleasing or solution-jumping.",
+  },
+  {
+    key: "working_session_facilitation",
+    label: "Working Session Facilitation",
     step: "Step 4",
     focus:
-      "How well did the coach navigate stakeholders: surfacing concerns, securing concrete commitments, managing politics without over-pleasing or solution-jumping. Did agreements get captured cleanly?",
-  },
-  {
-    key: "activity_ecosystem",
-    label: "Activity 1 · Customer Ecosystem Map",
-    step: "Step 6 · Activity 1",
-    focus:
-      "Quality of the ecosystem artifact: are end users, beneficiaries, economic buyers, decision makers, channel partners, influencers, recommenders and saboteurs separated and named specifically (not 'customers')? Did the coach guide the team to surface role disagreement rather than fill cells themselves?",
-  },
-  {
-    key: "activity_customer_profile",
-    label: "Activity 2 · Customer Profile",
-    step: "Step 6 · Activity 2",
-    focus:
-      "Quality of the Jobs/Pains/Gains artifact: jobs are verbs and span functional/social/emotional, pains and gains are concrete and tied to the priority customer chosen from the ecosystem, assumptions are flagged vs evidence. Did the coach push back on vague language without taking over the pen?",
+      "Did the coach exercise fidelity judgment — going deep where it mattered, stopping early when the evidence wasn't there, avoiding over-canvasing? Reward incomplete artifacts when justified; penalize canvas-completion-as-goal.",
   },
   {
     key: "methodological_soundness",
     label: "Strategyzer Methodological Soundness",
     step: "Cross-cutting",
     focus:
-      "Does the coaching consistently honor Strategyzer principles across the session: evidence over opinion, test before scale, customer-first sequencing (ecosystem → profile → value map), and separating discovery from delivery? Flag any methodology drift, framework name-dropping without substance, or skipped sequencing.",
+      "Strategyzer rigor across every section: evidence over opinion, test before scale, customer-first sequencing (ecosystem → profile → value map), discovery vs delivery. Flag framework name-dropping without substance and skipped sequencing.",
   },
   {
-    key: "intervention",
+    key: "intervention_discipline",
     label: "Intervention Discipline",
     step: "Step 5",
     focus:
-      "Was the recommendation tight, evidence-based, and aligned to what was agreed in 1:1s and produced in the working session? Did commitments made in dialogue (e.g. CIO pitch) get reflected?",
+      "Was the recommendation tight, scope-disciplined, sequenced, and aligned with stakeholder readiness and commitments from the workspace? Reward restraint and clarity; penalize over-prescription.",
+  },
+  {
+    key: "engagement_pathway",
+    label: "Engagement Pathway",
+    step: "Step 6",
+    focus:
+      "How responsibly would the coach sequence Strategyzer methodology over time: next best playbook(s), evidence goals, workshop cadence, alignment moves. Consultative and customer-centered, NOT upsell-driven.",
   },
 ] as const;
 
