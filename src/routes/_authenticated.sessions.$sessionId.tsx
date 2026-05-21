@@ -549,8 +549,8 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
 
   return (
     <StepShell
-      title="Choose your coaching strategy"
-      hint="Methodology is an intervention, not an obligation. Pick the smallest sufficient response: one playbook, a sequenced combination, or none yet if you need more evidence first. The point is restraint and fit, not framework coverage."
+      title="Choose your coaching approach"
+      hint="How are you going to work with this team? Pick the smallest useful Strategyzer intervention — one playbook, a sequenced combination, or none yet if evidence is too thin. Decide methodology fit, sequencing, and working style (workshop · guided coaching · evidence gathering) before you enter the room. This is the approach you'll activate in Live Playbook Facilitation."
     >
       {/* Mode selector — single / multi / none */}
       <div className="grid md:grid-cols-3 gap-2 mb-6">
