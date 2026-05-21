@@ -23,13 +23,13 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
 
 type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
-const STEPS: { key: Step; label: string }[] = [
-  { key: "framing", label: "Framing" },
-  { key: "method", label: "Method" },
-  { key: "dialogue", label: "Dialogue" },
-  { key: "application", label: "Canvas" },
-  { key: "intervention", label: "Intervention" },
-  { key: "playbook", label: "Playbook Application" },
+const STEPS: { key: Step; label: string; sub: string }[] = [
+  { key: "framing",      label: "Situation Framing",      sub: "Ambiguity, evidence, success expectations" },
+  { key: "method",       label: "Coaching Strategy",      sub: "Approach, sequencing, methodology restraint" },
+  { key: "dialogue",     label: "Stakeholder Workspace",  sub: "Persistent — return any time" },
+  { key: "application",  label: "Working Session Design", sub: "Facilitate Strategyzer thinking — fidelity is a choice" },
+  { key: "intervention", label: "Intervention Decision",  sub: "Continue · Pivot · Escalate · Stop" },
+  { key: "playbook",     label: "Engagement Pathway",     sub: "How would you sequence this responsibly" },
 ];
 
 function SessionPage() {
@@ -49,18 +49,33 @@ function SessionPage() {
   const session: any = data.session;
   const scenario = session.scenarios;
 
+  // Free navigation by design. Saving never auto-advances — the coach chooses
+  // when to move on, or to return to a prior section. Stakeholder Workspace is
+  // always one click away via the StepNav and the floating "Revisit
+  // stakeholders" affordance below.
+  const refreshOnly = () => { refetch(); };
+
   return (
     <Shell>
       <ScenarioHeader scenario={scenario} session={session} />
       <StepNav step={step} onChange={setStep} />
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={() => { refetch(); setStep("method"); }} onRefresh={refetch} />}
-        {step === "method" && <MethodStep session={session} onSaved={() => { refetch(); setStep("dialogue"); }} />}
-        {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("application")} />}
-        {step === "application" && <ApplicationStep session={session} onSaved={() => { refetch(); setStep("intervention"); }} />}
-        {step === "intervention" && <InterventionStep session={session} onSaved={() => { refetch(); setStep("playbook"); }} />}
+        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
+        {step === "method" && <MethodStep session={session} onSaved={refreshOnly} />}
+        {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
+        {step === "application" && <ApplicationStep session={session} onSaved={refreshOnly} />}
+        {step === "intervention" && <InterventionStep session={session} onSaved={refreshOnly} />}
         {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
       </div>
+      {step !== "dialogue" && step !== "framing" && (
+        <button
+          onClick={() => setStep("dialogue")}
+          className="fixed bottom-6 right-6 z-40 bg-ink text-paper px-4 py-3 text-xs uppercase tracking-[0.12em] rounded-sm shadow-[3px_3px_0_var(--ink)] border border-ink hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_var(--ink)] transition-transform"
+          title="Stakeholder dialogue is persistent — return any time to clarify, negotiate scope, or surface resistance"
+        >
+          ↩ Revisit stakeholders
+        </button>
+      )}
     </Shell>
   );
 }
