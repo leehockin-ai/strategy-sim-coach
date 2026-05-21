@@ -1358,7 +1358,7 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
           disabled={submit.isPending || !rec.trim() || !decision}
           className="bg-ink text-paper px-6 py-3 text-sm font-medium rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Saving…" : "Continue to playbook application →"}
+          {submit.isPending ? "Saving…" : "Continue to engagement orchestration →"}
         </button>
       </div>
     </StepShell>
