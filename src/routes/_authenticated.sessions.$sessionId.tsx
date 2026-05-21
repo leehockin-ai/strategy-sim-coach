@@ -12,6 +12,14 @@ import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook, BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+import canvasVPC from "@/assets/canvas-value-proposition.png";
+import canvasBMC from "@/assets/canvas-business-model.png";
+
+const CANVAS_IMAGES: Record<string, { src: string; alt: string }> = {
+  strong_value_propositions: { src: canvasVPC, alt: "Strategyzer Value Proposition Canvas" },
+  customer_profile_interviews: { src: canvasVPC, alt: "Strategyzer Customer Profile (right side of the Value Proposition Canvas)" },
+  competing_on_business_models: { src: canvasBMC, alt: "Strategyzer Business Model Canvas" },
+};
 
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
