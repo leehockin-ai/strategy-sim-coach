@@ -75,6 +75,16 @@ ${s.intervention_recommendation || "(none)"}
 — Final decision —
 ${s.decision || "(none)"}
 
+— Strategyzer Playbook applied (Step 6) —
+${s.playbook_extracted ? `Playbook: ${(s.playbook_extracted as any).title}\nOverview: ${(s.playbook_extracted as any).overview}` : "(no playbook uploaded)"}
+
+— Coach's responses per playbook exercise —
+${s.playbook_application && s.playbook_extracted
+  ? (s.playbook_extracted as any).exercises
+      .map((ex: any) => `• ${ex.title}\n${(s.playbook_application as any)[ex.id] || "(no response)"}`)
+      .join("\n\n")
+  : "(none)"}
+
 — Stakeholder transcript —
 ${transcriptText || "(no transcript)"}`;
 

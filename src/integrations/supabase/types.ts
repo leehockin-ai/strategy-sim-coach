@@ -161,6 +161,9 @@ export type Database = {
           methodology_choice: string | null
           methodology_rationale: string | null
           owner_id: string | null
+          playbook_application: Json | null
+          playbook_extracted: Json | null
+          playbook_pdf_path: string | null
           scenario_id: string
           status: string
         }
@@ -177,6 +180,9 @@ export type Database = {
           methodology_choice?: string | null
           methodology_rationale?: string | null
           owner_id?: string | null
+          playbook_application?: Json | null
+          playbook_extracted?: Json | null
+          playbook_pdf_path?: string | null
           scenario_id: string
           status?: string
         }
@@ -193,6 +199,9 @@ export type Database = {
           methodology_choice?: string | null
           methodology_rationale?: string | null
           owner_id?: string | null
+          playbook_application?: Json | null
+          playbook_extracted?: Json | null
+          playbook_pdf_path?: string | null
           scenario_id?: string
           status?: string
         }

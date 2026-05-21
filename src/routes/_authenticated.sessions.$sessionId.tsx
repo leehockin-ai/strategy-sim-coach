@@ -8,6 +8,8 @@ import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sen
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
+import { extractPlaybook, savePlaybookApplication } from "@/lib/playbook.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook } from "@/lib/playbooks";
 
@@ -18,14 +20,15 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   component: SessionPage,
 });
 
-type Step = "framing" | "method" | "dialogue" | "application" | "intervention";
+type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "framing", label: "Framing" },
   { key: "method", label: "Method" },
   { key: "dialogue", label: "Dialogue" },
-  { key: "application", label: "Application" },
+  { key: "application", label: "Canvas" },
   { key: "intervention", label: "Intervention" },
+  { key: "playbook", label: "Playbook Application" },
 ];
 
 function SessionPage() {
@@ -54,7 +57,8 @@ function SessionPage() {
         {step === "method" && <MethodStep session={session} onSaved={() => { refetch(); setStep("dialogue"); }} />}
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("application")} />}
         {step === "application" && <ApplicationStep session={session} onSaved={() => { refetch(); setStep("intervention"); }} />}
-        {step === "intervention" && <InterventionStep session={session} onSaved={refetch} />}
+        {step === "intervention" && <InterventionStep session={session} onSaved={() => { refetch(); setStep("playbook"); }} />}
+        {step === "playbook" && <PlaybookStep session={session} onSaved={refetch} />}
       </div>
     </Shell>
   );
@@ -818,23 +822,18 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 }
 
 function InterventionStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  const navigate = useNavigate();
   const [rec, setRec] = useState<string>(session.intervention_recommendation ?? "");
   const [decision, setDecision] = useState(session.decision ?? "");
   const save = useServerFn(updateSession);
-  const evalFn = useServerFn(generateEvaluation);
 
   const submit = useMutation({
-    mutationFn: async () => {
-      await save({ data: { sessionId: session.id, interventionRecommendation: rec, decision, status: "evaluating" } });
-      await evalFn({ data: { sessionId: session.id } });
-    },
+    mutationFn: () =>
+      save({ data: { sessionId: session.id, interventionRecommendation: rec, decision, status: "intervention" } }),
     onSuccess: () => {
-      toast.success("Evaluation generated");
+      toast.success("Intervention saved — now apply a real playbook");
       onSaved();
-      navigate({ to: "/sessions/$sessionId/report", params: { sessionId: session.id } });
     },
-    onError: (e: any) => toast.error(e.message ?? "Evaluation failed"),
+    onError: (e: any) => toast.error(e.message ?? "Save failed"),
   });
 
   const decisions = [
@@ -847,7 +846,7 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
   return (
     <StepShell
       title="Recommend & decide"
-      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Submitting locks the session and triggers AI evaluation."
+      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Next you'll apply a real Strategyzer playbook with the team."
     >
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Next-best action</label>
       <div className="relative">
@@ -883,9 +882,201 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
           disabled={submit.isPending || !rec.trim() || !decision}
           className="bg-ink text-paper px-6 py-3 text-sm font-medium rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Generating evaluation…" : "Submit & generate evaluation →"}
+          {submit.isPending ? "Saving…" : "Continue to playbook application →"}
         </button>
       </div>
     </StepShell>
+  );
+}
+
+// ---------- Playbook Application: upload a real Strategyzer playbook PDF and run it ----------
+
+function PlaybookStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+  const navigate = useNavigate();
+  const extracted = session.playbook_extracted as
+    | { title: string; overview: string; exercises: { id: string; title: string; objective: string; instructions: string; prompts: string[] }[] }
+    | null;
+  const initialApp = (session.playbook_application as Record<string, string> | null) ?? {};
+
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [responses, setResponses] = useState<Record<string, string>>(initialApp);
+
+  const extractFn = useServerFn(extractPlaybook);
+  const saveApp = useServerFn(savePlaybookApplication);
+  const evalFn = useServerFn(generateEvaluation);
+
+  async function handleUpload() {
+    if (!file) return;
+    if (file.type !== "application/pdf") {
+      toast.error("Please upload a PDF file");
+      return;
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("PDF too large (max 15MB)");
+      return;
+    }
+    setUploading(true);
+    try {
+      const { data: userRes } = await supabase.auth.getUser();
+      const userId = userRes.user?.id;
+      if (!userId) throw new Error("Not signed in");
+      const path = `${userId}/${session.id}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from("playbooks")
+        .upload(path, file, { upsert: true, contentType: "application/pdf" });
+      if (upErr) throw new Error(upErr.message);
+
+      setUploading(false);
+      setExtracting(true);
+      await extractFn({ data: { sessionId: session.id, pdfPath: path } });
+      toast.success("Playbook parsed");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+      setExtracting(false);
+    }
+  }
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      await saveApp({ data: { sessionId: session.id, application: responses } });
+      await evalFn({ data: { sessionId: session.id } });
+    },
+    onSuccess: () => {
+      toast.success("Evaluation generated");
+      onSaved();
+      navigate({ to: "/sessions/$sessionId/report", params: { sessionId: session.id } });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Evaluation failed"),
+  });
+
+  // ---------- Upload screen ----------
+  if (!extracted) {
+    return (
+      <StepShell
+        title="Bring in a real playbook"
+        hint="Upload the Strategyzer playbook PDF you'd actually use here. We'll parse its exercises so you can run them with the team — no improvising frameworks."
+      >
+        <div className="border border-ink p-5 bg-secondary mb-4">
+          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Where to get the playbook</div>
+          <p className="text-sm leading-relaxed mb-3">
+            Sign in to the Strategyzer platform and download the relevant playbook PDF from the official library.
+          </p>
+          <a
+            href="https://platform.strategyzer.com/playbook_libraries/strategyzer_library"
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs underline"
+          >
+            Open Strategyzer playbook library ↗
+          </a>
+        </div>
+
+        <label className="block border-2 border-dashed border-ink p-8 text-center cursor-pointer hover:bg-secondary">
+          <input
+            type="file"
+            accept="application/pdf"
+            className="hidden"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+          <div className="text-sm">
+            {file ? <strong>{file.name}</strong> : "Click to choose a playbook PDF (max 15MB)"}
+          </div>
+          {file && (
+            <div className="text-[11px] text-muted-foreground mt-1">
+              {(file.size / 1024).toFixed(0)} KB
+            </div>
+          )}
+        </label>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading || extracting}
+            className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
+          >
+            {uploading ? "Uploading…" : extracting ? "Parsing exercises…" : "Upload & parse →"}
+          </button>
+        </div>
+      </StepShell>
+    );
+  }
+
+  // ---------- Run the playbook ----------
+  return (
+    <div>
+      <div className="grid md:grid-cols-12 gap-6 mb-6">
+        <div className="md:col-span-4">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Active playbook</div>
+          <h2 className="text-2xl tracking-tight mb-2">{extracted.title}</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-4">{extracted.overview}</p>
+          <div className="border border-ink p-3 text-xs bg-secondary">
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">How to run this</div>
+            <p className="leading-relaxed">
+              Walk the team through each exercise in order. Capture what the team produces — not what you think.
+              Empty responses mean the exercise wasn't completed.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (confirm("Replace the current playbook with a different PDF?")) {
+                setResponses({});
+                // Force re-upload UI
+                (session as any).playbook_extracted = null;
+                onSaved();
+              }
+            }}
+            className="mt-3 text-xs underline"
+          >
+            Replace playbook PDF
+          </button>
+        </div>
+
+        <div className="md:col-span-8 space-y-4">
+          {extracted.exercises.map((ex, i) => (
+            <div key={ex.id} className="border border-ink p-4 bg-paper">
+              <div className="flex items-baseline gap-3 mb-1">
+                <span className="marker-num text-xs opacity-60">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="text-base font-medium">{ex.title}</h3>
+              </div>
+              <p className="text-xs text-muted-foreground italic mb-2">{ex.objective}</p>
+              <p className="text-xs leading-relaxed mb-3 whitespace-pre-wrap">{ex.instructions}</p>
+              {ex.prompts.length > 0 && (
+                <ul className="text-xs list-disc pl-5 mb-3 space-y-0.5">
+                  {ex.prompts.map((p, j) => <li key={j}>{p}</li>)}
+                </ul>
+              )}
+              <textarea
+                value={responses[ex.id] ?? ""}
+                onChange={(e) => setResponses((p) => ({ ...p, [ex.id]: e.target.value }))}
+                rows={5}
+                placeholder="Capture the team's responses to this exercise."
+                className="w-full border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary font-mono"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-ink pt-4">
+        <button
+          onClick={() => saveApp({ data: { sessionId: session.id, application: responses } }).then(() => toast.success("Saved"))}
+          className="border border-ink px-4 py-2 text-sm hover:bg-secondary"
+        >
+          Save progress
+        </button>
+        <button
+          onClick={() => submit.mutate()}
+          disabled={submit.isPending}
+          className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
+        >
+          {submit.isPending ? "Generating evaluation…" : "Submit & generate evaluation →"}
+        </button>
+      </div>
+    </div>
   );
 }
