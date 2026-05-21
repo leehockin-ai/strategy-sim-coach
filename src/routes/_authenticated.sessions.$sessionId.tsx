@@ -843,11 +843,19 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
 
 // ---------- Application: run the playbook canvas with the team ----------
 
+type FacilitationAssist = {
+  team_says: string;
+  probing_questions: string[];
+  evidence_gaps: string[];
+  reframe: string;
+  contradiction: string | null;
+};
+
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const canvas = canvasForPlaybook(session.methodology_choice);
   const initial = (session.application_canvas as Record<string, string> | null) ?? {};
   const [cells, setCells] = useState<Record<string, string>>(initial);
-  const [evidence, setEvidence] = useState<Record<string, string>>({});
+  const [assist, setAssist] = useState<Record<string, FacilitationAssist>>({});
   const [loading, setLoading] = useState<string | null>(null);
 
   const suggest = useServerFn(suggestCanvasCell);
@@ -855,18 +863,26 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 
   const saveMut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, canvas: cells } }),
-    onSuccess: () => { toast.success("Canvas saved"); onSaved(); },
+    onSuccess: () => { toast.success("Working session captured — incomplete is fine"); onSaved(); },
     onError: (e: any) => toast.error(e?.message ?? "Save failed"),
   });
 
-  async function askTeam(cellKey: string) {
+  async function runAssist(cellKey: string) {
     setLoading(cellKey);
     try {
       const res = await suggest({ data: { sessionId: session.id, cellKey } });
-      setCells((p) => ({ ...p, [cellKey]: res.suggestion ?? "" }));
-      if (res.evidence) setEvidence((p) => ({ ...p, [cellKey]: res.evidence }));
+      setAssist((p) => ({
+        ...p,
+        [cellKey]: {
+          team_says: res.team_says ?? "",
+          probing_questions: res.probing_questions ?? [],
+          evidence_gaps: res.evidence_gaps ?? [],
+          reframe: res.reframe ?? "",
+          contradiction: res.contradiction ?? null,
+        },
+      }));
     } catch (e: any) {
-      toast.error(e?.message ?? "AI suggestion failed");
+      toast.error(e?.message ?? "Facilitation assist failed");
     } finally {
       setLoading(null);
     }
@@ -901,16 +917,18 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   const isBMC = canvas.id === "competing_on_business_models";
 
   function CellCard({ cell }: { cell: { key: string; label: string; hint: string; column?: string } }) {
+    const a = assist[cell.key];
     return (
       <div className="border border-ink p-3 bg-paper">
         <div className="flex items-baseline justify-between gap-2 mb-1">
           <label className="text-[11px] uppercase tracking-[0.12em] font-medium">{cell.label}</label>
           <button
-            onClick={() => askTeam(cell.key)}
+            onClick={() => runAssist(cell.key)}
             disabled={loading === cell.key}
             className="text-[10px] uppercase tracking-wider border border-ink px-2 py-0.5 hover:bg-secondary disabled:opacity-50"
+            title="Surface a realistic weak team response, probing questions, evidence gaps, and a reframe — you write the cell."
           >
-            {loading === cell.key ? "Asking…" : "Ask team"}
+            {loading === cell.key ? "Listening…" : "Facilitation assist"}
           </button>
         </div>
         <p className="text-[10px] text-muted-foreground mb-2 leading-snug">{cell.hint}</p>
@@ -918,11 +936,47 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
           value={cells[cell.key] ?? ""}
           onChange={(e) => setCells((p) => ({ ...p, [cell.key]: e.target.value }))}
           rows={5}
-          placeholder="Fill with the team, or click 'Ask team' to draft from the conversation so far."
+          placeholder="Capture what the team actually says, in their words. Blank is OK if you have no evidence yet — note that."
           className="w-full border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary font-mono"
         />
-        {evidence[cell.key] && (
-          <p className="text-[10px] text-muted-foreground italic mt-1.5">Evidence: {evidence[cell.key]}</p>
+
+        {a && (
+          <div className="mt-2 border-t border-ink/30 pt-2 space-y-2">
+            {a.team_says && (
+              <div className="border border-ink/40 bg-secondary/40 p-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Team just said</div>
+                <p className="text-[11px] italic leading-snug">"{a.team_says}"</p>
+              </div>
+            )}
+            {a.probing_questions.length > 0 && (
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Probes you could ask</div>
+                <ul className="text-[11px] space-y-0.5 leading-snug list-disc list-inside">
+                  {a.probing_questions.map((q, i) => <li key={i}>{q}</li>)}
+                </ul>
+              </div>
+            )}
+            {a.evidence_gaps.length > 0 && (
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Evidence gaps</div>
+                <ul className="text-[11px] space-y-0.5 leading-snug list-disc list-inside">
+                  {a.evidence_gaps.map((g, i) => <li key={i}>{g}</li>)}
+                </ul>
+              </div>
+            )}
+            {a.reframe && (
+              <div className="border-l-2 border-ink pl-2">
+                <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-0.5">Reframe</div>
+                <p className="text-[11px] leading-snug">{a.reframe}</p>
+              </div>
+            )}
+            {a.contradiction && (
+              <div className="border border-ink p-2" style={{ backgroundColor: "var(--brand-red, #fee)" }}>
+                <div className="text-[9px] uppercase tracking-[0.14em] mb-0.5">Contradiction</div>
+                <p className="text-[11px] leading-snug">{a.contradiction}</p>
+              </div>
+            )}
+          </div>
         )}
       </div>
     );
@@ -935,10 +989,19 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
           <h2 className="text-2xl tracking-tight mb-2">{canvas.name}</h2>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">{canvas.blurb}</p>
           <div className="border border-ink p-3 text-xs bg-secondary mb-3">
-            <div className="uppercase tracking-[0.12em] font-medium mb-1">How to run this</div>
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">You're facilitating live</div>
             <p className="leading-relaxed">
-              Walk through each cell with the team. Use <strong>Ask team</strong> to have the AI synthesize what
-              stakeholders have already said on that cell — then refine. Empty AI evidence means you need to ask the team a direct question.
+              This is a working session, not a worksheet. Use <strong>Facilitation assist</strong> on a cell to
+              surface a realistic weak team response, probing questions, evidence gaps, and a reframe — then
+              YOU decide what to write in the cell. Leaving cells blank or partial because the evidence isn't
+              there is a coaching strength, not a gap.
+            </p>
+          </div>
+          <div className="border border-ink p-3 text-xs mb-3">
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">Reward / penalize</div>
+            <p className="leading-relaxed">
+              <span className="block mb-1"><strong>Rewarded:</strong> specificity, evidence rigor, simplification, customer-centric reframing, intervention restraint.</span>
+              <span className="block"><strong>Penalized:</strong> answering for the team, mechanically completed cells, framework dumping, premature solutioning.</span>
             </p>
           </div>
           {(session.dialogue_commitments ?? "").trim() && (
@@ -1001,12 +1064,13 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
           disabled={saveMut.isPending}
           className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
         >
-          {saveMut.isPending ? "Saving…" : "Save canvas & recommend →"}
+          {saveMut.isPending ? "Saving…" : "Capture session & continue →"}
         </button>
       </div>
     </div>
   );
 }
+
 
 function InterventionStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const [rec, setRec] = useState<string>(session.intervention_recommendation ?? "");
