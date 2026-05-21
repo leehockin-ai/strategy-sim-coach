@@ -12,6 +12,14 @@ import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook, BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+import canvasVPC from "@/assets/canvas-value-proposition.png";
+import canvasBMC from "@/assets/canvas-business-model.png";
+
+const CANVAS_IMAGES: Record<string, { src: string; alt: string }> = {
+  strong_value_propositions: { src: canvasVPC, alt: "Strategyzer Value Proposition Canvas" },
+  customer_profile_interviews: { src: canvasVPC, alt: "Strategyzer Customer Profile (right side of the Value Proposition Canvas)" },
+  competing_on_business_models: { src: canvasBMC, alt: "Strategyzer Business Model Canvas" },
+};
 
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
@@ -1145,8 +1153,35 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   }
 
 
+  const canvasImage = CANVAS_IMAGES[canvas.id];
+
   return (
     <div>
+      {canvasImage && (
+        <div className="mb-6 border border-ink bg-paper">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-ink">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              Anchor canvas · placeholder reference
+            </div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+              {canvas.name}
+            </div>
+          </div>
+          <div className="p-4 flex justify-center bg-white">
+            <img
+              src={canvasImage.src}
+              alt={canvasImage.alt}
+              className="max-h-[460px] w-auto object-contain"
+              loading="lazy"
+            />
+          </div>
+          <div className="px-4 py-2 border-t border-ink text-[11px] text-muted-foreground leading-relaxed">
+            Reference only — anchors the working session visually until the live playbook
+            artifact is integrated. Capture facilitation moves and evidence in the cells below.
+          </div>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-12 gap-6 mb-6">
         <div className="md:col-span-4">
           <h2 className="text-2xl tracking-tight mb-2">{canvas.name}</h2>
