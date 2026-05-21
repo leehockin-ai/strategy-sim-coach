@@ -1266,11 +1266,9 @@ function CustomerProfileArtifact({
     pains: "var(--brand-red)",
     gains: "var(--brand-lime)",
   };
-  const jobs = quadrants.find((q) => q.key === "jobs")!;
-  const pains = quadrants.find((q) => q.key === "pains")!;
-  const gains = quadrants.find((q) => q.key === "gains")!;
   const [focus, setFocus] = useState<"jobs" | "pains" | "gains">("jobs");
   const focused = quadrants.find((q) => q.key === focus)!;
+
 
   return (
     <div className="border border-ink bg-paper">
