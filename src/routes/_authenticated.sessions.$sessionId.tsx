@@ -807,14 +807,21 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
         <div className="md:col-span-4">
           <h2 className="text-2xl tracking-tight mb-2">{canvas.name}</h2>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">{canvas.blurb}</p>
-          <div className="border border-ink p-3 text-xs bg-secondary">
+          <div className="border border-ink p-3 text-xs bg-secondary mb-3">
             <div className="uppercase tracking-[0.12em] font-medium mb-1">How to run this</div>
             <p className="leading-relaxed">
               Walk through each cell with the team. Use <strong>Ask team</strong> to have the AI synthesize what
               stakeholders have already said on that cell — then refine. Empty AI evidence means you need to ask the team a direct question.
             </p>
           </div>
+          {(session.dialogue_commitments ?? "").trim() && (
+            <div className="border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
+              <div className="uppercase tracking-[0.12em] font-medium mb-1">Carry these in from your 1:1s</div>
+              <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{session.dialogue_commitments}</pre>
+            </div>
+          )}
         </div>
+
 
         <div className="md:col-span-8">
           {isVPC && (
