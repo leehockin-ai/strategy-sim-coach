@@ -587,4 +587,117 @@ export const saveCanvas = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---------- Playbook working session: simulate the team doing an activity with the coach ----------
+
+import { BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+
+export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; activityKey: string; coachMessage: string }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      activityKey: z.string().min(1).max(64),
+      coachMessage: z.string().min(1).max(4000),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const activity = BUILTIN_PLAYBOOK.activities.find((a) => a.key === data.activityKey);
+    if (!activity) throw new Error("Unknown activity");
+
+    const phase = `playbook:${data.activityKey}`;
+
+    await supabaseAdmin.from("messages").insert({
+      session_id: data.sessionId,
+      role: "candidate",
+      stakeholder_name: "(team)",
+      content: data.coachMessage,
+      phase,
+    });
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("*, scenarios(*)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const scenario = (session as any).scenarios;
+    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
+
+    const { data: transcript } = await supabaseAdmin
+      .from("messages")
+      .select("role, stakeholder_name, content")
+      .eq("session_id", data.sessionId)
+      .eq("phase", phase)
+      .order("created_at", { ascending: true });
+
+    const systemPrompt = `You are simulating the project team in a paper-and-pen working session with a Strategyzer coach.
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+
+TEAM MEMBERS in this working session:
+${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture}`).join("\n")}
+
+ACTIVITY THE COACH IS RUNNING:
+"${activity.title}" — ${activity.objective}
+Why it matters: ${activity.whyItMatters}
+
+RULES:
+- Respond as ONE team member at a time (pick whichever member would most naturally respond to what the coach just said). Prefix the reply with the speaker's name in brackets, e.g. "[Maya] ...".
+- Stay in character. Bring their actual job context, examples, and (where appropriate) disagreements with each other.
+- This is a working session, not an interview. Speak naturally: half-formed ideas, "I think...", "actually that's a good question for ${'$'}{otherName}", pushback, examples from real work.
+- Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
+- Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
+- 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.`;
+
+    const chatMessages = [
+      { role: "system", content: systemPrompt },
+      ...(transcript ?? []).map((m: any) => ({
+        role: m.role === "candidate" ? "user" : "assistant",
+        content: m.role === "candidate" ? `[Coach]: ${m.content}` : m.content,
+      })),
+    ];
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: chatMessages,
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const reply: string = json.choices?.[0]?.message?.content ?? "...";
+
+    // Try to extract speaker name from "[Name] ..." prefix
+    const match = reply.match(/^\s*\[([^\]]+)\]\s*(.*)$/s);
+    const speaker = match?.[1]?.trim() || "Team";
+    const body = match?.[2]?.trim() || reply;
+
+    const { data: saved } = await supabaseAdmin
+      .from("messages")
+      .insert({
+        session_id: data.sessionId,
+        role: "stakeholder",
+        stakeholder_name: speaker,
+        content: body,
+        phase,
+      })
+      .select()
+      .single();
+
+    return { message: saved };
+  });
+
+
 
