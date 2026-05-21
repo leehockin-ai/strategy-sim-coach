@@ -514,6 +514,15 @@ Return strict JSON:
 
 
 
+// Facilitation Prompt Assist — formerly "Ask team".
+// Does NOT autofill cells. Returns:
+//   - team_says: a realistic WEAK team response for this cell (vague / feature-first /
+//                solutioning / unsupported confidence) the coach must redirect
+//   - probing_questions: 2-4 open-ended probes to push specificity and evidence
+//   - evidence_gaps: what's still unsupported and needs a behavioral observation
+//   - reframe: one short line the coach could use to redirect weak thinking
+//   - contradiction: an inconsistency vs other cells / transcript, or null
+// The coach remains responsible for facilitation, interpretation, sequencing, judgment.
 export const suggestCanvasCell = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string; cellKey: string }) =>
@@ -555,32 +564,41 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
       .map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
       .join("\n");
 
-    const prompt = `You are a Strategyzer master coach helping the team draft a "${canvas.name}". The coach is asking the team to populate ONE cell: "${cell.label}" — ${cell.hint}
+    const prompt = `You are simulating a live Strategyzer working session for the coach to FACILITATE in real time. The coach is currently on the "${cell.label}" cell of a "${canvas.name}".
 
-Synthesize what the TEAM would honestly say for this cell, grounded in:
-1. The scenario context
-2. What stakeholders actually said in the scoping call and one-on-one dialogues
-3. Existing canvas cells the team has already filled
+${STRATEGYZER_INTELLIGENCE}
+
+Your job is NOT to draft polished cell content. Your job is to give the coach the messy, realistic raw material of a live working session so they can practice facilitation.
+
+Return STRICT JSON with this exact shape:
+{
+  "team_says": "<one short, realistic WEAK team response someone might say for this cell — vague ('everyone is our customer'), feature-first ('let's just add AI'), solutioning, generic, or unsupported confidence. 1-2 sentences, spoken voice, no bullets.>",
+  "probing_questions": ["<2-4 open-ended probing questions the coach could ask to push specificity, behavior, and evidence>"],
+  "evidence_gaps": ["<1-3 specific things that are unsupported and need a behavioral observation or interview to validate>"],
+  "reframe": "<one short line the coach could use to redirect weak thinking back to customer specificity / evidence>",
+  "contradiction": "<one inconsistency between what was just said and other cells / what stakeholders said in the transcript — or null if none>"
+}
 
 Rules:
-- Stay strictly within the definition of this cell. ${cell.label} ≠ any other cell.
-- 3–6 short bullet points OR 2–3 sentences. Plain language. No framework jargon.
-- If the conversation gave NO evidence for this cell, say so explicitly and propose the single question the coach should ask to surface it. Do not fabricate.
+- The "team_says" line should sound like a real, slightly defensive, busy team — not a polished strategist. It is a facilitation stimulus, not an answer.
+- Probing questions must be OPEN-ENDED and BEHAVIORAL. Never "would customers want X" or "should we add X".
+- If the transcript has real evidence for this cell, the contradiction may reference it. Otherwise, contradiction can be null.
+- Do NOT fill in the cell. Do NOT propose a "suggestion" field. The coach writes the cell themselves.
 
 SCENARIO: ${scenario.title}
 ${scenario.context}
 
 STAKEHOLDERS: ${JSON.stringify(scenario.stakeholders)}
 
+CURRENT CELL: ${cell.label} — ${cell.hint}
+
 FRAMING NOTES: ${(session as any).framing_notes ?? "(none)"}
 
-CONVERSATION:
+CONVERSATION SO FAR:
 ${convo || "(no conversation yet)"}
 
-EXISTING CANVAS CELLS:
-${existingPretty || "(empty)"}
-
-Return strict JSON: {"suggestion": "<the cell content>", "evidence": "<one sentence citing what in the convo supports this, or 'no evidence — ask the team'>"}`;
+EXISTING CANVAS CELLS (for contradiction detection):
+${existingPretty || "(empty)"}`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -599,9 +617,18 @@ Return strict JSON: {"suggestion": "<the cell content>", "evidence": "<one sente
     const json = await res.json();
     const content = json.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
-    try { parsed = JSON.parse(content); } catch { parsed = { suggestion: content }; }
-    return { cellKey: cell.key, ...parsed };
+    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+    return {
+      cellKey: cell.key,
+      team_says: parsed.team_says ?? "",
+      probing_questions: Array.isArray(parsed.probing_questions) ? parsed.probing_questions : [],
+      evidence_gaps: Array.isArray(parsed.evidence_gaps) ? parsed.evidence_gaps : [],
+      reframe: parsed.reframe ?? "",
+      contradiction: parsed.contradiction ?? null,
+    };
   });
+
+
 
 export const saveCanvas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
