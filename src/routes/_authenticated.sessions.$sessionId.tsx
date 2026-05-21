@@ -1154,19 +1154,27 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
           <div className="border border-ink p-3 text-xs bg-secondary mb-3">
             <div className="uppercase tracking-[0.12em] font-medium mb-1">You're facilitating live</div>
             <p className="leading-relaxed">
-              This is a working session, not a worksheet. Use <strong>Facilitation assist</strong> on a cell to
-              surface a realistic weak team response, probing questions, evidence gaps, and a reframe — then
-              YOU decide what to write in the cell. Leaving cells blank or partial because the evidence isn't
-              there is a coaching strength, not a gap.
+              Open a cell to start a <strong>live facilitation moment</strong>. The team replies in character —
+              vague, defensive, solution-jumping, half-formed. Your probes, reframes and pauses move the moment
+              forward. You decide what (if anything) to capture in the cell.
             </p>
           </div>
           <div className="border border-ink p-3 text-xs mb-3">
             <div className="uppercase tracking-[0.12em] font-medium mb-1">Reward / penalize</div>
             <p className="leading-relaxed">
-              <span className="block mb-1"><strong>Rewarded:</strong> specificity, evidence rigor, simplification, customer-centric reframing, intervention restraint.</span>
-              <span className="block"><strong>Penalized:</strong> answering for the team, mechanically completed cells, framework dumping, premature solutioning.</span>
+              <span className="block mb-1"><strong>Rewarded:</strong> open-ended probes, specificity, evidence rigor, simplification, ownership transfer, workshop recovery, ambiguity navigation, facilitation restraint.</span>
+              <span className="block"><strong>Penalized:</strong> answering for the team, leading/yes-no questions, framework jargon, mechanically completed cells, premature solutioning, polished consulting narration.</span>
             </p>
           </div>
+          <div className="border border-ink p-3 text-xs mb-3 bg-paper">
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">Signals you'll see</div>
+            <ul className="leading-relaxed list-disc pl-4 space-y-0.5">
+              <li><strong>Flag chips</strong> per cell: recovered · still vague · evidence gap · solution-jumping · team tension · genuine progress.</li>
+              <li><strong>Evidence confidence</strong> (none / weak / moderate / strong) — you set it honestly.</li>
+              <li><strong>Unresolved</strong> marker — flag cells where ambiguity is the truthful answer.</li>
+            </ul>
+          </div>
+
           {(session.dialogue_commitments ?? "").trim() && (
             <div className="border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
               <div className="uppercase tracking-[0.12em] font-medium mb-1">Carry these in from your 1:1s</div>
