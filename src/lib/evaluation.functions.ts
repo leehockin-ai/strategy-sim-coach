@@ -55,7 +55,7 @@ export const SECTION_RUBRIC = [
     label: "Engagement Pathway",
     step: "Step 6",
     focus:
-      "How responsibly would the coach sequence Strategyzer methodology over time: next best playbook(s), evidence goals, workshop cadence, alignment moves. Consultative and customer-centered, NOT upsell-driven.",
+      "How responsibly did the coach ORCHESTRATE Strategyzer methodology over time across the 5 pathway sections (Situation Summary, Immediate Intervention, Pathway, Risks, Success Criteria)? Reward sequencing coherence, methodology restraint, lightweight executable interventions, evidence progression, stakeholder readiness awareness, and reframing of unrealistic success criteria. Penalize framework stacking, bloated multi-week plans, sales/upsell framing, polished consulting language without operational detail, and assuming smooth progress. Multiple valid pathways exist — judge coherence, not a single 'correct' sequence.",
   },
 ] as const;
 
