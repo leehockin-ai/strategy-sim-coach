@@ -123,13 +123,15 @@ function Flow() {
     { n: "03", t: "Method", d: "Pick a playbook approach and explain why." },
     { n: "04", t: "Dialogue", d: "Talk to simulated stakeholders. Sponsors, skeptics, operators." },
     { n: "05", t: "Intervention", d: "Recommend a next step. Decide: continue, pivot, escalate, stop." },
-    { n: "06", t: "Review", d: "AI-drafted rubric report, reviewed and signed off by a human." },
+    { n: "06", t: "Application", d: "Run real Strategyzer playbook activities with the team — map ecosystem and customer profile." },
+    { n: "07", t: "Review", d: "AI-drafted rubric report, reviewed and signed off by a human." },
   ];
   return (
     <section className="hairline-b" style={{ backgroundColor: "var(--brand-blue)" }}>
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-16 md:py-20 text-paper">
         <h2 className="text-3xl md:text-4xl tracking-tight mb-12">How a session runs</h2>
-        <div className="grid md:grid-cols-6 gap-px">
+        <div className="grid md:grid-cols-7 gap-px">
+
           {steps.map((s, i) => (
             <div key={s.n} className="border-t border-paper pt-4">
               <div className="flex items-baseline justify-between mb-3">
