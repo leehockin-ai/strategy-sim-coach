@@ -851,19 +851,62 @@ type FacilitationAssist = {
   contradiction: string | null;
 };
 
+type FacilitationTurn = { role: "team" | "coach"; content: string; flag?: string; coach_signal?: string };
+
+type CellMeta = {
+  confidence?: "none" | "weak" | "moderate" | "strong";
+  ambiguity?: boolean;
+};
+
+const FLAG_LABEL: Record<string, { label: string; color: string }> = {
+  recovered:         { label: "Recovered",         color: "var(--brand-lime)" },
+  still_vague:       { label: "Still vague",       color: "var(--brand-yellow)" },
+  evidence_gap:      { label: "Evidence gap",      color: "var(--brand-red)" },
+  solution_jumping:  { label: "Solution-jumping",  color: "var(--brand-cyan)" },
+  team_tension:      { label: "Team tension",      color: "var(--brand-purple)" },
+  genuine_progress:  { label: "Genuine progress",  color: "var(--brand-lime)" },
+};
+
+const CONFIDENCE_OPTIONS: { v: NonNullable<CellMeta["confidence"]>; l: string; c: string }[] = [
+  { v: "none",     l: "No evidence",  c: "transparent" },
+  { v: "weak",     l: "Weak",         c: "var(--brand-red)" },
+  { v: "moderate", l: "Moderate",     c: "var(--brand-yellow)" },
+  { v: "strong",   l: "Strong",       c: "var(--brand-lime)" },
+];
+
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
   const canvas = canvasForPlaybook(session.methodology_choice);
   const initial = (session.application_canvas as Record<string, string> | null) ?? {};
   const [cells, setCells] = useState<Record<string, string>>(initial);
+  const [meta, setMeta] = useState<Record<string, CellMeta>>(() => {
+    // Allow meta to be encoded in canvas as `__meta__${cellKey}` strings (JSON)
+    const m: Record<string, CellMeta> = {};
+    for (const [k, v] of Object.entries(initial)) {
+      if (k.startsWith("__meta__") && typeof v === "string") {
+        try { m[k.replace("__meta__", "")] = JSON.parse(v); } catch {}
+      }
+    }
+    return m;
+  });
   const [assist, setAssist] = useState<Record<string, FacilitationAssist>>({});
+  const [turns, setTurns] = useState<Record<string, FacilitationTurn[]>>({});
+  const [draft, setDraft] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState<string | null>(null);
+  const [replying, setReplying] = useState<string | null>(null);
 
   const suggest = useServerFn(suggestCanvasCell);
+  const respond = useServerFn(respondAsTeamCell);
   const save = useServerFn(saveCanvas);
 
+  function buildPersistable(): Record<string, string> {
+    const out: Record<string, string> = { ...cells };
+    for (const [k, v] of Object.entries(meta)) out[`__meta__${k}`] = JSON.stringify(v);
+    return out;
+  }
+
   const saveMut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, canvas: cells } }),
-    onSuccess: () => { toast.success("Working session captured — incomplete is fine"); onSaved(); },
+    mutationFn: () => save({ data: { sessionId: session.id, canvas: buildPersistable() } }),
+    onSuccess: () => { toast.success("Facilitation captured — incomplete is fine"); onSaved(); },
     onError: (e: any) => toast.error(e?.message ?? "Save failed"),
   });
 
@@ -871,15 +914,18 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
     setLoading(cellKey);
     try {
       const res = await suggest({ data: { sessionId: session.id, cellKey } });
-      setAssist((p) => ({
+      const a: FacilitationAssist = {
+        team_says: res.team_says ?? "",
+        probing_questions: res.probing_questions ?? [],
+        evidence_gaps: res.evidence_gaps ?? [],
+        reframe: res.reframe ?? "",
+        contradiction: res.contradiction ?? null,
+      };
+      setAssist((p) => ({ ...p, [cellKey]: a }));
+      // Seed the live transcript with the opening team utterance
+      setTurns((p) => ({
         ...p,
-        [cellKey]: {
-          team_says: res.team_says ?? "",
-          probing_questions: res.probing_questions ?? [],
-          evidence_gaps: res.evidence_gaps ?? [],
-          reframe: res.reframe ?? "",
-          contradiction: res.contradiction ?? null,
-        },
+        [cellKey]: a.team_says ? [{ role: "team", content: `[Team] ${a.team_says}` }] : (p[cellKey] ?? []),
       }));
     } catch (e: any) {
       toast.error(e?.message ?? "Facilitation assist failed");
@@ -888,20 +934,51 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
     }
   }
 
+  async function sendCoachMove(cellKey: string) {
+    const move = (draft[cellKey] ?? "").trim();
+    if (!move || replying) return;
+    setReplying(cellKey);
+    const history = turns[cellKey] ?? [];
+    // optimistic append
+    setTurns((p) => ({ ...p, [cellKey]: [...(p[cellKey] ?? []), { role: "coach", content: move }] }));
+    setDraft((p) => ({ ...p, [cellKey]: "" }));
+    try {
+      const res = await respond({
+        data: {
+          sessionId: session.id,
+          cellKey,
+          history: history.map((t) => ({ role: t.role, content: t.content })),
+          coachMove: move,
+        },
+      });
+      setTurns((p) => ({
+        ...p,
+        [cellKey]: [
+          ...(p[cellKey] ?? []),
+          { role: "team", content: res.team_reply, flag: res.facilitation_flag, coach_signal: res.coach_signal },
+        ],
+      }));
+    } catch (e: any) {
+      toast.error(e?.message ?? "Team didn't respond");
+    } finally {
+      setReplying(null);
+    }
+  }
+
   if (!canvas) {
     const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
       <StepShell
-        title="Working Session Design"
-        hint="Artifacts are tools, not deliverables. The point is to facilitate Strategyzer thinking — sometimes the right move is no canvas at all."
+        title="Facilitated Working Session"
+        hint="Sometimes the right move is no canvas at all. Restraint scores above forced facilitation."
       >
         {mode === "none" ? (
           <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
             <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
             <p className="text-sm leading-relaxed">
               You chose to gather more evidence before committing to a playbook. Stay here while you work the
-              Stakeholder Workspace, then return to Coaching Strategy when you're ready. The evaluator rewards
-              this kind of restraint when your rationale shows it was deliberate, not avoidant.
+              Stakeholder Workspace, then return to Coaching Strategy when you're ready. Knowing when NOT to
+              facilitate deeper playbook work is itself rewarded.
             </p>
           </div>
         ) : (
@@ -918,36 +995,121 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 
   function CellCard({ cell }: { cell: { key: string; label: string; hint: string; column?: string } }) {
     const a = assist[cell.key];
+    const cellTurns = turns[cell.key] ?? [];
+    const cellMeta = meta[cell.key] ?? {};
+    const lastFlag = [...cellTurns].reverse().find((t) => t.flag)?.flag;
     return (
       <div className="border border-ink p-3 bg-paper">
         <div className="flex items-baseline justify-between gap-2 mb-1">
           <label className="text-[11px] uppercase tracking-[0.12em] font-medium">{cell.label}</label>
-          <button
-            onClick={() => runAssist(cell.key)}
-            disabled={loading === cell.key}
-            className="text-[10px] uppercase tracking-wider border border-ink px-2 py-0.5 hover:bg-secondary disabled:opacity-50"
-            title="Surface a realistic weak team response, probing questions, evidence gaps, and a reframe — you write the cell."
-          >
-            {loading === cell.key ? "Listening…" : "Facilitation assist"}
-          </button>
+          <div className="flex items-center gap-1">
+            {lastFlag && FLAG_LABEL[lastFlag] && (
+              <span
+                className="text-[9px] uppercase tracking-[0.1em] border border-ink px-1.5 py-0.5"
+                style={{ backgroundColor: FLAG_LABEL[lastFlag].color }}
+                title="Latest facilitation signal"
+              >
+                {FLAG_LABEL[lastFlag].label}
+              </span>
+            )}
+            <button
+              onClick={() => runAssist(cell.key)}
+              disabled={loading === cell.key}
+              className="text-[10px] uppercase tracking-wider border border-ink px-2 py-0.5 hover:bg-secondary disabled:opacity-50"
+              title="Start a live facilitation moment with the team. They reply realistically; you facilitate."
+            >
+              {loading === cell.key ? "Listening…" : cellTurns.length === 0 ? "Open the moment" : "Re-open"}
+            </button>
+          </div>
         </div>
         <p className="text-[10px] text-muted-foreground mb-2 leading-snug">{cell.hint}</p>
+
+        {/* Live facilitation transcript */}
+        {cellTurns.length > 0 && (
+          <div className="border border-ink/40 bg-secondary/30 mb-2 max-h-[260px] overflow-y-auto">
+            <div className="px-2 py-1 text-[9px] uppercase tracking-[0.14em] text-muted-foreground border-b border-ink/30 bg-paper">
+              Live facilitation moment
+            </div>
+            <div className="p-2 space-y-1.5">
+              {cellTurns.map((t, i) => (
+                <div key={i} className={`text-[11px] ${t.role === "coach" ? "text-right" : "text-left"}`}>
+                  <div className={`inline-block max-w-[92%] px-2 py-1 leading-snug ${t.role === "coach" ? "bg-ink text-paper" : "bg-paper border border-ink/40"}`}>
+                    <div className="text-[8px] uppercase tracking-[0.12em] opacity-70 mb-0.5">{t.role === "coach" ? "Coach" : "Team"}</div>
+                    <div className="whitespace-pre-wrap italic">{t.content}</div>
+                    {t.role === "team" && t.coach_signal && (
+                      <div className="text-[9px] mt-1 not-italic opacity-80 border-t border-ink/20 pt-1">
+                        ↳ {t.coach_signal}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {replying === cell.key && (
+                <div className="text-[10px] text-muted-foreground italic">Team is thinking…</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Coach move input — appears after the moment opens */}
+        {cellTurns.length > 0 && (
+          <div className="flex gap-1.5 mb-2">
+            <textarea
+              value={draft[cell.key] ?? ""}
+              onChange={(e) => setDraft((p) => ({ ...p, [cell.key]: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendCoachMove(cell.key); }}
+              rows={2}
+              placeholder="Your facilitation move — a probe, a reframe, a pause. (⌘/Ctrl+Enter)"
+              className="flex-1 border border-ink bg-paper p-1.5 text-[11px] focus:outline-none focus:bg-secondary"
+            />
+            <button
+              onClick={() => sendCoachMove(cell.key)}
+              disabled={!(draft[cell.key] ?? "").trim() || replying === cell.key}
+              className="bg-ink text-paper px-2 py-1 text-[10px] uppercase tracking-wider rounded-sm disabled:opacity-50"
+            >
+              Send
+            </button>
+          </div>
+        )}
+
+        {/* Coach's note for this cell — what they decided to capture */}
         <textarea
           value={cells[cell.key] ?? ""}
           onChange={(e) => setCells((p) => ({ ...p, [cell.key]: e.target.value }))}
-          rows={5}
-          placeholder="Capture what the team actually says, in their words. Blank is OK if you have no evidence yet — note that."
+          rows={4}
+          placeholder="What did you capture FROM this moment? In the team's words. Blank is OK if the evidence wasn't there — flag it below."
           className="w-full border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary font-mono"
         />
 
+        {/* Evidence confidence + ambiguity marker */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-2">
+          <div className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground mr-1">Evidence</div>
+          {CONFIDENCE_OPTIONS.map((opt) => {
+            const active = (cellMeta.confidence ?? "none") === opt.v;
+            return (
+              <button
+                key={opt.v}
+                onClick={() => setMeta((p) => ({ ...p, [cell.key]: { ...p[cell.key], confidence: opt.v } }))}
+                className={`text-[9px] uppercase tracking-[0.1em] border border-ink px-1.5 py-0.5 ${active ? "ring-2 ring-ink ring-offset-1" : ""}`}
+                style={{ backgroundColor: opt.c }}
+                title={`Mark the evidence behind this cell as ${opt.l.toLowerCase()}`}
+              >
+                {opt.l}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setMeta((p) => ({ ...p, [cell.key]: { ...p[cell.key], ambiguity: !cellMeta.ambiguity } }))}
+            className={`ml-auto text-[9px] uppercase tracking-[0.1em] border border-ink px-1.5 py-0.5 ${cellMeta.ambiguity ? "bg-ink text-paper" : "bg-paper"}`}
+            title="Mark this cell as unresolved ambiguity to flag for the evaluator"
+          >
+            {cellMeta.ambiguity ? "✓ Unresolved" : "Flag unresolved"}
+          </button>
+        </div>
+
+        {/* Assist panel (reframe / gaps / contradiction) */}
         {a && (
           <div className="mt-2 border-t border-ink/30 pt-2 space-y-2">
-            {a.team_says && (
-              <div className="border border-ink/40 bg-secondary/40 p-2">
-                <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Team just said</div>
-                <p className="text-[11px] italic leading-snug">"{a.team_says}"</p>
-              </div>
-            )}
             {a.probing_questions.length > 0 && (
               <div>
                 <div className="text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Probes you could ask</div>
@@ -981,6 +1143,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
       </div>
     );
   }
+
 
   return (
     <div>
