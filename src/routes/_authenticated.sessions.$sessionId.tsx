@@ -8,6 +8,8 @@ import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sen
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
+import { extractPlaybook, savePlaybookApplication } from "@/lib/playbook.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook } from "@/lib/playbooks";
 
