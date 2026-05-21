@@ -740,17 +740,17 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
     <div className="space-y-6">
       {/* Purpose framing */}
       <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — open whenever you need it</div>
+        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — diagnostic & preparatory</div>
         <p className="text-sm leading-relaxed">
-          One-on-ones live here for the full session. Use them to clarify assumptions, surface resistance, negotiate scope,
-          challenge unrealistic success definitions, validate readiness, or earn small concrete commitments (a 15-min pitch,
-          access to a customer, a pilot slot). Stakeholders remember the full transcript — they will resist, evolve, and
-          sometimes contradict themselves under pressure, just like real ones.
+          This is where you gather the missing context <em>before</em> you facilitate. Use these 1:1s to validate
+          assumptions, uncover constraints, clarify stakeholder readiness, read emotional dynamics, identify hidden
+          blockers, test alignment, and surface political reality. Stakeholders remember the full transcript — they will
+          resist, evolve, and sometimes contradict themselves under pressure, just like real ones.
         </p>
         <p className="text-sm leading-relaxed mt-2">
-          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These feed your
-          working session design, your intervention call, and your engagement pathway. No need to "finish" this section —
-          come back whenever a later step surfaces a new question for a stakeholder.
+          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These sharpen
+          your Live Playbook Facilitation, your Next-Step Judgment, and your Engagement Orchestration. This isn't a
+          standalone coaching phase — return here any time a later step surfaces a new question for a stakeholder.
         </p>
       </div>
 
