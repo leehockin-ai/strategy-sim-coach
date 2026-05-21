@@ -20,14 +20,15 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   component: SessionPage,
 });
 
-type Step = "framing" | "method" | "dialogue" | "application" | "intervention";
+type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "framing", label: "Framing" },
   { key: "method", label: "Method" },
   { key: "dialogue", label: "Dialogue" },
-  { key: "application", label: "Application" },
+  { key: "application", label: "Canvas" },
   { key: "intervention", label: "Intervention" },
+  { key: "playbook", label: "Playbook Application" },
 ];
 
 function SessionPage() {
