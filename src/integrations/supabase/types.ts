@@ -155,6 +155,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           decision: string | null
+          dialogue_commitments: string | null
           framing_notes: string | null
           id: string
           intervention_recommendation: string | null
@@ -174,6 +175,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           decision?: string | null
+          dialogue_commitments?: string | null
           framing_notes?: string | null
           id?: string
           intervention_recommendation?: string | null
@@ -193,6 +195,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           decision?: string | null
+          dialogue_commitments?: string | null
           framing_notes?: string | null
           id?: string
           intervention_recommendation?: string | null
