@@ -31,6 +31,7 @@ function useSessionUser() {
 
 function Header() {
   const email = useSessionUser();
+  const { isReviewer } = useMyRoles();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
