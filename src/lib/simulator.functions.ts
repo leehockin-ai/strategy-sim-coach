@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
+import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -24,7 +25,10 @@ export const suggestPlaybook = createServerFn({ method: "POST" })
       (p) => `- ${p.id} — ${p.name} (${p.diagnosis}): "${p.whenToUse}" · Signals: ${p.signals.join("; ")} · Outcome: ${p.outcome}`,
     ).join("\n");
 
-    const prompt = `You are a Strategyzer master coach evaluating a scoping conversation. Given the scenario and the candidate's framing, recommend ONE primary playbook from the official Strategyzer library. Do not mix playbooks.
+    const mode = data.mode ?? "single";
+    const prompt = `You are a Strategyzer master coach evaluating a scoping conversation. Apply the methodology intelligence below to recommend the smallest sufficient intervention. Methodology restraint is a virtue: if the evidence is too weak or the real bottleneck is alignment, recommend NO playbook yet and name the evidence/alignment moves to do first.
+
+${STRATEGYZER_INTELLIGENCE}
 
 SCENARIO: ${scenario.title}
 ${scenario.context}
@@ -33,10 +37,22 @@ Ambiguity: ${(scenario.ambiguity_factors ?? []).join(", ")}
 CANDIDATE FRAMING:
 ${(session as any).framing_notes ?? "(no framing provided)"}
 
+COACH'S REQUESTED MODE: ${mode}  (single = one playbook; multi = sequenced combination; none = evidence/alignment moves before any playbook)
+
 PLAYBOOK OPTIONS:
 ${playbookCatalog}
 
-Return strict JSON: {"playbookId": "<id>", "confidence": "low|medium|high", "rationale": "<2-3 sentences citing the scoping signals>", "watchouts": ["<short risk if this playbook is misapplied>", "..."]}`;
+Return strict JSON:
+{
+  "mode": "single" | "multi" | "none",
+  "playbookId": "<id or null if mode=none>",
+  "sequence": ["<id>", "..."],          // ordered list when mode=multi, else []
+  "confidence": "low" | "medium" | "high",
+  "rationale": "<2-3 sentences citing scoping signals, evidence quality, and sequencing logic>",
+  "evidence_gaps": ["<what we still don't know that would change the recommendation>", "..."],
+  "pre_work": ["<alignment or evidence move to do BEFORE any playbook, especially when mode=none>", "..."],
+  "watchouts": ["<risk if this playbook is misapplied — over-canvasing, premature BMC, etc.>", "..."]
+}`;
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
