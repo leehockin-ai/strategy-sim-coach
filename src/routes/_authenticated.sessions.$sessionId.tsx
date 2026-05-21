@@ -896,18 +896,27 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
     { v: "stop", l: "Stop", c: "var(--brand-red)" },
   ];
 
+  const commitments: string = (session.dialogue_commitments ?? "").trim();
+
   return (
     <StepShell
       title="Recommend & decide"
-      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Next you'll apply a real Strategyzer playbook with the team."
+      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Reflect the commitments stakeholders gave you in the dialogue — they're the real currency of your intervention."
     >
+      {commitments && (
+        <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
+          <div className="uppercase tracking-[0.12em] font-medium mb-1">Commitments from your 1:1s</div>
+          <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{commitments}</pre>
+        </div>
+      )}
+
       <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Next-best action</label>
       <div className="relative">
         <textarea
           value={rec}
           onChange={(e) => setRec(e.target.value)}
           rows={8}
-          placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate?"
+          placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate? Build on the commitments above."
           className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
         />
         <div className="absolute top-2 right-2">
@@ -941,6 +950,7 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
     </StepShell>
   );
 }
+
 
 // ---------- Playbook Application: run the built-in playbook with the simulated team ----------
 
