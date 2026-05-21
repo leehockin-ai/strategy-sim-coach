@@ -59,7 +59,7 @@ function SessionPage() {
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("application")} />}
         {step === "application" && <ApplicationStep session={session} onSaved={() => { refetch(); setStep("intervention"); }} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={() => { refetch(); setStep("playbook"); }} />}
-        {step === "playbook" && <PlaybookStep session={session} onSaved={refetch} />}
+        {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
       </div>
     </Shell>
   );
