@@ -629,6 +629,110 @@ ${existingPretty || "(empty)"}`;
   });
 
 
+// ---------- Live facilitation moment: coach moves, team replies ----------
+
+export const respondAsTeamCell = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    sessionId: string;
+    cellKey: string;
+    history: { role: "team" | "coach"; content: string }[];
+    coachMove: string;
+  }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      cellKey: z.string().min(1).max(64),
+      history: z.array(z.object({
+        role: z.enum(["team", "coach"]),
+        content: z.string().min(1).max(4000),
+      })).max(12),
+      coachMove: z.string().min(1).max(4000),
+    }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const { data: session } = await supabaseAdmin
+      .from("sessions")
+      .select("framing_notes, methodology_choice, application_canvas, scenarios(title, context, stakeholders)")
+      .eq("id", data.sessionId)
+      .single();
+    if (!session) throw new Error("Session not found");
+
+    const canvas = canvasForPlaybook((session as any).methodology_choice);
+    if (!canvas) throw new Error("No canvas mapped");
+    const cell = canvas.cells.find((c) => c.key === data.cellKey);
+    if (!cell) throw new Error(`Unknown cell: ${data.cellKey}`);
+
+    const scenario: any = (session as any).scenarios;
+    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
+
+    const transcript = [
+      ...data.history.map((h) => (h.role === "coach" ? `Coach: ${h.content}` : `Team: ${h.content}`)),
+      `Coach: ${data.coachMove}`,
+    ].join("\n");
+
+    const prompt = `You are simulating a LIVE Strategyzer working session. The coach is facilitating the "${cell.label}" cell of a "${canvas.name}".
+
+${STRATEGYZER_INTELLIGENCE}
+
+Reply AS ONE TEAM MEMBER reacting to the coach's last move. Prefix with "[Name]". Stay in character — busy, slightly defensive, half-formed, sometimes solution-jumping, sometimes confused, sometimes pushing back. NOT polished. NOT consultant-speak.
+
+Then return STRICT JSON with this exact shape:
+{
+  "team_reply": "<the spoken team reply, prefixed with [Name]. 1-3 sentences. Keep realistic facilitation tension: vague answer, deflection, sub-question, mild disagreement, or a real but partial signal>",
+  "facilitation_flag": "<one of: 'recovered' | 'still_vague' | 'evidence_gap' | 'solution_jumping' | 'team_tension' | 'genuine_progress'>",
+  "coach_signal": "<one short sentence naming what the coach's move did well or missed — e.g. 'open-ended probe surfaced a behavioral example' or 'closed yes/no question pulled the team into agreement theater'>"
+}
+
+Rules:
+- If the coach asks an open behavioral question, the team may give a partial real example BUT keep evidence ambiguous.
+- If the coach asks leading / yes-no / hypothetical questions, the team agrees superficially or deflects.
+- Never wrap up the cell. Leave something unresolved unless the coach has explicitly closed the moment.
+- Never use Strategyzer jargon unless the coach introduced it.
+
+TEAM MEMBERS:
+${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture}`).join("\n")}
+
+SCENARIO: ${scenario.title}
+${scenario.context}
+
+CURRENT CELL: ${cell.label} — ${cell.hint}
+
+FACILITATION TRANSCRIPT SO FAR:
+${transcript}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
+      if (res.status === 402) throw new Error("AI credits exhausted.");
+      throw new Error(`AI gateway error: ${res.status}`);
+    }
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content ?? "{}";
+    let parsed: any = {};
+    try { parsed = JSON.parse(content); } catch { parsed = {}; }
+    return {
+      cellKey: cell.key,
+      team_reply: parsed.team_reply ?? "",
+      facilitation_flag: parsed.facilitation_flag ?? "still_vague",
+      coach_signal: parsed.coach_signal ?? "",
+    };
+  });
+
+
+
+
 
 export const saveCanvas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
