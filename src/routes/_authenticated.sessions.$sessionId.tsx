@@ -4,14 +4,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas } from "@/lib/simulator.functions";
+import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
-import { extractPlaybook, savePlaybookApplication } from "@/lib/playbook.functions";
+import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
-import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook } from "@/lib/playbooks";
+import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook, BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({
@@ -58,7 +59,7 @@ function SessionPage() {
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={() => setStep("application")} />}
         {step === "application" && <ApplicationStep session={session} onSaved={() => { refetch(); setStep("intervention"); }} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={() => { refetch(); setStep("playbook"); }} />}
-        {step === "playbook" && <PlaybookStep session={session} onSaved={refetch} />}
+        {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
       </div>
     </Shell>
   );
@@ -889,61 +890,56 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
   );
 }
 
-// ---------- Playbook Application: upload a real Strategyzer playbook PDF and run it ----------
+// ---------- Playbook Application: run the built-in playbook with the simulated team ----------
 
-function PlaybookStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+type PBMessage = { id: string; role: string; stakeholder_name: string | null; content: string; phase: string; created_at: string };
+
+function PlaybookStep({ session, messages, onSaved }: { session: any; messages: PBMessage[]; onSaved: () => void }) {
   const navigate = useNavigate();
-  const extracted = session.playbook_extracted as
-    | { title: string; overview: string; exercises: { id: string; title: string; objective: string; instructions: string; prompts: string[] }[] }
-    | null;
-  const initialApp = (session.playbook_application as Record<string, string> | null) ?? {};
+  const playbook = BUILTIN_PLAYBOOK;
+  const [activeKey, setActiveKey] = useState<string>(playbook.activities[0].key);
+  const activity = playbook.activities.find((a) => a.key === activeKey)!;
 
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [extracting, setExtracting] = useState(false);
-  const [responses, setResponses] = useState<Record<string, string>>(initialApp);
+  const initialApp = (session.playbook_application as Record<string, any> | null) ?? {};
+  const [artifact, setArtifact] = useState<Record<string, any>>(initialApp);
 
-  const extractFn = useServerFn(extractPlaybook);
   const saveApp = useServerFn(savePlaybookApplication);
   const evalFn = useServerFn(generateEvaluation);
+  const sendTurn = useServerFn(sendPlaybookTeamTurn);
 
-  async function handleUpload() {
-    if (!file) return;
-    if (file.type !== "application/pdf") {
-      toast.error("Please upload a PDF file");
-      return;
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      toast.error("PDF too large (max 15MB)");
-      return;
-    }
-    setUploading(true);
+  const phase = `playbook:${activeKey}`;
+  const turnMessages = messages.filter((m) => m.phase === phase);
+
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+
+  async function handleSend() {
+    if (!draft.trim() || sending) return;
+    setSending(true);
     try {
-      const { data: userRes } = await supabase.auth.getUser();
-      const userId = userRes.user?.id;
-      if (!userId) throw new Error("Not signed in");
-      const path = `${userId}/${session.id}.pdf`;
-      const { error: upErr } = await supabase.storage
-        .from("playbooks")
-        .upload(path, file, { upsert: true, contentType: "application/pdf" });
-      if (upErr) throw new Error(upErr.message);
-
-      setUploading(false);
-      setExtracting(true);
-      await extractFn({ data: { sessionId: session.id, pdfPath: path } });
-      toast.success("Playbook parsed");
+      await sendTurn({ data: { sessionId: session.id, activityKey: activeKey, coachMessage: draft.trim() } });
+      setDraft("");
       onSaved();
     } catch (e: any) {
-      toast.error(e?.message ?? "Upload failed");
+      toast.error(e?.message ?? "Team didn't respond");
     } finally {
-      setUploading(false);
-      setExtracting(false);
+      setSending(false);
     }
+  }
+
+  // Stringify artifact for save (everything as Record<string, string>)
+  function persist(next: Record<string, any>) {
+    setArtifact(next);
+    const flat: Record<string, string> = {};
+    for (const [k, v] of Object.entries(next)) flat[k] = typeof v === "string" ? v : JSON.stringify(v);
+    saveApp({ data: { sessionId: session.id, application: flat } }).catch(() => {});
   }
 
   const submit = useMutation({
     mutationFn: async () => {
-      await saveApp({ data: { sessionId: session.id, application: responses } });
+      const flat: Record<string, string> = {};
+      for (const [k, v] of Object.entries(artifact)) flat[k] = typeof v === "string" ? v : JSON.stringify(v);
+      await saveApp({ data: { sessionId: session.id, application: flat } });
       await evalFn({ data: { sessionId: session.id } });
     },
     onSuccess: () => {
@@ -954,121 +950,119 @@ function PlaybookStep({ session, onSaved }: { session: any; onSaved: () => void 
     onError: (e: any) => toast.error(e?.message ?? "Evaluation failed"),
   });
 
-  // ---------- Upload screen ----------
-  if (!extracted) {
-    return (
-      <StepShell
-        title="Bring in a real playbook"
-        hint="Upload the Strategyzer playbook PDF you'd actually use here. We'll parse its exercises so you can run them with the team — no improvising frameworks."
-      >
-        <div className="border border-ink p-5 bg-secondary mb-4">
-          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Where to get the playbook</div>
-          <p className="text-sm leading-relaxed mb-3">
-            Sign in to the Strategyzer platform and download the relevant playbook PDF from the official library.
-          </p>
-          <a
-            href="https://platform.strategyzer.com/playbook_libraries/strategyzer_library"
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs underline"
-          >
-            Open Strategyzer playbook library ↗
-          </a>
-        </div>
-
-        <label className="block border-2 border-dashed border-ink p-8 text-center cursor-pointer hover:bg-secondary">
-          <input
-            type="file"
-            accept="application/pdf"
-            className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-          <div className="text-sm">
-            {file ? <strong>{file.name}</strong> : "Click to choose a playbook PDF (max 15MB)"}
-          </div>
-          {file && (
-            <div className="text-[11px] text-muted-foreground mt-1">
-              {(file.size / 1024).toFixed(0)} KB
-            </div>
-          )}
-        </label>
-
-        <div className="mt-4 flex justify-end">
-          <button
-            onClick={handleUpload}
-            disabled={!file || uploading || extracting}
-            className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
-          >
-            {uploading ? "Uploading…" : extracting ? "Parsing exercises…" : "Upload & parse →"}
-          </button>
-        </div>
-      </StepShell>
-    );
-  }
-
-  // ---------- Run the playbook ----------
   return (
     <div>
-      <div className="grid md:grid-cols-12 gap-6 mb-6">
-        <div className="md:col-span-4">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Active playbook</div>
-          <h2 className="text-2xl tracking-tight mb-2">{extracted.title}</h2>
-          <p className="text-sm text-muted-foreground leading-relaxed mb-4">{extracted.overview}</p>
-          <div className="border border-ink p-3 text-xs bg-secondary">
-            <div className="uppercase tracking-[0.12em] font-medium mb-1">How to run this</div>
-            <p className="leading-relaxed">
-              Walk the team through each exercise in order. Capture what the team produces — not what you think.
-              Empty responses mean the exercise wasn't completed.
-            </p>
+      {/* Playbook header */}
+      <div className="border border-ink p-5 bg-secondary mb-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">{playbook.source}</div>
+            <h2 className="text-2xl tracking-tight">{playbook.name}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">{playbook.overview}</p>
           </div>
-          <button
-            onClick={() => {
-              if (confirm("Replace the current playbook with a different PDF?")) {
-                setResponses({});
-                // Force re-upload UI
-                (session as any).playbook_extracted = null;
-                onSaved();
-              }
-            }}
-            className="mt-3 text-xs underline"
-          >
-            Replace playbook PDF
-          </button>
-        </div>
-
-        <div className="md:col-span-8 space-y-4">
-          {extracted.exercises.map((ex, i) => (
-            <div key={ex.id} className="border border-ink p-4 bg-paper">
-              <div className="flex items-baseline gap-3 mb-1">
-                <span className="marker-num text-xs opacity-60">{String(i + 1).padStart(2, "0")}</span>
-                <h3 className="text-base font-medium">{ex.title}</h3>
-              </div>
-              <p className="text-xs text-muted-foreground italic mb-2">{ex.objective}</p>
-              <p className="text-xs leading-relaxed mb-3 whitespace-pre-wrap">{ex.instructions}</p>
-              {ex.prompts.length > 0 && (
-                <ul className="text-xs list-disc pl-5 mb-3 space-y-0.5">
-                  {ex.prompts.map((p, j) => <li key={j}>{p}</li>)}
-                </ul>
-              )}
-              <textarea
-                value={responses[ex.id] ?? ""}
-                onChange={(e) => setResponses((p) => ({ ...p, [ex.id]: e.target.value }))}
-                rows={5}
-                placeholder="Capture the team's responses to this exercise."
-                className="w-full border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary font-mono"
-              />
-            </div>
-          ))}
         </div>
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-ink pt-4">
-        <button
-          onClick={() => saveApp({ data: { sessionId: session.id, application: responses } }).then(() => toast.success("Saved"))}
-          className="border border-ink px-4 py-2 text-sm hover:bg-secondary"
-        >
-          Save progress
-        </button>
+      {/* Activity tabs */}
+      <div className="flex gap-2 mb-6 border-b border-ink">
+        {playbook.activities.map((a) => (
+          <button
+            key={a.key}
+            onClick={() => setActiveKey(a.key)}
+            className={`px-4 py-2 text-xs uppercase tracking-[0.12em] -mb-px border-b-2 ${
+              a.key === activeKey ? "border-ink font-medium" : "border-transparent text-muted-foreground hover:text-ink"
+            }`}
+          >
+            {String(a.number).padStart(2, "0")} · {a.title}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-12 gap-6">
+        {/* Left: facilitator brief */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="border border-ink p-4 bg-paper">
+            <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Activity {activity.number} · {activity.duration}</div>
+            <h3 className="text-lg font-medium mb-2">{activity.title}</h3>
+            <p className="text-xs text-muted-foreground italic mb-3">{activity.objective}</p>
+            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">Why this asset matters</div>
+            <p className="text-xs leading-relaxed mb-3">{activity.whyItMatters}</p>
+            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">How to facilitate</div>
+            <ol className="text-xs leading-relaxed list-decimal pl-4 space-y-1 mb-3">
+              {activity.facilitatorSteps.map((s, i) => <li key={i}>{s}</li>)}
+            </ol>
+            <div className="text-[10px] uppercase tracking-[0.14em] font-medium mb-1">Prompts you can ask the team</div>
+            <ul className="text-xs leading-relaxed list-disc pl-4 space-y-0.5">
+              {activity.promptsForTeam.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        </div>
+
+        {/* Middle: working chat with the team */}
+        <div className="lg:col-span-4 flex flex-col">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">Working session with the team</div>
+          <div className="border border-ink bg-paper flex-1 min-h-[400px] max-h-[600px] overflow-y-auto p-3 space-y-2">
+            {turnMessages.length === 0 && (
+              <div className="text-xs text-muted-foreground italic p-2">
+                Open the activity with the team. Explain what you're about to do and why this asset matters before asking the first question.
+              </div>
+            )}
+            {turnMessages.map((m) => (
+              <div key={m.id} className={`text-xs ${m.role === "candidate" ? "text-right" : "text-left"}`}>
+                <div className={`inline-block max-w-[90%] px-3 py-2 ${m.role === "candidate" ? "bg-ink text-paper" : "bg-secondary border border-ink"}`}>
+                  <div className="text-[9px] uppercase tracking-[0.12em] opacity-70 mb-0.5">
+                    {m.role === "candidate" ? "Coach" : (m.stakeholder_name ?? "Team")}
+                  </div>
+                  <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-2 items-end">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSend(); }}
+              rows={3}
+              placeholder="What do you say to the team next? (⌘/Ctrl+Enter to send)"
+              className="flex-1 border border-ink bg-paper p-2 text-xs focus:outline-none focus:bg-secondary"
+            />
+            <div className="flex flex-col gap-1">
+              <VoiceInput onTranscript={(c) => setDraft((p) => appendTranscript(p, c))} />
+              <button
+                onClick={handleSend}
+                disabled={!draft.trim() || sending}
+                className="bg-ink text-paper px-3 py-2 text-xs rounded-sm disabled:opacity-50"
+              >
+                {sending ? "…" : "Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: the artifact the team is filling */}
+        <div className="lg:col-span-4">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">The asset</div>
+          {activity.artifact.kind === "ecosystem" ? (
+            <EcosystemArtifact
+              categories={activity.artifact.categories}
+              value={artifact[activity.key] ?? {}}
+              onChange={(next) => persist({ ...artifact, [activity.key]: next })}
+            />
+          ) : (
+            <CustomerProfileArtifact
+              quadrants={activity.artifact.quadrants}
+              value={artifact[activity.key] ?? { segmentName: "", jobs: "", pains: "", gains: "" }}
+              onChange={(next) => persist({ ...artifact, [activity.key]: next })}
+            />
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center gap-2 border-t border-ink pt-4 mt-6">
+        <div className="text-xs text-muted-foreground">
+          Complete both activities, then submit for evaluation. The evaluator sees the chat and the artifacts.
+        </div>
         <button
           onClick={() => submit.mutate()}
           disabled={submit.isPending}
@@ -1080,3 +1074,70 @@ function PlaybookStep({ session, onSaved }: { session: any; onSaved: () => void 
     </div>
   );
 }
+
+function EcosystemArtifact({
+  categories,
+  value,
+  onChange,
+}: {
+  categories: { key: string; label: string; description: string }[];
+  value: Record<string, string>;
+  onChange: (next: Record<string, string>) => void;
+}) {
+  return (
+    <div className="border border-ink p-3 bg-paper space-y-3 max-h-[640px] overflow-y-auto">
+      <div className="text-xs font-medium">Customer ecosystem map</div>
+      {categories.map((c) => (
+        <div key={c.key}>
+          <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">{c.label}</label>
+          <div className="text-[10px] text-muted-foreground italic mb-1">{c.description}</div>
+          <textarea
+            value={value[c.key] ?? ""}
+            onChange={(e) => onChange({ ...value, [c.key]: e.target.value })}
+            rows={2}
+            placeholder="One per line"
+            className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CustomerProfileArtifact({
+  quadrants,
+  value,
+  onChange,
+}: {
+  quadrants: { key: "jobs" | "pains" | "gains"; label: string; hint: string }[];
+  value: { segmentName: string; jobs: string; pains: string; gains: string };
+  onChange: (next: { segmentName: string; jobs: string; pains: string; gains: string }) => void;
+}) {
+  return (
+    <div className="border border-ink p-3 bg-paper space-y-3">
+      <div>
+        <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">Customer segment name</label>
+        <input
+          value={value.segmentName}
+          onChange={(e) => onChange({ ...value, segmentName: e.target.value })}
+          placeholder="e.g. Two-person legal practices in the EU"
+          className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+        />
+      </div>
+      {quadrants.map((q) => (
+        <div key={q.key}>
+          <label className="text-[10px] uppercase tracking-[0.12em] font-medium block">{q.label}</label>
+          <div className="text-[10px] text-muted-foreground italic mb-1">{q.hint}</div>
+          <textarea
+            value={value[q.key] ?? ""}
+            onChange={(e) => onChange({ ...value, [q.key]: e.target.value })}
+            rows={4}
+            placeholder="One per line"
+            className="w-full border border-ink bg-paper p-1.5 text-xs focus:outline-none focus:bg-secondary"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
