@@ -123,6 +123,7 @@ function StepNav({ step, onChange }: { step: Step; onChange: (s: Step) => void }
                   <span className="marker-num text-xs opacity-70">{String(i + 1).padStart(2, "0")}</span>
                   <span className="text-sm font-medium">{s.label}</span>
                 </div>
+                <div className={`text-[10px] mt-1 ml-7 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{s.sub}</div>
               </button>
             );
           })}
