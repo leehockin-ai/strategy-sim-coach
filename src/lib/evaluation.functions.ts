@@ -132,7 +132,7 @@ ${s.framing_notes || "(none)"}
 Choice: ${s.methodology_choice || "(none)"}
 Rationale: ${s.methodology_rationale || "(none)"}
 
-── DIALOGUE (Step 4) ──
+── NAVIGATION (Step 4) — stakeholder 1:1s ──
 Commitments captured: ${s.dialogue_commitments || "(none captured)"}
 
 Stakeholder transcript:
@@ -140,12 +140,23 @@ ${transcriptText || "(no transcript)"}
 
 ── APPLICATION (Step 6) — Strategyzer playbook applied with the team ──
 Playbook: Strong Value Propositions and Differentiation with Gen AI
-Activities: (1) Customer ecosystem map, (2) Customer Profile (Jobs/Pains/Gains).
-Team artifacts produced:
-${s.playbook_application ? JSON.stringify(s.playbook_application, null, 2) : "(empty — activities not completed)"}
 
-Application canvas notes:
+Activity 1 — Customer Ecosystem Map
+Expected: separate end users, beneficiaries, economic buyers, decision makers, channel partners, influencers, recommenders, saboteurs. Specific named people/roles, not generic.
+Artifact:
+${s.playbook_application?.ecosystem ? JSON.stringify(s.playbook_application.ecosystem, null, 2) : "(empty — activity not completed)"}
+
+Activity 2 — Customer Profile (Jobs / Pains / Gains)
+Expected: priority customer named specifically; Jobs as verbs spanning functional/social/emotional; Pains/Gains concrete and tied to that customer; assumptions flagged vs evidence.
+Artifact:
+${s.playbook_application?.customer_profile ? JSON.stringify(s.playbook_application.customer_profile, null, 2) : "(empty — activity not completed)"}
+
+Additional canvas notes:
 ${s.application_canvas ? JSON.stringify(s.application_canvas, null, 2) : "(none)"}
+
+── METHODOLOGICAL SOUNDNESS (cross-cutting) ──
+Assess across ALL inputs above: framing, methodology rationale, navigation commitments, both activity artifacts, and intervention. Look for Strategyzer rigor (evidence-first, customer-first sequencing, discovery vs delivery) and flag drift.
+
 
 ── INTERVENTION (Step 5) ──
 Recommendation: ${s.intervention_recommendation || "(none)"}
