@@ -32,12 +32,12 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
 type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
 const STEPS: { key: Step; label: string; sub: string }[] = [
-  { key: "framing",      label: "Situation Framing",      sub: "Ambiguity, evidence, success expectations" },
-  { key: "method",       label: "Coaching Strategy",      sub: "Approach, sequencing, methodology restraint" },
-  { key: "dialogue",     label: "Stakeholder Workspace",  sub: "Persistent — return any time" },
-  { key: "application",  label: "Facilitated Working Session", sub: "Live Strategyzer facilitation — guide the team in real time" },
-  { key: "intervention", label: "Intervention Decision",  sub: "Continue · Pivot · Escalate · Stop" },
-  { key: "playbook",     label: "Engagement Pathway",     sub: "How would you sequence this responsibly" },
+  { key: "framing",      label: "Situation Framing",          sub: "Diagnose ambiguity, evidence, and success expectations" },
+  { key: "method",       label: "Coaching Approach",          sub: "Choose the smallest useful Strategyzer intervention" },
+  { key: "dialogue",     label: "Stakeholder Workspace",      sub: "Surface political reality, readiness, and resistance before facilitating" },
+  { key: "application",  label: "Live Playbook Facilitation", sub: "Run a real Strategyzer working session with the team" },
+  { key: "intervention", label: "Next-Step Judgment",         sub: "What should happen now based on what emerged?" },
+  { key: "playbook",     label: "Engagement Orchestration",   sub: "Design the smallest responsible pathway forward" },
 ];
 
 function SessionPage() {
