@@ -66,6 +66,10 @@ ${s.framing_notes || "(none)"}
 ${s.methodology_choice || "(none)"}
 Rationale: ${s.methodology_rationale || "(none)"}
 
+— Commitments captured in 1:1 stakeholder dialogue —
+${s.dialogue_commitments || "(none captured)"}
+
+
 — Application canvas (playbook applied with the team) —
 ${s.application_canvas ? JSON.stringify(s.application_canvas, null, 2) : "(none)"}
 
