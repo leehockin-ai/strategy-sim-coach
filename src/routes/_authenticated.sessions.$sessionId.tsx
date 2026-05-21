@@ -27,7 +27,7 @@ const STEPS: { key: Step; label: string; sub: string }[] = [
   { key: "framing",      label: "Situation Framing",      sub: "Ambiguity, evidence, success expectations" },
   { key: "method",       label: "Coaching Strategy",      sub: "Approach, sequencing, methodology restraint" },
   { key: "dialogue",     label: "Stakeholder Workspace",  sub: "Persistent — return any time" },
-  { key: "application",  label: "Working Session Design", sub: "Facilitate Strategyzer thinking — fidelity is a choice" },
+  { key: "application",  label: "Facilitated Working Session", sub: "Live Strategyzer facilitation — guide the team in real time" },
   { key: "intervention", label: "Intervention Decision",  sub: "Continue · Pivot · Escalate · Stop" },
   { key: "playbook",     label: "Engagement Pathway",     sub: "How would you sequence this responsibly" },
 ];
