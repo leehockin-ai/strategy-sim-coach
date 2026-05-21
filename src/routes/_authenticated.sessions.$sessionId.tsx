@@ -1157,6 +1157,16 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 
   return (
     <div>
+      <div className="border border-ink p-5 mb-6" style={{ backgroundColor: "var(--brand-blue)", color: "var(--paper)" }}>
+        <div className="text-[10px] uppercase tracking-[0.14em] mb-1 opacity-80">Step 04 · The intervention</div>
+        <h2 className="text-2xl tracking-tight">Live Playbook Facilitation</h2>
+        <p className="text-sm leading-relaxed mt-2 max-w-3xl opacity-95">
+          You are now <strong>in</strong> the session. You're not designing a workshop anymore — you are actively
+          guiding the team through Strategyzer methodology. Run the playbook you committed to in Coaching Approach,
+          respond to what the team gives you, narrow segments, redirect solution-jumping, simplify assumptions, and
+          surface evidence gaps in real time. This is the core of the simulation.
+        </p>
+      </div>
       {canvasImage && (
         <div className="mb-6 border border-ink bg-paper">
           <div className="flex items-center justify-between px-4 py-2 border-b border-ink">
