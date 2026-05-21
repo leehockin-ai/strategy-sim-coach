@@ -65,7 +65,7 @@ function SessionPage() {
         {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
         {step === "application" && <ApplicationStep session={session} onSaved={refreshOnly} />}
         {step === "intervention" && <InterventionStep session={session} onSaved={refreshOnly} />}
-        {step === "playbook" && <PlaybookStep session={session} messages={data.messages} onSaved={refetch} />}
+        {step === "playbook" && <EngagementPathwayStep session={session} onSaved={refetch} />}
       </div>
       {step !== "dialogue" && step !== "framing" && (
         <button
