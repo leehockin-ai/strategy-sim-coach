@@ -52,7 +52,7 @@ function Header() {
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/scenarios">Scenarios</NavLink>
           {email && <NavLink to="/sessions">My sessions</NavLink>}
-          <NavLink to="/reviewer">Reviewer</NavLink>
+          {isReviewer && <NavLink to="/reviewer">Reviewer</NavLink>}
           <div className="ml-3 pl-3 border-l border-ink/20 flex items-center gap-2">
             {email === undefined ? null : email ? (
               <>
