@@ -17,44 +17,62 @@ export type Database = {
       evaluations: {
         Row: {
           ai_detection: Json | null
+          coach_feedback: string | null
           created_at: string
           gaps: string[]
           id: string
+          internal_notes: string | null
+          methodology_skills: Json | null
           overall_summary: string | null
           raw_response: Json | null
           recommendation: string
+          reviewed_at: string | null
           reviewer_decision: string | null
+          reviewer_name: string | null
           reviewer_notes: string | null
           scores: Json
           session_id: string
+          soft_skills: Json | null
           strengths: string[]
         }
         Insert: {
           ai_detection?: Json | null
+          coach_feedback?: string | null
           created_at?: string
           gaps?: string[]
           id?: string
+          internal_notes?: string | null
+          methodology_skills?: Json | null
           overall_summary?: string | null
           raw_response?: Json | null
           recommendation?: string
+          reviewed_at?: string | null
           reviewer_decision?: string | null
+          reviewer_name?: string | null
           reviewer_notes?: string | null
           scores?: Json
           session_id: string
+          soft_skills?: Json | null
           strengths?: string[]
         }
         Update: {
           ai_detection?: Json | null
+          coach_feedback?: string | null
           created_at?: string
           gaps?: string[]
           id?: string
+          internal_notes?: string | null
+          methodology_skills?: Json | null
           overall_summary?: string | null
           raw_response?: Json | null
           recommendation?: string
+          reviewed_at?: string | null
           reviewer_decision?: string | null
+          reviewer_name?: string | null
           reviewer_notes?: string | null
           scores?: Json
           session_id?: string
+          soft_skills?: Json | null
           strengths?: string[]
         }
         Relationships: [
