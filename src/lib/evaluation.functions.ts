@@ -11,7 +11,7 @@ export const SECTION_RUBRIC = [
     label: "Framing",
     step: "Step 2",
     focus:
-      "Did the coach reframe the brief into clear problem statements & testable assumptions before prescribing anything?",
+      "Did the coach reframe the brief into clear problem statements & testable assumptions before prescribing anything? Strategyzer rigor: separates evidence from opinion, names the unknowns.",
   },
   {
     key: "methodology",
@@ -21,25 +21,39 @@ export const SECTION_RUBRIC = [
       "Was the chosen methodology fit-for-purpose for the evidence at hand, and was the rationale specific (not generic Strategyzer vocabulary)?",
   },
   {
-    key: "dialogue",
-    label: "Stakeholder Dialogue",
+    key: "navigation",
+    label: "Stakeholder Navigation",
     step: "Step 4",
     focus:
-      "How well did the coach navigate stakeholders: surfacing concerns, securing concrete commitments, avoiding solution-jumping or over-pleasing?",
+      "How well did the coach navigate stakeholders: surfacing concerns, securing concrete commitments, managing politics without over-pleasing or solution-jumping. Did agreements get captured cleanly?",
   },
   {
-    key: "application",
-    label: "Playbook Application",
-    step: "Step 6",
+    key: "activity_ecosystem",
+    label: "Activity 1 · Customer Ecosystem Map",
+    step: "Step 6 · Activity 1",
     focus:
-      "Quality of the team artifacts (Ecosystem map, Customer Profile): specificity, evidence-orientation, not generic. Did the coach guide vs. take over?",
+      "Quality of the ecosystem artifact: are end users, beneficiaries, economic buyers, decision makers, channel partners, influencers, recommenders and saboteurs separated and named specifically (not 'customers')? Did the coach guide the team to surface role disagreement rather than fill cells themselves?",
+  },
+  {
+    key: "activity_customer_profile",
+    label: "Activity 2 · Customer Profile",
+    step: "Step 6 · Activity 2",
+    focus:
+      "Quality of the Jobs/Pains/Gains artifact: jobs are verbs and span functional/social/emotional, pains and gains are concrete and tied to the priority customer chosen from the ecosystem, assumptions are flagged vs evidence. Did the coach push back on vague language without taking over the pen?",
+  },
+  {
+    key: "methodological_soundness",
+    label: "Strategyzer Methodological Soundness",
+    step: "Cross-cutting",
+    focus:
+      "Does the coaching consistently honor Strategyzer principles across the session: evidence over opinion, test before scale, customer-first sequencing (ecosystem → profile → value map), and separating discovery from delivery? Flag any methodology drift, framework name-dropping without substance, or skipped sequencing.",
   },
   {
     key: "intervention",
     label: "Intervention Discipline",
     step: "Step 5",
     focus:
-      "Was the recommendation tight, evidence-based, and aligned to what was agreed in 1:1s and produced in the working session?",
+      "Was the recommendation tight, evidence-based, and aligned to what was agreed in 1:1s and produced in the working session? Did commitments made in dialogue (e.g. CIO pitch) get reflected?",
   },
 ] as const;
 
@@ -118,7 +132,7 @@ ${s.framing_notes || "(none)"}
 Choice: ${s.methodology_choice || "(none)"}
 Rationale: ${s.methodology_rationale || "(none)"}
 
-── DIALOGUE (Step 4) ──
+── NAVIGATION (Step 4) — stakeholder 1:1s ──
 Commitments captured: ${s.dialogue_commitments || "(none captured)"}
 
 Stakeholder transcript:
@@ -126,12 +140,23 @@ ${transcriptText || "(no transcript)"}
 
 ── APPLICATION (Step 6) — Strategyzer playbook applied with the team ──
 Playbook: Strong Value Propositions and Differentiation with Gen AI
-Activities: (1) Customer ecosystem map, (2) Customer Profile (Jobs/Pains/Gains).
-Team artifacts produced:
-${s.playbook_application ? JSON.stringify(s.playbook_application, null, 2) : "(empty — activities not completed)"}
 
-Application canvas notes:
+Activity 1 — Customer Ecosystem Map
+Expected: separate end users, beneficiaries, economic buyers, decision makers, channel partners, influencers, recommenders, saboteurs. Specific named people/roles, not generic.
+Artifact:
+${s.playbook_application?.ecosystem ? JSON.stringify(s.playbook_application.ecosystem, null, 2) : "(empty — activity not completed)"}
+
+Activity 2 — Customer Profile (Jobs / Pains / Gains)
+Expected: priority customer named specifically; Jobs as verbs spanning functional/social/emotional; Pains/Gains concrete and tied to that customer; assumptions flagged vs evidence.
+Artifact:
+${s.playbook_application?.customer_profile ? JSON.stringify(s.playbook_application.customer_profile, null, 2) : "(empty — activity not completed)"}
+
+Additional canvas notes:
 ${s.application_canvas ? JSON.stringify(s.application_canvas, null, 2) : "(none)"}
+
+── METHODOLOGICAL SOUNDNESS (cross-cutting) ──
+Assess across ALL inputs above: framing, methodology rationale, navigation commitments, both activity artifacts, and intervention. Look for Strategyzer rigor (evidence-first, customer-first sequencing, discovery vs delivery) and flag drift.
+
 
 ── INTERVENTION (Step 5) ──
 Recommendation: ${s.intervention_recommendation || "(none)"}
