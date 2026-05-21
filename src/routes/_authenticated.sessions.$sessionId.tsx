@@ -4,14 +4,15 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas } from "@/lib/simulator.functions";
+import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
-import { extractPlaybook, savePlaybookApplication } from "@/lib/playbook.functions";
+import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
-import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook } from "@/lib/playbooks";
+import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook, BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({
