@@ -192,7 +192,7 @@ export const updateSession = createServerFn({ method: "POST" })
 
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
-      .update(patch)
+      .update(patch as any)
       .eq("id", data.sessionId)
       .select()
       .single();
