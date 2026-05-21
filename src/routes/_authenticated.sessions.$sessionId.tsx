@@ -32,12 +32,12 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
 type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
 
 const STEPS: { key: Step; label: string; sub: string }[] = [
-  { key: "framing",      label: "Situation Framing",      sub: "Ambiguity, evidence, success expectations" },
-  { key: "method",       label: "Coaching Strategy",      sub: "Approach, sequencing, methodology restraint" },
-  { key: "dialogue",     label: "Stakeholder Workspace",  sub: "Persistent — return any time" },
-  { key: "application",  label: "Facilitated Working Session", sub: "Live Strategyzer facilitation — guide the team in real time" },
-  { key: "intervention", label: "Intervention Decision",  sub: "Continue · Pivot · Escalate · Stop" },
-  { key: "playbook",     label: "Engagement Pathway",     sub: "How would you sequence this responsibly" },
+  { key: "framing",      label: "Situation Framing",          sub: "Diagnose ambiguity, evidence, and success expectations" },
+  { key: "method",       label: "Coaching Approach",          sub: "Choose the smallest useful Strategyzer intervention" },
+  { key: "dialogue",     label: "Stakeholder Workspace",      sub: "Surface political reality, readiness, and resistance before facilitating" },
+  { key: "application",  label: "Live Playbook Facilitation", sub: "Run a real Strategyzer working session with the team" },
+  { key: "intervention", label: "Next-Step Judgment",         sub: "What should happen now based on what emerged?" },
+  { key: "playbook",     label: "Engagement Orchestration",   sub: "Design the smallest responsible pathway forward" },
 ];
 
 function SessionPage() {
@@ -549,8 +549,8 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
 
   return (
     <StepShell
-      title="Choose your coaching strategy"
-      hint="Methodology is an intervention, not an obligation. Pick the smallest sufficient response: one playbook, a sequenced combination, or none yet if you need more evidence first. The point is restraint and fit, not framework coverage."
+      title="Choose your coaching approach"
+      hint="How are you going to work with this team? Pick the smallest useful Strategyzer intervention — one playbook, a sequenced combination, or none yet if evidence is too thin. Decide methodology fit, sequencing, and working style (workshop · guided coaching · evidence gathering) before you enter the room. This is the approach you'll activate in Live Playbook Facilitation."
     >
       {/* Mode selector — single / multi / none */}
       <div className="grid md:grid-cols-3 gap-2 mb-6">
@@ -740,17 +740,17 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
     <div className="space-y-6">
       {/* Purpose framing */}
       <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — open whenever you need it</div>
+        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — diagnostic & preparatory</div>
         <p className="text-sm leading-relaxed">
-          One-on-ones live here for the full session. Use them to clarify assumptions, surface resistance, negotiate scope,
-          challenge unrealistic success definitions, validate readiness, or earn small concrete commitments (a 15-min pitch,
-          access to a customer, a pilot slot). Stakeholders remember the full transcript — they will resist, evolve, and
-          sometimes contradict themselves under pressure, just like real ones.
+          This is where you gather the missing context <em>before</em> you facilitate. Use these 1:1s to validate
+          assumptions, uncover constraints, clarify stakeholder readiness, read emotional dynamics, identify hidden
+          blockers, test alignment, and surface political reality. Stakeholders remember the full transcript — they will
+          resist, evolve, and sometimes contradict themselves under pressure, just like real ones.
         </p>
         <p className="text-sm leading-relaxed mt-2">
-          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These feed your
-          working session design, your intervention call, and your engagement pathway. No need to "finish" this section —
-          come back whenever a later step surfaces a new question for a stakeholder.
+          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These sharpen
+          your Live Playbook Facilitation, your Next-Step Judgment, and your Engagement Orchestration. This isn't a
+          standalone coaching phase — return here any time a later step surfaces a new question for a stakeholder.
         </p>
       </div>
 
@@ -977,20 +977,20 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
     const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
       <StepShell
-        title="Facilitated Working Session"
-        hint="Sometimes the right move is no canvas at all. Restraint scores above forced facilitation."
+        title="Live Playbook Facilitation"
+        hint="You're in the room with the team now. Sometimes the right move is no canvas at all — restraint scores above forced facilitation."
       >
         {mode === "none" ? (
           <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
             <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
             <p className="text-sm leading-relaxed">
-              You chose to gather more evidence before committing to a playbook. Stay here while you work the
-              Stakeholder Workspace, then return to Coaching Strategy when you're ready. Knowing when NOT to
-              facilitate deeper playbook work is itself rewarded.
+              You chose to gather more evidence before activating a playbook. Stay here while you work the
+              Stakeholder Workspace, then return to Coaching Approach when you're ready to commit. Knowing when NOT
+              to run a playbook is itself rewarded.
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Strategy if you'd like to commit to a playbook.</p>
+          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Approach if you'd like to commit to a playbook.</p>
         )}
       </StepShell>
     );
@@ -1157,6 +1157,16 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 
   return (
     <div>
+      <div className="border border-ink p-5 mb-6" style={{ backgroundColor: "var(--brand-blue)", color: "var(--paper)" }}>
+        <div className="text-[10px] uppercase tracking-[0.14em] mb-1 opacity-80">Step 04 · The intervention</div>
+        <h2 className="text-2xl tracking-tight">Live Playbook Facilitation</h2>
+        <p className="text-sm leading-relaxed mt-2 max-w-3xl opacity-95">
+          You are now <strong>in</strong> the session. You're not designing a workshop anymore — you are actively
+          guiding the team through Strategyzer methodology. Run the playbook you committed to in Coaching Approach,
+          respond to what the team gives you, narrow segments, redirect solution-jumping, simplify assumptions, and
+          surface evidence gaps in real time. This is the core of the simulation.
+        </p>
+      </div>
       {canvasImage && (
         <div className="mb-6 border border-ink bg-paper">
           <div className="flex items-center justify-between px-4 py-2 border-b border-ink">
@@ -1304,8 +1314,8 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
 
   return (
     <StepShell
-      title="Recommend & decide"
-      hint="What's the next concrete step you'd recommend? Then make the call: continue, pivot, escalate, or stop. Reflect the commitments stakeholders gave you in the dialogue — they're the real currency of your intervention."
+      title="Next-Step Judgment"
+      hint="The intervention has already happened in Live Playbook Facilitation. Now interpret what emerged. What did the session actually reveal? What is realistically true now? What should the team do next — and just as importantly, what should NOT happen yet? Then make the call: continue, pivot, escalate, or stop. Anchor your reasoning in the stakeholder commitments below."
     >
       {commitments && (
         <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
@@ -1348,7 +1358,7 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
           disabled={submit.isPending || !rec.trim() || !decision}
           className="bg-ink text-paper px-6 py-3 text-sm font-medium rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Saving…" : "Continue to playbook application →"}
+          {submit.isPending ? "Saving…" : "Continue to engagement orchestration →"}
         </button>
       </div>
     </StepShell>
@@ -1440,13 +1450,14 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
   return (
     <div>
       <div className="border border-ink p-5 bg-secondary mb-6">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Final stage · Strategyzer engagement orchestration</div>
-        <h2 className="text-2xl tracking-tight">Design the engagement pathway</h2>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Step 06 · Portfolio-level orchestration</div>
+        <h2 className="text-2xl tracking-tight">Engagement Orchestration</h2>
         <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">
-          Orchestrate Strategyzer methodology over time. Think in terms of facilitated working
-          sessions, evidence-generating activities, and lightweight interventions — not abstract
-          consulting recommendations. The minimum structured intervention that creates meaningful
-          progress beats the biggest engagement design.
+          Design the smallest responsible pathway forward. How would you guide this engagement over time?
+          Sequence future playbooks, workshop cadence, evidence checkpoints, stakeholder alignment moves, and
+          coaching rhythm against real organizational readiness. This is orchestration thinking — not picking
+          another playbook, and not tactical facilitation. The minimum structured pathway that creates
+          meaningful progress beats the biggest engagement design.
         </p>
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-3">
           {filledCount} / {PATHWAY_SECTIONS.length} sections drafted
