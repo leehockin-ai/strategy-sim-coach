@@ -147,6 +147,30 @@ Commitments captured: ${s.dialogue_commitments || "(none captured)"}
 Stakeholder transcript:
 ${transcriptText || "(no transcript)"}
 
+── FACILITATED WORKING SESSION (Step 4) — live Strategyzer playbook facilitation ──
+Methodology: ${s.methodology_choice || "(none)"}
+This is where the coach facilitated live with the (simulated) team, cell by cell. Each cell may
+contain: what the coach captured, the evidence-confidence the coach assigned (none/weak/moderate/strong),
+and whether the coach explicitly flagged the cell as unresolved ambiguity. Reward open-ended probing,
+specificity, evidence rigor, ownership transfer, ambiguity navigation, and facilitation restraint.
+Penalize leading questions, answering for the team, framework jargon, polished consulting narration,
+and mechanically completed cells with no evidence trail.
+${(() => {
+  const c = (s.application_canvas ?? {}) as Record<string, unknown>;
+  const cells: string[] = [];
+  for (const [k, v] of Object.entries(c)) {
+    if (k.startsWith("__meta__")) continue;
+    const metaRaw = c[`__meta__${k}`];
+    let meta: any = {};
+    if (typeof metaRaw === "string") { try { meta = JSON.parse(metaRaw); } catch {} }
+    const confidence = meta.confidence ?? "unset";
+    const unresolved = meta.ambiguity ? "yes" : "no";
+    cells.push(`  • ${k} [evidence: ${confidence}, unresolved: ${unresolved}]\n    ${typeof v === "string" ? v.replace(/\n/g, "\n    ") || "(blank)" : JSON.stringify(v)}`);
+  }
+  return cells.length ? cells.join("\n") : "  (no cells captured)";
+})()}
+
+
 ── ENGAGEMENT PATHWAY (Step 6) — the coach's orchestration artifact ──
 The coach must produce a 5-section pathway. Evaluate each section against the engagement-pathway
 intelligence: reward restraint, sequencing coherence, evidence progression, readiness awareness,
