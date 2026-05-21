@@ -1450,13 +1450,14 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
   return (
     <div>
       <div className="border border-ink p-5 bg-secondary mb-6">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Final stage · Strategyzer engagement orchestration</div>
-        <h2 className="text-2xl tracking-tight">Design the engagement pathway</h2>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Step 06 · Portfolio-level orchestration</div>
+        <h2 className="text-2xl tracking-tight">Engagement Orchestration</h2>
         <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">
-          Orchestrate Strategyzer methodology over time. Think in terms of facilitated working
-          sessions, evidence-generating activities, and lightweight interventions — not abstract
-          consulting recommendations. The minimum structured intervention that creates meaningful
-          progress beats the biggest engagement design.
+          Design the smallest responsible pathway forward. How would you guide this engagement over time?
+          Sequence future playbooks, workshop cadence, evidence checkpoints, stakeholder alignment moves, and
+          coaching rhythm against real organizational readiness. This is orchestration thinking — not picking
+          another playbook, and not tactical facilitation. The minimum structured pathway that creates
+          meaningful progress beats the biggest engagement design.
         </p>
         <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground mt-3">
           {filledCount} / {PATHWAY_SECTIONS.length} sections drafted
