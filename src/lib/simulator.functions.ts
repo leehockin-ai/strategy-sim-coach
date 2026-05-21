@@ -166,6 +166,7 @@ export const updateSession = createServerFn({ method: "POST" })
     interventionRecommendation?: string;
     decision?: string;
     status?: string;
+    dialogueCommitments?: string;
   }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -175,24 +176,19 @@ export const updateSession = createServerFn({ method: "POST" })
       interventionRecommendation: z.string().max(8000).optional(),
       decision: z.string().max(60).optional(),
       status: z.string().max(40).optional(),
+      dialogueCommitments: z.string().max(8000).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
     await assertSessionOwner(data.sessionId, context.userId);
-    const patch: {
-      framing_notes?: string;
-      methodology_choice?: string;
-      methodology_rationale?: string;
-      intervention_recommendation?: string;
-      decision?: string;
-      status?: string;
-    } = {};
+    const patch: Record<string, unknown> = {};
     if (data.framingNotes !== undefined) patch.framing_notes = data.framingNotes;
     if (data.methodologyChoice !== undefined) patch.methodology_choice = data.methodologyChoice;
     if (data.methodologyRationale !== undefined) patch.methodology_rationale = data.methodologyRationale;
     if (data.interventionRecommendation !== undefined) patch.intervention_recommendation = data.interventionRecommendation;
     if (data.decision !== undefined) patch.decision = data.decision;
     if (data.status !== undefined) patch.status = data.status;
+    if (data.dialogueCommitments !== undefined) patch.dialogue_commitments = data.dialogueCommitments;
 
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
@@ -203,6 +199,7 @@ export const updateSession = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { session };
   });
+
 
 export const sendStakeholderMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
