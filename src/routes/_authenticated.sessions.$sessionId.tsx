@@ -698,7 +698,12 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         })}
       </div>
 
-      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Rationale — sequencing, scope, evidence focus, restraint</label>
+      <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
+        Your reasoning — sequencing, scope, evidence focus, restraint
+      </label>
+      <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
+        This is what's scored on Coaching Strategy. Reviewers compare your reasoning to any AI suggestions you consulted.
+      </p>
       <div className="relative">
         <textarea
           value={rationale}
