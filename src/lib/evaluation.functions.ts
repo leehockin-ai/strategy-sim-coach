@@ -3,6 +3,15 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
+import {
+  buildSectionInput,
+  extractInputQualitySignals,
+  renderCanvasForPrompt,
+  renderTranscript,
+  type SectionKey,
+  type SessionForEval,
+  type TranscriptTurn,
+} from "@/lib/evaluation.io";
 
 // Per-section rubric aligned to the coaching-judgment philosophy:
 // reward simplification, evidence rigor, sequencing, alignment, restraint.
@@ -62,6 +71,299 @@ export const SECTION_RUBRIC = [
 // Legacy export so the report page still imports cleanly.
 export const RUBRIC_DIMENSIONS = SECTION_RUBRIC.map((s) => ({ key: s.key, label: s.label }));
 
+// ────────────────────────────────────────────────────────────────────
+// Per-section scoring (Stage A of the fan-out)
+// ────────────────────────────────────────────────────────────────────
+type SectionVerdict = {
+  score: number;
+  verdict: "exemplary" | "strong" | "competent" | "developing" | "insufficient";
+  confidence: "low" | "medium" | "high";
+  reviewer_flag: boolean;
+  evidence: string;
+  strengths: string[];
+  gaps: string[];
+};
+
+const SECTION_SCORING_SYSTEM = `You are an expert Strategyzer certification reviewer scoring ONE rubric section.
+
+${STRATEGYZER_INTELLIGENCE}
+
+CRITICAL: You are evaluating ONLY the section you are asked about. Do NOT speculate about other sections you cannot see. Do NOT let the perceived overall quality of the candidate bias this single-section score — you have not seen the other sections.
+
+PHILOSOPHY:
+- Reward simplification, evidence rigor, sequencing quality, methodology restraint, realistic facilitation.
+- Penalize forced framework application, over-engineering, canvas-as-goal thinking, framework dumping, consulting theater, vague customer language.
+- A deliberately partial artifact with a clear "we stopped here because…" rationale is valid and can score well.
+- Actively flag AI-generated-sounding outputs, suspiciously confident specificity with no evidence trail, and mechanically filled sections.
+
+For this section, return strict JSON:
+{
+  "score": <1-5: 1=absent/harmful, 2=weak, 3=competent, 4=strong, 5=exemplary>,
+  "verdict": "exemplary" | "strong" | "competent" | "developing" | "insufficient",
+  "confidence": "low" | "medium" | "high",
+  "reviewer_flag": <true if a human reviewer should double-check>,
+  "evidence": "<cite specific observable behavior or quote artifact text — what made you assign this score>",
+  "strengths": ["1-3 specific strengths in THIS section, or empty if none"],
+  "gaps": ["1-3 specific gaps in THIS section"]
+}
+
+Be specific. Generic praise is not acceptable — cite the moment.`;
+
+function clamp(n: any, min: number, max: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return min;
+  return Math.max(min, Math.min(max, Math.round(v)));
+}
+
+async function scoreSection(
+  apiKey: string,
+  sec: (typeof SECTION_RUBRIC)[number],
+  userPrompt: string
+): Promise<SectionVerdict> {
+  const sectionFocus = `SECTION: ${sec.label} (${sec.step})\nWHAT THIS SECTION ASSESSES: ${sec.focus}\n\n${userPrompt}`;
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: SECTION_SCORING_SYSTEM },
+        { role: "user", content: sectionFocus },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Rate limit — retry shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted.");
+    throw new Error(`Section scoring failed (${sec.key}): ${res.status}`);
+  }
+  const json = await res.json();
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  let parsed: any = {};
+  try { parsed = JSON.parse(content); } catch {
+    throw new Error(`Section ${sec.key} returned non-JSON`);
+  }
+  return {
+    score: clamp(parsed.score, 1, 5),
+    verdict: parsed.verdict ?? "developing",
+    confidence: parsed.confidence ?? "medium",
+    reviewer_flag: !!parsed.reviewer_flag,
+    evidence: typeof parsed.evidence === "string" ? parsed.evidence : "(no evidence cited)",
+    strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 3) : [],
+    gaps: Array.isArray(parsed.gaps) ? parsed.gaps.slice(0, 3) : [],
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Skills scoring (Stage B)
+// ────────────────────────────────────────────────────────────────────
+type SkillItem = { key: string; label: string; rating: "strength" | "mixed" | "concern"; explanation: string; evidence: string };
+
+const SOFT_SKILLS_PROMPT = `Assess SOFT facilitation skills only, observed across the stakeholder transcript and canvas work.
+Cover: active_listening, open_questioning, psychological_safety, stakeholder_empathy, neutrality, handling_resistance, avoiding_dominating, redirecting_ownership.
+Flag concerns like overly directive tone, missed emotional cues, ignored resistance, excessive explaining, premature advice-giving, confrontational language, shuttle-diplomacy as a substitute for facilitation.
+Return JSON: { "skills": [ { "key", "label", "rating": "strength"|"mixed"|"concern", "explanation", "evidence" } ] } — 6 to 8 items.`;
+
+const METHODOLOGY_SKILLS_PROMPT = `Assess STRATEGYZER METHODOLOGY skills only.
+Cover: strategyzer_fluency, playbook_selection, playbook_sequencing, vpc_bmc_understanding, jobs_pains_gains_quality, evidence_rigor, assumption_identification, tool_facilitation, restraint_when_not_to_playbook.
+Flag concerns like weak customer specificity, confusing jobs with solutions, vague pains/gains, treating assumptions as evidence, forcing a playbook prematurely, over-completing artifacts, generic consulting recommendations, VPC misapplied to internal-team issues.
+Return JSON: { "skills": [ { "key", "label", "rating": "strength"|"mixed"|"concern", "explanation", "evidence" } ] } — 6 to 9 items.`;
+
+async function scoreSkills(
+  apiKey: string,
+  kind: "soft" | "methodology",
+  s: SessionForEval,
+  transcriptText: string,
+  canvasText: string
+): Promise<SkillItem[]> {
+  const prompt = kind === "soft" ? SOFT_SKILLS_PROMPT : METHODOLOGY_SKILLS_PROMPT;
+  const userPrompt = `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}
+
+── STAKEHOLDER TRANSCRIPT ──
+${transcriptText}
+
+── CANVAS WORK ──
+${canvasText}
+
+── FRAMING NOTES ──
+${s.framing_notes ?? "(none)"}
+
+── METHODOLOGY CHOICE ──
+${s.methodology_choice ?? "(none)"} — ${s.methodology_rationale ?? "(no rationale)"}
+
+── ENGAGEMENT PATHWAY ARTIFACT ──
+${["situation_summary", "immediate_intervention", "pathway", "risks", "success_criteria"]
+  .map((k) => `${k}: ${s.playbook_application?.[k] ?? "(empty)"}`)
+  .join("\n")}`;
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}` },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) throw new Error(`Skills scoring failed (${kind}): ${res.status}`);
+  const json = await res.json();
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  let parsed: any = {};
+  try { parsed = JSON.parse(content); } catch { parsed = { skills: [] }; }
+  const arr = Array.isArray(parsed.skills) ? parsed.skills : [];
+  return arr.map((x: any) => ({
+    key: String(x.key ?? "unknown"),
+    label: String(x.label ?? x.key ?? "Unknown"),
+    rating: ["strength", "mixed", "concern"].includes(x.rating) ? x.rating : "mixed",
+    explanation: String(x.explanation ?? ""),
+    evidence: String(x.evidence ?? ""),
+  }));
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Synthesis (Stage C) — sees verdicts, NOT raw transcript or artifacts.
+// ────────────────────────────────────────────────────────────────────
+type SynthesisOut = {
+  overall_summary: string;
+  top_strengths: string[];
+  top_gaps: string[];
+  calibration_notes: string;
+  reviewer_focus: string;
+  confidence: "low" | "medium" | "high";
+  recommendation: "pass" | "conditional_pass" | "human_review_required" | "retry_recommended" | "not_yet_certified";
+  recommendation_rationale: string;
+  coach_feedback_draft: string;
+};
+
+async function synthesizeFinal(
+  apiKey: string,
+  input: {
+    candidateName: string;
+    scenarioTitle: string;
+    sections: Record<string, SectionVerdict>;
+    softSkills: SkillItem[];
+    methodologySkills: SkillItem[];
+    inputQualitySignals: ReturnType<typeof extractInputQualitySignals>;
+    aiAssistanceCount: number;
+  }
+): Promise<SynthesisOut> {
+  const sectionDigest = SECTION_RUBRIC.map((sec) => {
+    const v = input.sections[sec.key];
+    if (!v) return `${sec.label}: (no verdict)`;
+    return `${sec.label} (${sec.step}): score ${v.score}/5, verdict ${v.verdict}, confidence ${v.confidence}${v.reviewer_flag ? " ⚑ flagged" : ""}
+  evidence: ${v.evidence}
+  strengths: ${v.strengths.join(" | ") || "(none)"}
+  gaps: ${v.gaps.join(" | ") || "(none)"}`;
+  }).join("\n\n");
+
+  const softSkillsDigest = input.softSkills.map((sk) => `  ${sk.rating === "concern" ? "⚠" : sk.rating === "strength" ? "✓" : "·"} ${sk.label}: ${sk.explanation}`).join("\n");
+  const methSkillsDigest = input.methodologySkills.map((sk) => `  ${sk.rating === "concern" ? "⚠" : sk.rating === "strength" ? "✓" : "·"} ${sk.label}: ${sk.explanation}`).join("\n");
+
+  const q = input.inputQualitySignals;
+  const qualityDigest = `framing: ${q.framing_chars} chars · methodology rationale: ${q.methodology_rationale_chars} chars · intervention: ${q.intervention_chars} chars · commitments captured: ${q.dialogue_commitments_chars} chars · pathway sections filled: ${q.pathway_sections_filled}/5 (${q.pathway_total_chars} chars total) · canvas cells: ${q.canvas_cells_with_content}/${q.canvas_cells_total} with content, ${q.canvas_cells_with_evidence_marker} with evidence marker · coach transcript: ${q.coach_transcript_turns} turns, ${q.coach_transcript_total_chars} chars · AI suggestions consulted: ${q.ai_suggestions_consulted}`;
+
+  const systemPrompt = `You are an expert Strategyzer certification reviewer producing a FINAL assessment.
+
+You are working ONLY from per-section verdicts and skills assessments that other reviewers have already produced. You do NOT have access to the raw transcript or artifacts. Trust the per-section evidence. Do NOT invent specifics that don't appear in the verdicts.
+
+Your job is to:
+1. Synthesize the pattern across sections — name the dominant coaching mode honestly.
+2. Identify cross-cutting strengths and gaps that appear in multiple sections.
+3. Make a recommendation grounded in the section scores, NOT in a holistic re-judgment.
+4. Write developmental coach feedback that quotes from the section evidence.
+
+Apply input-quality signals when relevant: a candidate who submitted blank or 3-word answers on critical sections cannot be certified regardless of other section quality. A candidate with low character counts AND low scores has demonstrated minimum-viable engagement, not certification-level work.
+
+Recommendation thresholds (apply consistently):
+- "pass": no section scores below 3; methodological_soundness ≥ 4; majority of sections at 4+
+- "conditional_pass": at most one section below 3; methodological_soundness ≥ 3; specific developmental gaps
+- "human_review_required": mixed signals across sections, or any section flagged with reviewer_flag=true that affects the outcome
+- "retry_recommended": multiple sections at 2 or below; methodological misunderstanding evident; recoverable with rework
+- "not_yet_certified": methodological_soundness ≤ 2, OR multiple sections at 1, OR engagement_pathway insufficient, OR foundational misapplication (e.g. VPC on internal team)`;
+
+  const userPrompt = `CANDIDATE: ${input.candidateName}
+SCENARIO: ${input.scenarioTitle}
+
+══════════════════════════════════════════
+PER-SECTION VERDICTS (from independent scoring passes)
+══════════════════════════════════════════
+${sectionDigest}
+
+══════════════════════════════════════════
+SOFT SKILLS
+══════════════════════════════════════════
+${softSkillsDigest}
+
+══════════════════════════════════════════
+METHODOLOGY SKILLS
+══════════════════════════════════════════
+${methSkillsDigest}
+
+══════════════════════════════════════════
+INPUT-QUALITY SIGNALS
+══════════════════════════════════════════
+${qualityDigest}
+
+AI assistance consultations during Coaching Approach: ${input.aiAssistanceCount}
+
+Return strict JSON:
+{
+  "overall_summary": "<3-5 sentences synthesizing the pattern. Name the dominant coaching mode (e.g. 'evidence-disciplined facilitator', 'framework-dumping consultant', 'premature solutioner', 'shuttle diplomat'). Do NOT invent transcript specifics — work from the section evidence provided.>",
+  "top_strengths": ["2-4 cross-cutting strengths"],
+  "top_gaps": ["2-4 cross-cutting gaps"],
+  "calibration_notes": "<what a human reviewer should sanity-check. Mention any section flagged with reviewer_flag.>",
+  "reviewer_focus": "<1-2 sentences on where the reviewer should spend attention>",
+  "confidence": "low" | "medium" | "high",
+  "recommendation": "pass" | "conditional_pass" | "human_review_required" | "retry_recommended" | "not_yet_certified",
+  "recommendation_rationale": "<1-2 sentences tying recommendation to the section scores you saw>",
+  "coach_feedback_draft": "<Developmental coach-facing feedback in markdown. Use headings: ## What you did well / ## Where to improve / ## Methodology guidance / ## Facilitation guidance / ## Recommended next step. Quote section evidence; do not invent new specifics.>"
+}`;
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-pro",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+    }),
+  });
+  if (!res.ok) {
+    if (res.status === 429) throw new Error("Rate limit on synthesis — retry shortly.");
+    if (res.status === 402) throw new Error("AI credits exhausted.");
+    throw new Error(`Synthesis call failed: ${res.status}`);
+  }
+  const json = await res.json();
+  const content = json.choices?.[0]?.message?.content ?? "{}";
+  let parsed: any = {};
+  try { parsed = JSON.parse(content); } catch {
+    throw new Error("Synthesis returned non-JSON");
+  }
+  return {
+    overall_summary: String(parsed.overall_summary ?? ""),
+    top_strengths: Array.isArray(parsed.top_strengths) ? parsed.top_strengths.slice(0, 4) : [],
+    top_gaps: Array.isArray(parsed.top_gaps) ? parsed.top_gaps.slice(0, 4) : [],
+    calibration_notes: String(parsed.calibration_notes ?? ""),
+    reviewer_focus: String(parsed.reviewer_focus ?? ""),
+    confidence: ["low", "medium", "high"].includes(parsed.confidence) ? parsed.confidence : "medium",
+    recommendation: ["pass", "conditional_pass", "human_review_required", "retry_recommended", "not_yet_certified"].includes(parsed.recommendation)
+      ? parsed.recommendation
+      : "human_review_required",
+    recommendation_rationale: String(parsed.recommendation_rationale ?? ""),
+    coach_feedback_draft: String(parsed.coach_feedback_draft ?? ""),
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Orchestrator
+// ────────────────────────────────────────────────────────────────────
 export const generateEvaluation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
@@ -83,287 +385,75 @@ export const generateEvaluation = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
-    const scenario = (session as any).scenarios;
-    const s: any = session;
+    const s = session as unknown as SessionForEval & { id: string };
+    const turns = transcript as TranscriptTurn[] | null;
+    const inputQualitySignals = extractInputQualitySignals(s, turns);
 
-    const transcriptText = (transcript ?? [])
-      .map((m: any) => `${m.role === "candidate" ? "COACH" : m.stakeholder_name?.toUpperCase()}: ${m.content}`)
-      .join("\n\n");
+    // STAGE A: per-section fan-out (parallel, blind to each other)
+    const sectionResults = await Promise.all(
+      SECTION_RUBRIC.map(async (sec) => {
+        const userPrompt = buildSectionInput(sec.key as SectionKey, s, turns);
+        const verdict = await scoreSection(apiKey, sec, userPrompt);
+        return [sec.key, verdict] as const;
+      })
+    );
+    const sections: Record<string, SectionVerdict> = Object.fromEntries(sectionResults);
 
-    const systemPrompt = `You are an expert Strategyzer certification reviewer.
-You assess coaching JUDGMENT under ambiguity, not framework memorization or canvas completion.
+    // STAGE B: skills (parallel with each other; uses transcript + canvas)
+    const transcriptText = renderTranscript(turns);
+    const canvasText = renderCanvasForPrompt(s.application_canvas);
+    const [softSkills, methodologySkills] = await Promise.all([
+      scoreSkills(apiKey, "soft", s, transcriptText, canvasText),
+      scoreSkills(apiKey, "methodology", s, transcriptText, canvasText),
+    ]);
 
-${STRATEGYZER_INTELLIGENCE}
-
-PHILOSOPHY (apply consistently):
-- Reward simplification, evidence rigor, sequencing quality, stakeholder alignment, methodology restraint, realistic facilitation.
-- Penalize forced playbook application, over-engineering, canvas-as-goal thinking, sales/upsell framing, ignoring stakeholder readiness, framework dumping, consulting theater, vague customer language.
-- A coach who deliberately did LESS but did it WELL — challenged the success definition, gathered evidence, ran a partial artifact with rationale — should be rated ABOVE a coach who applied every framework end-to-end without judgment.
-- Incomplete artifacts with a clear "we stopped here because…" rationale are valid and often preferable.
-- When scoring artifacts, actively look for AI-generated-sounding outputs, suspiciously confident specificity with no evidence trail, and mechanically filled canvases — flag these in 'gaps' and lower the score for that section.
-- When an AI assistance log is present in the inputs, treat AI-shaped reasoning as a Coaching Strategy concern unless the candidate's rationale shows clear independent thinking (divergence from AI suggestion, additional scoping, original framing, or evidence the rationale predated the AI consultation).
-
-For each section, return:
-  • score 1-5 (1=absent/harmful, 2=weak, 3=competent, 4=strong, 5=exemplary)
-  • 1-3 specific strengths in THAT section
-  • 1-3 specific gaps in THAT section
-  • evidence: cite observable moments, quoting candidate text where useful. Reference the facilitation signals above when relevant ("the prompt 'would customers want this' is a weak, hypothetical question").
-  • verdict: one of "exemplary" | "strong" | "competent" | "developing" | "insufficient"
-
-Then return a FINAL ASSESSMENT:
-  • overall_summary: 3-5 sentences synthesizing the pattern. Name the dominant coaching mode (e.g. "evidence-disciplined facilitator", "framework-dumping consultant", "premature solutioner").
-  • top_strengths / top_gaps: 2-4 cross-cutting items each
-  • calibration_notes: what a human reviewer should sanity-check
-  • recommendation: "certify" | "conditional" | "not_yet"
-  • recommendation_rationale: 1-2 sentences tying the recommendation to evidence rigor, methodology restraint, and facilitation quality — not artifact completeness.
-
-Be specific. Generic praise ("good facilitation") is not acceptable — cite the moment.`;
-
-    const sectionDescriptions = SECTION_RUBRIC.map(
-      (sec) => `• ${sec.label} (${sec.step}) — ${sec.focus}`
-    ).join("\n");
-
-    const userPrompt = `SCENARIO: ${scenario.title}
-${scenario.summary}
-
-CANDIDATE: ${s.candidate_name}
-
-SECTIONS TO EVALUATE:
-${sectionDescriptions}
-
-══════════════════════════════════════════
-SECTION INPUTS
-══════════════════════════════════════════
-
-── FRAMING (Step 2) ──
-${s.framing_notes || "(none)"}
-
-── AI ASSISTANCE LOG (Coaching Approach step) ──
-${(() => {
-  const log = Array.isArray(s.playbook_suggestions) ? s.playbook_suggestions : [];
-  if (log.length === 0) {
-    return "Candidate did NOT consult AI suggestions before committing to a coaching approach. Their methodology choice and rationale below reflect independent reasoning.";
-  }
-  const lines: string[] = [
-    `Candidate consulted AI suggestions ${log.length} time(s) during Coaching Approach.`,
-    `For each, judge whether the candidate's final choice and rationale below reflect INDEPENDENT REASONING that may have been validated by the AI, or whether they appear to mirror the AI's framing without their own thinking.`,
-    ``,
-  ];
-  log.forEach((entry: any, i: number) => {
-    const sug = entry?.suggestion ?? {};
-    const state = entry?.candidate_state_at_request ?? {};
-    lines.push(`Suggestion ${i + 1} (requested mode: ${entry?.requested_mode ?? "?"}):`);
-    lines.push(`  At time of request — candidate had drafted choice: ${state.had_draft_choice ? "yes" : "no"}; rationale length: ${state.draft_rationale_chars ?? 0} chars.`);
-    lines.push(`  AI proposed: ${sug.playbookId ?? "(no playbook)"} · confidence ${sug.confidence ?? "?"}`);
-    if (sug.rationale) lines.push(`  AI rationale: ${sug.rationale}`);
-    if (Array.isArray(sug.pre_work) && sug.pre_work.length) lines.push(`  AI pre_work: ${sug.pre_work.join("; ")}`);
-    lines.push(``);
-  });
-  lines.push(`When scoring 'coaching_strategy', factor in: a candidate who consulted AI BEFORE drafting their own rationale (had_draft_choice=no, draft_rationale_chars<40) and then submitted a rationale closely mirroring the AI's framing should NOT score above 'competent'. A candidate who drafted their own thinking first and used AI to pressure-test it — and whose final rationale shows independent reasoning, divergence, or specific scoping of the AI's suggestion — can score 'strong' or 'exemplary' on this dimension.`);
-  return lines.join("\n");
-})()}
-
-── METHODOLOGY (Step 3) ──
-Choice: ${s.methodology_choice || "(none)"}
-Rationale: ${s.methodology_rationale || "(none)"}
-
-── NAVIGATION (Step 4) — stakeholder 1:1s ──
-Commitments captured: ${s.dialogue_commitments || "(none captured)"}
-
-Stakeholder transcript:
-${transcriptText || "(no transcript)"}
-
-── FACILITATED WORKING SESSION (Step 4) — live Strategyzer playbook facilitation ──
-Methodology: ${s.methodology_choice || "(none)"}
-This is where the coach facilitated live with the (simulated) team, cell by cell. Each cell may
-contain: what the coach captured, the evidence-confidence the coach assigned (none/weak/moderate/strong),
-and whether the coach explicitly flagged the cell as unresolved ambiguity. Reward open-ended probing,
-specificity, evidence rigor, ownership transfer, ambiguity navigation, and facilitation restraint.
-Penalize leading questions, answering for the team, framework jargon, polished consulting narration,
-and mechanically completed cells with no evidence trail.
-${(() => {
-  const c = (s.application_canvas ?? {}) as Record<string, unknown>;
-  const cells: string[] = [];
-  for (const [k, v] of Object.entries(c)) {
-    if (k.startsWith("__meta__")) continue;
-    const metaRaw = c[`__meta__${k}`];
-    let meta: any = {};
-    if (typeof metaRaw === "string") { try { meta = JSON.parse(metaRaw); } catch {} }
-    const confidence = meta.confidence ?? "unset";
-    const unresolved = meta.ambiguity ? "yes" : "no";
-    cells.push(`  • ${k} [evidence: ${confidence}, unresolved: ${unresolved}]\n    ${typeof v === "string" ? v.replace(/\n/g, "\n    ") || "(blank)" : JSON.stringify(v)}`);
-  }
-  return cells.length ? cells.join("\n") : "  (no cells captured)";
-})()}
-
-
-── ENGAGEMENT PATHWAY (Step 6) — the coach's orchestration artifact ──
-The coach must produce a 5-section pathway. Evaluate each section against the engagement-pathway
-intelligence: reward restraint, sequencing coherence, evidence progression, readiness awareness,
-operational/facilitation realism. Penalize framework stacking, bloated plans, sales framing,
-and polished consulting language without operational detail.
-
-01 — Current Situation Summary:
-${s.playbook_application?.situation_summary || "(empty)"}
-
-02 — Recommended Immediate Intervention:
-${s.playbook_application?.immediate_intervention || "(empty)"}
-
-03 — Recommended Engagement Pathway (sequenced interventions over time):
-${s.playbook_application?.pathway || "(empty)"}
-
-04 — Risk Factors:
-${s.playbook_application?.risks || "(empty)"}
-
-05 — Success Criteria (realistic, evidence-anchored):
-${s.playbook_application?.success_criteria || "(empty)"}
-
-── METHODOLOGICAL SOUNDNESS (cross-cutting) ──
-Assess across ALL inputs above: framing, methodology rationale, navigation commitments, the
-engagement pathway artifact, and intervention. Look for Strategyzer rigor (evidence-first,
-customer-first sequencing, discovery vs delivery) and flag drift.
-
-
-── INTERVENTION (Step 5) ──
-Recommendation: ${s.intervention_recommendation || "(none)"}
-Final decision: ${s.decision || "(none)"}`;
-
-    const sectionSchema = {
-      type: "object",
-      properties: {
-        score: { type: "integer", minimum: 1, maximum: 5 },
-        verdict: {
-          type: "string",
-          enum: ["exemplary", "strong", "competent", "developing", "insufficient"],
-        },
-        confidence: { type: "string", enum: ["low", "medium", "high"] },
-        reviewer_flag: { type: "boolean", description: "True if a human reviewer should pay extra attention to this section." },
-        evidence: { type: "string", description: "Cite specific observable behavior or quote artifact text." },
-        strengths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 },
-        gaps: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 },
-      },
-      required: ["score", "verdict", "confidence", "reviewer_flag", "evidence", "strengths", "gaps"],
-      additionalProperties: false,
-    };
-
-    const skillItemSchema = {
-      type: "object",
-      properties: {
-        key: { type: "string" },
-        label: { type: "string" },
-        rating: { type: "string", enum: ["strength", "mixed", "concern"] },
-        explanation: { type: "string" },
-        evidence: { type: "string", description: "Quote or paraphrase a specific moment from transcript or artifact." },
-      },
-      required: ["key", "label", "rating", "explanation", "evidence"],
-      additionalProperties: false,
-    };
-
-    const tool = {
-      type: "function",
-      function: {
-        name: "submit_evaluation",
-        description: "Return per-section rubric, soft skills, methodology skills, and a final assessment.",
-        parameters: {
-          type: "object",
-          properties: {
-            sections: {
-              type: "object",
-              properties: Object.fromEntries(SECTION_RUBRIC.map((sec) => [sec.key, sectionSchema])),
-              required: SECTION_RUBRIC.map((sec) => sec.key),
-              additionalProperties: false,
-            },
-            soft_skills: {
-              type: "array",
-              minItems: 6,
-              maxItems: 8,
-              description: "Cover: active_listening, open_questioning, psychological_safety, stakeholder_empathy, neutrality, handling_resistance, avoiding_dominating, redirecting_ownership. Flag concerns like overly directive tone, missed emotional cues, ignored resistance, excessive explaining, premature advice-giving.",
-              items: skillItemSchema,
-            },
-            methodology_skills: {
-              type: "array",
-              minItems: 6,
-              maxItems: 9,
-              description: "Cover: strategyzer_fluency, playbook_selection, playbook_sequencing, vpc_bmc_understanding, jobs_pains_gains_quality, evidence_rigor, assumption_identification, tool_facilitation, restraint_when_not_to_playbook. Flag concerns like weak customer specificity, confusing jobs with solutions, vague pains/gains, treating assumptions as evidence, forcing a playbook prematurely, over-completing artifacts, generic consulting recommendations.",
-              items: skillItemSchema,
-            },
-            overall_summary: { type: "string" },
-            top_strengths: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
-            top_gaps: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 4 },
-            calibration_notes: { type: "string", description: "What a human reviewer should double-check." },
-            reviewer_focus: { type: "string", description: "1-2 sentences guiding the human reviewer where to spend attention." },
-            confidence: { type: "string", enum: ["low", "medium", "high"] },
-            recommendation: { type: "string", enum: ["pass", "conditional_pass", "human_review_required", "retry_recommended", "not_yet_certified"] },
-            recommendation_rationale: { type: "string" },
-            coach_feedback_draft: {
-              type: "string",
-              description: "Constructive, developmental coach-facing feedback. Use headings: What you did well / Where to improve / Methodology guidance / Facilitation guidance / Recommended next step. Specific, grounded in observable behavior, not harsh.",
-            },
-          },
-          required: [
-            "sections",
-            "soft_skills",
-            "methodology_skills",
-            "overall_summary",
-            "top_strengths",
-            "top_gaps",
-            "calibration_notes",
-            "reviewer_focus",
-            "confidence",
-            "recommendation",
-            "recommendation_rationale",
-            "coach_feedback_draft",
-          ],
-          additionalProperties: false,
-        },
-      },
-    };
-
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        tools: [tool],
-        tool_choice: { type: "function", function: { name: "submit_evaluation" } },
-      }),
+    // STAGE C: synthesis from verdicts only (no raw transcript/artifacts)
+    const synthesis = await synthesizeFinal(apiKey, {
+      candidateName: s.candidate_name,
+      scenarioTitle: s.scenarios.title,
+      sections,
+      softSkills,
+      methodologySkills,
+      inputQualitySignals,
+      aiAssistanceCount: Array.isArray(s.playbook_suggestions) ? s.playbook_suggestions.length : 0,
     });
 
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limit hit — please wait and retry.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Top up in Settings → Workspace → Usage.");
-      throw new Error(`AI gateway error: ${res.status}`);
-    }
-
-    const json = await res.json();
-    const call = json.choices?.[0]?.message?.tool_calls?.[0];
-    if (!call) throw new Error("AI did not return an evaluation");
-    const parsed = JSON.parse(call.function.arguments);
-
     const flatScores: Record<string, { score: number; evidence: string }> = {};
+    const aiSectionVerdicts: Record<string, { score: number; verdict: string; confidence: string }> = {};
     for (const sec of SECTION_RUBRIC) {
-      const sx = parsed.sections?.[sec.key];
-      if (sx) flatScores[sec.key] = { score: sx.score, evidence: sx.evidence };
+      const sx = sections[sec.key];
+      if (sx) {
+        flatScores[sec.key] = { score: sx.score, evidence: sx.evidence };
+        aiSectionVerdicts[sec.key] = { score: sx.score, verdict: sx.verdict, confidence: sx.confidence };
+      }
     }
+
+    const rawResponse = {
+      sections,
+      soft_skills: softSkills,
+      methodology_skills: methodologySkills,
+      ...synthesis,
+      input_quality_signals: inputQualitySignals,
+      architecture: "fanout_v1" as const,
+    };
 
     const { data: evaluation, error: eErr } = await supabaseAdmin
       .from("evaluations")
       .upsert(
         {
           session_id: data.sessionId,
-          scores: { ...flatScores, sections: parsed.sections },
-          strengths: parsed.top_strengths,
-          gaps: parsed.top_gaps,
-          recommendation: parsed.recommendation,
-          overall_summary: parsed.overall_summary,
-          soft_skills: parsed.soft_skills,
-          methodology_skills: parsed.methodology_skills,
-          coach_feedback: parsed.coach_feedback_draft,
-          raw_response: parsed,
+          scores: { ...flatScores, sections },
+          strengths: synthesis.top_strengths,
+          gaps: synthesis.top_gaps,
+          recommendation: synthesis.recommendation,
+          overall_summary: synthesis.overall_summary,
+          soft_skills: softSkills,
+          methodology_skills: methodologySkills,
+          coach_feedback: synthesis.coach_feedback_draft,
+          raw_response: rawResponse,
+          ai_section_verdicts: aiSectionVerdicts,
+          input_quality_signals: inputQualitySignals,
+          evaluation_architecture: "fanout_v1",
         },
         { onConflict: "session_id" }
       )
