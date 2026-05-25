@@ -392,6 +392,44 @@ function InputsTab({ session, messages }: { session: any; messages: any[] }) {
   const pa = session.playbook_application ?? {};
   return (
     <div className="space-y-8">
+      {(() => {
+        const log = Array.isArray(session.playbook_suggestions) ? session.playbook_suggestions : [];
+        if (log.length === 0) {
+          return (
+            <div className="p-3 border border-ink text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
+              <span className="font-medium">No AI assistance used.</span> Candidate's coaching strategy reflects independent reasoning.
+            </div>
+          );
+        }
+        return (
+          <div className="p-3 border border-ink text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
+            <div className="font-medium mb-2">AI assistance log — {log.length} suggestion{log.length === 1 ? "" : "s"} consulted</div>
+            <ul className="space-y-2">
+              {log.map((entry: any, i: number) => {
+                const sug = entry?.suggestion ?? {};
+                const state = entry?.candidate_state_at_request ?? {};
+                return (
+                  <li key={i} className="border-l-2 border-ink pl-2">
+                    <div className="opacity-70">
+                      Request {i + 1} · mode={entry?.requested_mode ?? "?"} ·
+                      {" "}draft at time of request: {state.had_draft_choice ? "had choice" : "no choice yet"},
+                      {" "}{state.draft_rationale_chars ?? 0} chars of rationale
+                    </div>
+                    <div>
+                      AI proposed: <strong>{sug.playbookId ?? "(no playbook)"}</strong>
+                      {sug.confidence ? ` · confidence ${sug.confidence}` : ""}
+                    </div>
+                    {sug.rationale && <div className="italic opacity-80">"{sug.rationale}"</div>}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="mt-2 opacity-70">
+              Compare these to the candidate's submitted rationale in Coaching Approach below. Reflexive AI use before drafting independent reasoning should weigh against Coaching Strategy.
+            </div>
+          </div>
+        );
+      })()}
       <CandidateBlock label="Situation framing (Step 1)" value={session.framing_notes} />
       <CandidateBlock
         label="Coaching approach (Step 2)"
