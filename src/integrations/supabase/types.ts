@@ -192,6 +192,7 @@ export type Database = {
           playbook_application: Json | null
           playbook_extracted: Json | null
           playbook_pdf_path: string | null
+          playbook_suggestions: Json
           scenario_id: string
           status: string
         }
@@ -212,6 +213,7 @@ export type Database = {
           playbook_application?: Json | null
           playbook_extracted?: Json | null
           playbook_pdf_path?: string | null
+          playbook_suggestions?: Json
           scenario_id: string
           status?: string
         }
@@ -232,6 +234,7 @@ export type Database = {
           playbook_application?: Json | null
           playbook_extracted?: Json | null
           playbook_pdf_path?: string | null
+          playbook_suggestions?: Json
           scenario_id?: string
           status?: string
         }

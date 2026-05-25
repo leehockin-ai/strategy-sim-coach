@@ -101,6 +101,7 @@ PHILOSOPHY (apply consistently):
 - A coach who deliberately did LESS but did it WELL — challenged the success definition, gathered evidence, ran a partial artifact with rationale — should be rated ABOVE a coach who applied every framework end-to-end without judgment.
 - Incomplete artifacts with a clear "we stopped here because…" rationale are valid and often preferable.
 - When scoring artifacts, actively look for AI-generated-sounding outputs, suspiciously confident specificity with no evidence trail, and mechanically filled canvases — flag these in 'gaps' and lower the score for that section.
+- When an AI assistance log is present in the inputs, treat AI-shaped reasoning as a Coaching Strategy concern unless the candidate's rationale shows clear independent thinking (divergence from AI suggestion, additional scoping, original framing, or evidence the rationale predated the AI consultation).
 
 For each section, return:
   • score 1-5 (1=absent/harmful, 2=weak, 3=competent, 4=strong, 5=exemplary)
@@ -136,6 +137,31 @@ SECTION INPUTS
 
 ── FRAMING (Step 2) ──
 ${s.framing_notes || "(none)"}
+
+── AI ASSISTANCE LOG (Coaching Approach step) ──
+${(() => {
+  const log = Array.isArray(s.playbook_suggestions) ? s.playbook_suggestions : [];
+  if (log.length === 0) {
+    return "Candidate did NOT consult AI suggestions before committing to a coaching approach. Their methodology choice and rationale below reflect independent reasoning.";
+  }
+  const lines: string[] = [
+    `Candidate consulted AI suggestions ${log.length} time(s) during Coaching Approach.`,
+    `For each, judge whether the candidate's final choice and rationale below reflect INDEPENDENT REASONING that may have been validated by the AI, or whether they appear to mirror the AI's framing without their own thinking.`,
+    ``,
+  ];
+  log.forEach((entry: any, i: number) => {
+    const sug = entry?.suggestion ?? {};
+    const state = entry?.candidate_state_at_request ?? {};
+    lines.push(`Suggestion ${i + 1} (requested mode: ${entry?.requested_mode ?? "?"}):`);
+    lines.push(`  At time of request — candidate had drafted choice: ${state.had_draft_choice ? "yes" : "no"}; rationale length: ${state.draft_rationale_chars ?? 0} chars.`);
+    lines.push(`  AI proposed: ${sug.playbookId ?? "(no playbook)"} · confidence ${sug.confidence ?? "?"}`);
+    if (sug.rationale) lines.push(`  AI rationale: ${sug.rationale}`);
+    if (Array.isArray(sug.pre_work) && sug.pre_work.length) lines.push(`  AI pre_work: ${sug.pre_work.join("; ")}`);
+    lines.push(``);
+  });
+  lines.push(`When scoring 'coaching_strategy', factor in: a candidate who consulted AI BEFORE drafting their own rationale (had_draft_choice=no, draft_rationale_chars<40) and then submitted a rationale closely mirroring the AI's framing should NOT score above 'competent'. A candidate who drafted their own thinking first and used AI to pressure-test it — and whose final rationale shows independent reasoning, divergence, or specific scoping of the AI's suggestion — can score 'strong' or 'exemplary' on this dimension.`);
+  return lines.join("\n");
+})()}
 
 ── METHODOLOGY (Step 3) ──
 Choice: ${s.methodology_choice || "(none)"}

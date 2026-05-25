@@ -7,7 +7,15 @@ import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; mode?: string }) => z.object({ sessionId: z.string().uuid(), mode: z.string().optional() }).parse(d))
+  .inputValidator((d: { sessionId: string; mode?: string; candidateDraft?: { choice?: string; rationale?: string } }) =>
+    z.object({
+      sessionId: z.string().uuid(),
+      mode: z.string().optional(),
+      candidateDraft: z
+        .object({ choice: z.string().optional(), rationale: z.string().optional() })
+        .optional(),
+    }).parse(d)
+  )
   .handler(async ({ data, context }) => {
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
@@ -15,7 +23,7 @@ export const suggestPlaybook = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, scenarios(title, context, summary, ambiguity_factors)")
+      .select("framing_notes, playbook_suggestions, scenarios(title, context, summary, ambiguity_factors)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
@@ -46,7 +54,7 @@ Return strict JSON:
 {
   "mode": "single" | "multi" | "none",
   "playbookId": "<id or null if mode=none>",
-  "sequence": ["<id>", "..."],          // ordered list when mode=multi, else []
+  "sequence": ["<id>", "..."],
   "confidence": "low" | "medium" | "high",
   "rationale": "<2-3 sentences citing scoping signals, evidence quality, and sequencing logic>",
   "evidence_gaps": ["<what we still don't know that would change the recommendation>", "..."],
@@ -72,7 +80,28 @@ Return strict JSON:
     const content = json.choices?.[0]?.message?.content ?? "{}";
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { playbookId: null, rationale: content }; }
-    return { suggestion: parsed };
+
+    const priorLog = Array.isArray((session as any).playbook_suggestions)
+      ? ((session as any).playbook_suggestions as any[])
+      : [];
+
+    const entry = {
+      shown_at: new Date().toISOString(),
+      requested_mode: mode,
+      candidate_state_at_request: {
+        had_draft_choice: !!data.candidateDraft?.choice,
+        draft_choice: data.candidateDraft?.choice ?? null,
+        draft_rationale_chars: (data.candidateDraft?.rationale ?? "").trim().length,
+      },
+      suggestion: parsed,
+    };
+
+    await supabaseAdmin
+      .from("sessions")
+      .update({ playbook_suggestions: [...priorLog, entry] })
+      .eq("id", data.sessionId);
+
+    return { suggestion: parsed, logIndex: priorLog.length };
   });
 
 
