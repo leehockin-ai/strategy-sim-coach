@@ -515,10 +515,24 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
   const suggest = useServerFn(suggestPlaybook);
 
   const suggestMut = useMutation({
-    mutationFn: () => suggest({ data: { sessionId: session.id, mode } as any }),
+    mutationFn: () =>
+      suggest({
+        data: {
+          sessionId: session.id,
+          mode,
+          candidateDraft: {
+            choice: mode === "single" ? choice : mode === "multi" ? `multi:${multi.join(",")}` : "none",
+            rationale,
+          },
+        } as any,
+      }),
     onSuccess: (res) => setSuggestion(res.suggestion),
     onError: (e: any) => toast.error(e.message ?? "Could not generate suggestion"),
   });
+
+  const hasDraft =
+    rationale.trim().length >= 40 &&
+    (mode === "none" || (mode === "single" && !!choice) || (mode === "multi" && multi.length > 0));
 
   function encodedChoice(): string {
     if (mode === "none") return "none";
