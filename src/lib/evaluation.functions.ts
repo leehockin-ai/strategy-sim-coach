@@ -101,6 +101,7 @@ PHILOSOPHY (apply consistently):
 - A coach who deliberately did LESS but did it WELL — challenged the success definition, gathered evidence, ran a partial artifact with rationale — should be rated ABOVE a coach who applied every framework end-to-end without judgment.
 - Incomplete artifacts with a clear "we stopped here because…" rationale are valid and often preferable.
 - When scoring artifacts, actively look for AI-generated-sounding outputs, suspiciously confident specificity with no evidence trail, and mechanically filled canvases — flag these in 'gaps' and lower the score for that section.
+- When an AI assistance log is present in the inputs, treat AI-shaped reasoning as a Coaching Strategy concern unless the candidate's rationale shows clear independent thinking (divergence from AI suggestion, additional scoping, original framing, or evidence the rationale predated the AI consultation).
 
 For each section, return:
   • score 1-5 (1=absent/harmful, 2=weak, 3=competent, 4=strong, 5=exemplary)
