@@ -3,6 +3,15 @@ import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
+import {
+  buildSectionInput,
+  extractInputQualitySignals,
+  renderCanvasForPrompt,
+  renderTranscript,
+  type SectionKey,
+  type SessionForEval,
+  type TranscriptTurn,
+} from "@/lib/evaluation.io";
 
 // Per-section rubric aligned to the coaching-judgment philosophy:
 // reward simplification, evidence rigor, sequencing, alignment, restraint.
