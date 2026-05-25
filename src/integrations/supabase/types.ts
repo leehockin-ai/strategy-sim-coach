@@ -17,13 +17,17 @@ export type Database = {
       evaluations: {
         Row: {
           ai_detection: Json | null
+          ai_section_verdicts: Json
           coach_feedback: string | null
           created_at: string
+          evaluation_architecture: string | null
           gaps: string[]
           id: string
+          input_quality_signals: Json
           internal_notes: string | null
           methodology_skills: Json | null
           overall_summary: string | null
+          per_section_overrides: Json
           raw_response: Json | null
           recommendation: string
           reviewed_at: string | null
@@ -37,13 +41,17 @@ export type Database = {
         }
         Insert: {
           ai_detection?: Json | null
+          ai_section_verdicts?: Json
           coach_feedback?: string | null
           created_at?: string
+          evaluation_architecture?: string | null
           gaps?: string[]
           id?: string
+          input_quality_signals?: Json
           internal_notes?: string | null
           methodology_skills?: Json | null
           overall_summary?: string | null
+          per_section_overrides?: Json
           raw_response?: Json | null
           recommendation?: string
           reviewed_at?: string | null
@@ -57,13 +65,17 @@ export type Database = {
         }
         Update: {
           ai_detection?: Json | null
+          ai_section_verdicts?: Json
           coach_feedback?: string | null
           created_at?: string
+          evaluation_architecture?: string | null
           gaps?: string[]
           id?: string
+          input_quality_signals?: Json
           internal_notes?: string | null
           methodology_skills?: Json | null
           overall_summary?: string | null
+          per_section_overrides?: Json
           raw_response?: Json | null
           recommendation?: string
           reviewed_at?: string | null
