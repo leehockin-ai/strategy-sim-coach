@@ -589,15 +589,24 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
 
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
-          <div className="font-medium mb-1">AI second opinion</div>
-          <div className="text-xs opacity-80">{mode === "none" ? "Ask the AI which evidence-gathering moves it would prioritize before any playbook." : "Have the AI review your scoping notes and propose a fit — then form your own call."}</div>
+          <div className="font-medium mb-1 flex items-center gap-2">
+            {hasDraft ? "Compare with AI" : "AI second opinion"}
+            <span className="text-[10px] uppercase tracking-[0.14em] opacity-70 px-1.5 py-0.5 border border-ink">Logged for reviewer</span>
+          </div>
+          <div className="text-xs opacity-80">
+            {hasDraft
+              ? "You've drafted your own reasoning. Pressure-test it against the AI — your reviewer will see both."
+              : mode === "none"
+                ? "Draft your evidence-gathering rationale first, then pressure-test it. AI assistance is logged and factored into your Coaching Strategy score."
+                : "Draft your own playbook choice and rationale first, then pressure-test with AI. Every suggestion shown is recorded."}
+          </div>
         </div>
         <button
           onClick={() => suggestMut.mutate()}
           disabled={suggestMut.isPending}
           className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
         >
-          {suggestMut.isPending ? "Thinking…" : mode === "none" ? "Suggest evidence moves" : "Suggest playbook"}
+          {suggestMut.isPending ? "Thinking…" : hasDraft ? "Compare" : "Suggest"}
         </button>
       </div>
 
