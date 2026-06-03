@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignments: {
+        Row: {
+          admin_note: string | null
+          assigned_by_user_id: string
+          assigned_to_user_id: string
+          cancelled_at: string | null
+          created_at: string
+          due_at: string | null
+          id: string
+          program_id: string
+          scenario_id: string
+          status: string
+        }
+        Insert: {
+          admin_note?: string | null
+          assigned_by_user_id: string
+          assigned_to_user_id: string
+          cancelled_at?: string | null
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          program_id: string
+          scenario_id: string
+          status?: string
+        }
+        Update: {
+          admin_note?: string | null
+          assigned_by_user_id?: string
+          assigned_to_user_id?: string
+          cancelled_at?: string | null
+          created_at?: string
+          due_at?: string | null
+          id?: string
+          program_id?: string
+          scenario_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       evaluations: {
         Row: {
           ai_detection: Json | null
@@ -135,6 +189,103 @@ export type Database = {
           },
         ]
       }
+      program_admins: {
+        Row: {
+          added_at: string
+          added_by: string | null
+          program_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by?: string | null
+          program_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string | null
+          program_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_admins_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_members: {
+        Row: {
+          cohort_label: string | null
+          display_name: string | null
+          invited_by: string | null
+          joined_at: string
+          program_id: string
+          user_id: string
+        }
+        Insert: {
+          cohort_label?: string | null
+          display_name?: string | null
+          invited_by?: string | null
+          joined_at?: string
+          program_id: string
+          user_id: string
+        }
+        Update: {
+          cohort_label?: string | null
+          display_name?: string | null
+          invited_by?: string | null
+          joined_at?: string
+          program_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_members_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      programs: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          kind: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind: string
+          name: string
+          slug: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       scenarios: {
         Row: {
           ambiguity_factors: string[]
@@ -189,6 +340,7 @@ export type Database = {
       sessions: {
         Row: {
           application_canvas: Json | null
+          assignment_id: string | null
           candidate_email: string
           candidate_name: string
           completed_at: string | null
@@ -210,6 +362,7 @@ export type Database = {
         }
         Insert: {
           application_canvas?: Json | null
+          assignment_id?: string | null
           candidate_email: string
           candidate_name: string
           completed_at?: string | null
@@ -231,6 +384,7 @@ export type Database = {
         }
         Update: {
           application_canvas?: Json | null
+          assignment_id?: string | null
           candidate_email?: string
           candidate_name?: string
           completed_at?: string | null
@@ -251,6 +405,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "assignments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_scenario_id_fkey"
             columns: ["scenario_id"]
@@ -292,6 +453,18 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      is_program_admin: {
+        Args: { _program_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_program_member: {
+        Args: { _program_id: string; _user_id: string }
+        Returns: boolean
+      }
+      refresh_assignment_status: {
+        Args: { _assignment_id: string }
+        Returns: undefined
       }
     }
     Enums: {
