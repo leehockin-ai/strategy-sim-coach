@@ -5,20 +5,22 @@ import { Shell } from "@/components/Shell";
 import { listMySessions } from "@/lib/simulator.functions";
 
 export const Route = createFileRoute("/_authenticated/sessions/")({
-  head: () => ({
-    meta: [{ title: "My sessions · Strategyzer Coach Certification" }],
-  }),
+  head: () => ({ meta: [{ title: "My sessions · Strategyzer Coach Certification" }] }),
   component: MySessionsPage,
 });
 
-const STATUS_LABEL: Record<string, string> = {
+const IN_PROGRESS_LABELS: Record<string, string> = {
   intake: "Intake",
   framing: "Framing",
   method: "Method",
+  methodology: "Method",
   dialogue: "Dialogue",
+  working_session: "Working session",
   intervention: "Intervention",
-  completed: "Completed",
 };
+
+// Reviewer-decision statuses → "Assessment ready" (the sign-off has landed).
+const DECIDED_STATUSES = new Set(["approved", "conditional", "not_approved", "retry", "escalated"]);
 
 function MySessionsPage() {
   const fetchMine = useServerFn(listMySessions);
@@ -35,7 +37,7 @@ function MySessionsPage() {
             <span className="chip mb-3 inline-flex">Your work</span>
             <h1 className="text-4xl md:text-5xl tracking-tight">My sessions</h1>
             <p className="mt-3 max-w-xl text-muted-foreground">
-              Resume any session in progress or revisit completed evaluations.
+              Resume a session in progress, read your AI rubric, or revisit Strategyzer-assessed work.
             </p>
           </div>
           <Link to="/scenarios" className="bg-ink text-paper px-4 py-2.5 text-sm rounded-sm">
@@ -56,29 +58,57 @@ function MySessionsPage() {
           </div>
         ) : (
           <div className="border border-ink divide-y divide-ink">
-            {data.sessions.map((s: any) => (
-              <Link
-                key={s.id}
-                to="/sessions/$sessionId"
-                params={{ sessionId: s.id }}
-                className="grid grid-cols-12 gap-4 px-6 py-5 hover:bg-secondary transition-colors items-center"
-              >
-                <span className="marker-num text-xs text-muted-foreground col-span-1">
-                  {new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "2-digit" })}
-                </span>
-                <div className="col-span-6">
-                  <div className="text-sm font-medium">{s.scenarios?.title ?? "Scenario"}</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">{s.scenarios?.industry}</div>
-                </div>
-                <span className="col-span-2 text-xs uppercase tracking-[0.12em]">
-                  {STATUS_LABEL[s.status] ?? s.status}
-                </span>
-                <span className="col-span-2 text-xs text-muted-foreground">
-                  {s.completed_at ? "Completed" : "In progress"}
-                </span>
-                <span className="col-span-1 text-right text-sm" aria-hidden>→</span>
-              </Link>
-            ))}
+            {data.sessions.map((s: any) => {
+              const ev = s.evaluations?.[0];
+              const hasAIRubric = !!ev;
+              const hasReviewerDecision = !!ev?.reviewer_decision || DECIDED_STATUSES.has(s.status);
+              const isSubmittedForReview = !!s.submission_requested_at && !hasReviewerDecision;
+
+              let stateLabel = "In progress";
+              let stateColor = "";
+              let nextActionText: string | null = null;
+              if (hasReviewerDecision) {
+                stateLabel = "Strategyzer-assessed";
+                stateColor = "var(--brand-lime)";
+                nextActionText = "View assessment →";
+              } else if (isSubmittedForReview) {
+                stateLabel = "In reviewer queue";
+                stateColor = "var(--brand-cyan)";
+                nextActionText = "View AI rubric →";
+              } else if (hasAIRubric) {
+                stateLabel = "AI rubric ready";
+                stateColor = "var(--secondary)";
+                nextActionText = "Read AI rubric →";
+              } else {
+                stateLabel = IN_PROGRESS_LABELS[s.status] ?? "In progress";
+              }
+
+              const detailHref = hasAIRubric ? `/sessions/${s.id}/report` : `/sessions/${s.id}`;
+              const linkLabel = nextActionText ?? "Resume →";
+
+              return (
+                <Link
+                  key={s.id}
+                  to={detailHref}
+                  className="grid grid-cols-12 gap-4 px-6 py-5 hover:bg-secondary transition-colors items-center"
+                >
+                  <span className="marker-num text-xs text-muted-foreground col-span-1">
+                    {new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "2-digit" })}
+                  </span>
+                  <div className="col-span-6">
+                    <div className="text-sm font-medium">{s.scenarios?.title ?? "Scenario"}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{s.scenarios?.industry}</div>
+                  </div>
+                  <span
+                    className="col-span-3 text-[10px] uppercase tracking-[0.12em] border border-ink px-2 py-1 inline-flex justify-center"
+                    style={stateColor ? { backgroundColor: stateColor } : undefined}
+                  >
+                    {stateLabel}
+                  </span>
+                  <span className="col-span-2 text-right text-sm">{linkLabel}</span>
+                </Link>
+              );
+            })}
           </div>
         )}
       </section>

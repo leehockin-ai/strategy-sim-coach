@@ -527,7 +527,7 @@ export const listReviewSessions = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("sessions")
       .select(
-        "id, candidate_name, candidate_email, status, created_at, completed_at, scenarios(title, slug, difficulty, industry), evaluations(recommendation, reviewer_decision, reviewer_name, reviewed_at)"
+        "id, candidate_name, candidate_email, status, created_at, completed_at, submission_requested_at, scenarios(title, slug, difficulty, industry), evaluations(recommendation, reviewer_decision, reviewer_name, reviewed_at)"
       )
       .order("created_at", { ascending: false })
       .limit(200);

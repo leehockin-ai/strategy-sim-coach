@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
+import { notify } from "@/lib/notifications.functions";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -148,11 +149,71 @@ export const listMySessions = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await supabaseAdmin
       .from("sessions")
-      .select("*, scenarios(title, industry, difficulty)")
+      .select(`
+        *,
+        scenarios(title, industry, difficulty),
+        evaluations(id, recommendation, reviewer_decision, reviewer_name, reviewed_at)
+      `)
       .eq("owner_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return { sessions: data ?? [] };
+  });
+
+// ──────────────────────────────────────────────────────────────────
+// Coach explicitly submits their completed work for Strategyzer
+// reviewer assessment. This is the moment the session enters the
+// reviewer queue. Idempotent: re-clicking does nothing if already
+// submitted.
+// ──────────────────────────────────────────────────────────────────
+export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string }) =>
+    z.object({ sessionId: z.string().uuid() }).parse(d)
+  )
+  .handler(async ({ data, context }) => {
+    const { data: existing } = await supabaseAdmin
+      .from("sessions")
+      .select("owner_id, submission_requested_at, status")
+      .eq("id", data.sessionId)
+      .single();
+    if (!existing) throw new Error("Session not found");
+    if ((existing as any).owner_id !== context.userId) throw new Error("Forbidden");
+
+    const { data: ev } = await supabaseAdmin
+      .from("evaluations")
+      .select("id")
+      .eq("session_id", data.sessionId)
+      .maybeSingle();
+    if (!ev) {
+      throw new Error("Generate the AI rubric first before submitting for Strategyzer assessment.");
+    }
+
+    if ((existing as any).submission_requested_at) {
+      return { alreadySubmitted: true, submittedAt: (existing as any).submission_requested_at };
+    }
+
+    const submittedAt = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("sessions")
+      .update({ submission_requested_at: submittedAt } as any)
+      .eq("id", data.sessionId);
+    if (error) throw new Error(error.message);
+
+    try {
+      await notify({
+        recipientId: context.userId,
+        kind: "submission_received",
+        title: "Submitted for Strategyzer assessment",
+        body: "Your work is now in the Strategyzer reviewer queue. You'll be notified when a reviewer signs off.",
+        deepLink: `/sessions/${data.sessionId}/report`,
+        metadata: { session_id: data.sessionId },
+      });
+    } catch {
+      // notifications must never fail the operation that emitted them
+    }
+
+    return { alreadySubmitted: false, submittedAt };
   });
 
 export const getSessionForReviewer = createServerFn({ method: "POST" })
