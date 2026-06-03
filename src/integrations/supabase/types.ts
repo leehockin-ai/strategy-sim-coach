@@ -359,6 +359,7 @@ export type Database = {
           playbook_suggestions: Json
           scenario_id: string
           status: string
+          submission_requested_at: string | null
         }
         Insert: {
           application_canvas?: Json | null
@@ -381,6 +382,7 @@ export type Database = {
           playbook_suggestions?: Json
           scenario_id: string
           status?: string
+          submission_requested_at?: string | null
         }
         Update: {
           application_canvas?: Json | null
@@ -403,6 +405,7 @@ export type Database = {
           playbook_suggestions?: Json
           scenario_id?: string
           status?: string
+          submission_requested_at?: string | null
         }
         Relationships: [
           {
