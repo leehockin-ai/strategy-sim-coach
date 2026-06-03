@@ -59,7 +59,9 @@ function MySessionsPage() {
         ) : (
           <div className="border border-ink divide-y divide-ink">
             {data.sessions.map((s: any) => {
-              const ev = s.evaluations?.[0];
+              // evaluations has a one-to-one FK on session_id, so PostgREST
+              // returns it as a single object (or null), not an array.
+              const ev = Array.isArray(s.evaluations) ? s.evaluations[0] : s.evaluations;
               const hasAIRubric = !!ev;
               const hasReviewerDecision = !!ev?.reviewer_decision || DECIDED_STATUSES.has(s.status);
               const isSubmittedForReview = !!s.submission_requested_at && !hasReviewerDecision;
