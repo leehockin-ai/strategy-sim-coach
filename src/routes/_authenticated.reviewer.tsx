@@ -94,14 +94,19 @@ function ReviewerPage() {
   const fetchSessions = useServerFn(listReviewSessions);
   const { data, refetch } = useQuery({ queryKey: ["review-sessions"], queryFn: () => fetchSessions() });
   const [openId, setOpenId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>("submitted");
 
   const sessions: any[] = data?.sessions ?? [];
   const filtered = sessions.filter((s) => {
     if (filter === "all") return true;
+    // "Submitted" = candidate explicitly requested Strategyzer assessment.
+    // Default reviewer view — only real certification submissions.
+    if (filter === "submitted") {
+      return !!s.submission_requested_at;
+    }
     if (filter === "needs_review") {
       const ev = s.evaluations?.[0];
-      return ev && !ev.reviewer_decision;
+      return ev && !ev.reviewer_decision && !!s.submission_requested_at;
     }
     if (filter === "decided") return !!s.evaluations?.[0]?.reviewer_decision;
     return s.evaluations?.[0]?.reviewer_decision === filter;
@@ -124,7 +129,7 @@ function ReviewerPage() {
       <section className="mx-auto max-w-[1500px] px-6 md:px-10 py-8">
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {[
-            { k: "all", l: "All" },
+            { k: "submitted", l: "Submitted" },
             { k: "needs_review", l: "Needs review" },
             { k: "decided", l: "Reviewed" },
             { k: "approved", l: "Approved" },
@@ -132,6 +137,7 @@ function ReviewerPage() {
             { k: "retry_required", l: "Retry" },
             { k: "not_approved", l: "Not approved" },
             { k: "escalate", l: "Escalated" },
+            { k: "all", l: "All (incl. practice)" },
           ].map((f) => (
             <button
               key={f.k}
