@@ -84,7 +84,7 @@ function MySessionsPage() {
               }
 
               const linkLabel = nextActionText ?? "Resume →";
-              const reportTo = "/sessions/$sessionId_/report" as const;
+              const reportTo = "/sessions/$sessionId/report" as const;
               const liveTo = "/sessions/$sessionId" as const;
 
               return (
