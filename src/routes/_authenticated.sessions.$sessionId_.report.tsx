@@ -7,7 +7,7 @@ import { SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { toast } from "sonner";
 import React from "react";
 
-export const Route = createFileRoute("/_authenticated/sessions/$sessionId/report")({
+export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/report")({
   head: () => ({ meta: [{ title: "Your assessment · Strategyzer Coach Certification" }] }),
   component: AssessmentPage,
 });
