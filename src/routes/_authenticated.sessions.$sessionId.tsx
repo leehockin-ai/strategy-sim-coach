@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
@@ -1454,6 +1454,7 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
 
   const saveApp = useServerFn(savePlaybookApplication);
   const evalFn = useServerFn(generateEvaluation);
+  const qc = useQueryClient();
 
   function persist(next: Record<string, string>) {
     setValues(next);
@@ -1467,6 +1468,8 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
     },
     onSuccess: () => {
       toast.success("Evaluation generated");
+      qc.invalidateQueries({ queryKey: ["my-sessions"] });
+      qc.invalidateQueries({ queryKey: ["session", session.id] });
       onSaved();
       navigate({ to: "/sessions/$sessionId/report", params: { sessionId: session.id } });
     },
