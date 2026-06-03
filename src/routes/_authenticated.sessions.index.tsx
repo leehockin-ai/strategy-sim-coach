@@ -106,7 +106,7 @@ function MySessionsPage() {
                     {stateLabel}
                   </span>
                   <span className="col-span-2 text-right text-sm">
-                    {hasAIRubric ? (
+                    {nextActionText ? (
                       <Link to={reportTo} params={{ sessionId: s.id }}>
                         {linkLabel}
                       </Link>
