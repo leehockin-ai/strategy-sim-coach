@@ -83,13 +83,13 @@ function MySessionsPage() {
                 stateLabel = IN_PROGRESS_LABELS[s.status] ?? "In progress";
               }
 
-              const detailHref = hasAIRubric ? `/sessions/${s.id}/report` : `/sessions/${s.id}`;
               const linkLabel = nextActionText ?? "Resume →";
+              const reportTo = "/sessions/$sessionId/report" as const;
+              const liveTo = "/sessions/$sessionId" as const;
 
               return (
-                <Link
+                <div
                   key={s.id}
-                  to={detailHref}
                   className="grid grid-cols-12 gap-4 px-6 py-5 hover:bg-secondary transition-colors items-center"
                 >
                   <span className="marker-num text-xs text-muted-foreground col-span-1">
@@ -105,8 +105,18 @@ function MySessionsPage() {
                   >
                     {stateLabel}
                   </span>
-                  <span className="col-span-2 text-right text-sm">{linkLabel}</span>
-                </Link>
+                  <span className="col-span-2 text-right text-sm">
+                    {hasAIRubric ? (
+                      <Link to={reportTo} params={{ sessionId: s.id }}>
+                        {linkLabel}
+                      </Link>
+                    ) : (
+                      <Link to={liveTo} params={{ sessionId: s.id }}>
+                        {linkLabel}
+                      </Link>
+                    )}
+                  </span>
+                </div>
               );
             })}
           </div>
