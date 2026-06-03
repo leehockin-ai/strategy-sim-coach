@@ -1468,7 +1468,7 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
     onSuccess: () => {
       toast.success("Evaluation generated");
       onSaved();
-      navigate({ to: "/sessions/$sessionId/report", params: { sessionId: session.id } });
+      navigate({ to: "/sessions/$sessionId_/report", params: { sessionId: session.id } });
     },
     onError: (e: any) => toast.error(e?.message ?? "Evaluation failed"),
   });

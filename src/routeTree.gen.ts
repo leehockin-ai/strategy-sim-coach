@@ -16,7 +16,7 @@ import { Route as AuthenticatedScenariosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedReviewerRouteImport } from './routes/_authenticated.reviewer'
 import { Route as AuthenticatedSessionsIndexRouteImport } from './routes/_authenticated.sessions.index'
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated.sessions.$sessionId'
-import { Route as AuthenticatedSessionsSessionIdReportRouteImport } from './routes/_authenticated.sessions.$sessionId.report'
+import { Route as AuthenticatedSessionsSessionIdReportRouteImport } from './routes/_authenticated.sessions.$sessionId_.report'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -56,9 +56,9 @@ const AuthenticatedSessionsSessionIdRoute =
   } as any)
 const AuthenticatedSessionsSessionIdReportRoute =
   AuthenticatedSessionsSessionIdReportRouteImport.update({
-    id: '/report',
-    path: '/report',
-    getParentRoute: () => AuthenticatedSessionsSessionIdRoute,
+    id: '/sessions/$sessionId_/report',
+    path: '/sessions/$sessionId/report',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -66,7 +66,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
-  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/sessions/': typeof AuthenticatedSessionsIndexRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
@@ -75,7 +75,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
-  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/sessions': typeof AuthenticatedSessionsIndexRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
@@ -86,9 +86,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/reviewer': typeof AuthenticatedReviewerRoute
   '/_authenticated/scenarios': typeof AuthenticatedScenariosRoute
-  '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/_authenticated/sessions/': typeof AuthenticatedSessionsIndexRoute
-  '/_authenticated/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
+  '/_authenticated/sessions/$sessionId_/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -118,7 +118,7 @@ export interface FileRouteTypes {
     | '/_authenticated/scenarios'
     | '/_authenticated/sessions/$sessionId'
     | '/_authenticated/sessions/'
-    | '/_authenticated/sessions/$sessionId/report'
+    | '/_authenticated/sessions/$sessionId_/report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -178,44 +178,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/sessions/$sessionId/report': {
-      id: '/_authenticated/sessions/$sessionId/report'
-      path: '/report'
+    '/_authenticated/sessions/$sessionId_/report': {
+      id: '/_authenticated/sessions/$sessionId_/report'
+      path: '/sessions/$sessionId/report'
       fullPath: '/sessions/$sessionId/report'
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdReportRouteImport
-      parentRoute: typeof AuthenticatedSessionsSessionIdRoute
+      parentRoute: typeof AuthenticatedRoute
     }
   }
 }
 
-interface AuthenticatedSessionsSessionIdRouteChildren {
-  AuthenticatedSessionsSessionIdReportRoute: typeof AuthenticatedSessionsSessionIdReportRoute
-}
-
-const AuthenticatedSessionsSessionIdRouteChildren: AuthenticatedSessionsSessionIdRouteChildren =
-  {
-    AuthenticatedSessionsSessionIdReportRoute:
-      AuthenticatedSessionsSessionIdReportRoute,
-  }
-
-const AuthenticatedSessionsSessionIdRouteWithChildren =
-  AuthenticatedSessionsSessionIdRoute._addFileChildren(
-    AuthenticatedSessionsSessionIdRouteChildren,
-  )
-
 interface AuthenticatedRouteChildren {
   AuthenticatedReviewerRoute: typeof AuthenticatedReviewerRoute
   AuthenticatedScenariosRoute: typeof AuthenticatedScenariosRoute
-  AuthenticatedSessionsSessionIdRoute: typeof AuthenticatedSessionsSessionIdRouteWithChildren
+  AuthenticatedSessionsSessionIdRoute: typeof AuthenticatedSessionsSessionIdRoute
   AuthenticatedSessionsIndexRoute: typeof AuthenticatedSessionsIndexRoute
+  AuthenticatedSessionsSessionIdReportRoute: typeof AuthenticatedSessionsSessionIdReportRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedReviewerRoute: AuthenticatedReviewerRoute,
   AuthenticatedScenariosRoute: AuthenticatedScenariosRoute,
-  AuthenticatedSessionsSessionIdRoute:
-    AuthenticatedSessionsSessionIdRouteWithChildren,
+  AuthenticatedSessionsSessionIdRoute: AuthenticatedSessionsSessionIdRoute,
   AuthenticatedSessionsIndexRoute: AuthenticatedSessionsIndexRoute,
+  AuthenticatedSessionsSessionIdReportRoute:
+    AuthenticatedSessionsSessionIdReportRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
