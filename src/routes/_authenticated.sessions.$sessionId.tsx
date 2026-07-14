@@ -1263,6 +1263,9 @@ function Chapter2Container({
 
   // Route by pathway_type + deep-vertical flag.
   let body: React.ReactNode;
+  // The competing_on_business_models branch renders its own Platform-styled
+  // shell (blue header + sub-tabs) — suppress the generic Coach Compass banner.
+  let suppressBanner = false;
 
   if (pathwayType === "pre_playbook") {
     body = (
@@ -1279,12 +1282,15 @@ function Chapter2Container({
     body = <Chapter2Placeholder title="Deliberate pause" note="The deliberate-pause shell will render here after Stage 6." interventionLabel={label} />;
   } else if (pathwayType === "playbook" && slug === "competing_on_business_models") {
     const row = interventions.find((r) => r.slug === slug);
+    suppressBanner = true;
     body = (
       <PlaybookDeepFacilitation
         session={session}
         intervention={row}
+        interventionLabel={label}
         onAdvance={onAdvanceToChapter3}
         onSaved={onSaved}
+        onBackToApproach={onChangeIntervention}
       />
     );
   } else if (pathwayType === "playbook" && isDeepVertical) {
@@ -1304,11 +1310,12 @@ function Chapter2Container({
 
   return (
     <div>
-      {banner}
+      {!suppressBanner && banner}
       {body}
     </div>
   );
 }
+
 
 function Chapter2Placeholder({ title, note, interventionLabel }: { title: string; note: string; interventionLabel: string }) {
   return (
