@@ -1,0 +1,41 @@
+/* Strategyzer Platform visual tokens.
+ * Scoped to .platform-scope so they only apply inside Chapter 2's
+ * deep Playbook facilitation views. Coach Compass's editorial style
+ * remains the default everywhere else. */
+
+.platform-scope {
+  /* Primary palette (from Strategyzer brand color reference) */
+  --platform-blue: #0026DF;
+  --platform-purple: #471169;
+  --platform-aqua: #4DCED4;
+  --platform-green: #74BE47;
+  --platform-red: #EB2835;
+  --platform-pink: #FF58F9;
+  --platform-yellow: #FFD642;
+
+  /* Neutrals derived from Platform screenshots */
+  --platform-bg: #F5F6FF;          /* pale blue-white page background */
+  --platform-surface: #FFFFFF;      /* card / row surface */
+  --platform-border: #E5E7F0;       /* light hairline for card edges */
+  --platform-ink: #0A0A0F;          /* primary text — near-black */
+  --platform-muted: #6B7280;        /* secondary text, time estimates */
+  --platform-badge-bg: #FFFFFF;     /* numbered badge background */
+
+  /* Type — using Inter as an interim substitute for TwK Everett.
+   * TwK Everett is the target font; swap requires webfont license
+   * confirmation from Strategyzer. When licensed, only this variable
+   * needs to change. */
+  --platform-font: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Sizing */
+  --platform-radius: 8px;           /* card corners */
+  --platform-radius-pill: 999px;    /* buttons, pills */
+  --platform-thumb-size: 96px;      /* activity thumbnail size */
+}
+
+/* Apply the design tokens to elements inside .platform-scope */
+.platform-scope {
+  background: var(--platform-bg);
+  color: var(--platform-ink);
+  font-family: var(--platform-font);
+}
