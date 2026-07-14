@@ -633,7 +633,7 @@ type InterventionRow = {
   phase: string | null;
   is_deep_vertical: boolean;
   sort_order: number;
-  default_activity_list?: PlaybookActivity[] | null;
+  default_activity_list?: PlaybookActivity[] | null | any;
 };
 
 type PathwayType = "pre_playbook" | "playbook" | "evidence_gathering" | "deliberate_pause";
