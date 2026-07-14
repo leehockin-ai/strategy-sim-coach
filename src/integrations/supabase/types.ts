@@ -151,6 +151,51 @@ export type Database = {
           },
         ]
       }
+      interventions: {
+        Row: {
+          created_at: string
+          default_activity_list: Json | null
+          id: string
+          is_deep_vertical: boolean
+          label: string
+          long_description: string
+          pathway_type: string
+          phase: string | null
+          short_description: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_activity_list?: Json | null
+          id?: string
+          is_deep_vertical?: boolean
+          label: string
+          long_description?: string
+          pathway_type: string
+          phase?: string | null
+          short_description?: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_activity_list?: Json | null
+          id?: string
+          is_deep_vertical?: boolean
+          label?: string
+          long_description?: string
+          pathway_type?: string
+          phase?: string | null
+          short_description?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -339,22 +384,31 @@ export type Database = {
       }
       sessions: {
         Row: {
+          alignment_workspace: Json | null
           application_canvas: Json | null
           assignment_id: string | null
           candidate_email: string
           candidate_name: string
+          chosen_intervention_slug: string | null
           completed_at: string | null
           created_at: string
           decision: string | null
           dialogue_commitments: string | null
+          evidence_gathering_plan: Json | null
           framing_notes: string | null
           id: string
+          intervention_committed_at: string | null
+          intervention_rationale: string | null
           intervention_recommendation: string | null
           methodology_choice: string | null
           methodology_rationale: string | null
           owner_id: string | null
+          pause_justification: Json | null
+          playbook_activity_run: Json | null
           playbook_application: Json | null
           playbook_extracted: Json | null
+          playbook_facilitation_plan: Json | null
+          playbook_interpretation: Json | null
           playbook_pdf_path: string | null
           playbook_suggestions: Json
           scenario_id: string
@@ -362,22 +416,31 @@ export type Database = {
           submission_requested_at: string | null
         }
         Insert: {
+          alignment_workspace?: Json | null
           application_canvas?: Json | null
           assignment_id?: string | null
           candidate_email: string
           candidate_name: string
+          chosen_intervention_slug?: string | null
           completed_at?: string | null
           created_at?: string
           decision?: string | null
           dialogue_commitments?: string | null
+          evidence_gathering_plan?: Json | null
           framing_notes?: string | null
           id?: string
+          intervention_committed_at?: string | null
+          intervention_rationale?: string | null
           intervention_recommendation?: string | null
           methodology_choice?: string | null
           methodology_rationale?: string | null
           owner_id?: string | null
+          pause_justification?: Json | null
+          playbook_activity_run?: Json | null
           playbook_application?: Json | null
           playbook_extracted?: Json | null
+          playbook_facilitation_plan?: Json | null
+          playbook_interpretation?: Json | null
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
           scenario_id: string
@@ -385,22 +448,31 @@ export type Database = {
           submission_requested_at?: string | null
         }
         Update: {
+          alignment_workspace?: Json | null
           application_canvas?: Json | null
           assignment_id?: string | null
           candidate_email?: string
           candidate_name?: string
+          chosen_intervention_slug?: string | null
           completed_at?: string | null
           created_at?: string
           decision?: string | null
           dialogue_commitments?: string | null
+          evidence_gathering_plan?: Json | null
           framing_notes?: string | null
           id?: string
+          intervention_committed_at?: string | null
+          intervention_rationale?: string | null
           intervention_recommendation?: string | null
           methodology_choice?: string | null
           methodology_rationale?: string | null
           owner_id?: string | null
+          pause_justification?: Json | null
+          playbook_activity_run?: Json | null
           playbook_application?: Json | null
           playbook_extracted?: Json | null
+          playbook_facilitation_plan?: Json | null
+          playbook_interpretation?: Json | null
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
           scenario_id?: string
