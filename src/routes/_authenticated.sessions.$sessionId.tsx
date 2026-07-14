@@ -1856,7 +1856,462 @@ function AlignmentInterpret({
   );
 }
 
+
+// ============ Playbook Deep Facilitation (slug-agnostic) ============
+// Reusable for any deep-vertical Playbook. The activity list comes from
+// interventions.default_activity_list; nothing here is CoBM-specific.
+
+type ActivityMode = "live" | "homework" | "skip";
+type ActivitySession = "session_1" | "session_2" | "session_3" | "between";
+type PlaybookDeepSubTab = "plan" | "facilitate" | "interpret";
+
+const PLAYBOOK_DEEP_SUBTABS: Array<{ key: PlaybookDeepSubTab; label: string }> = [
+  { key: "plan", label: "Plan the Playbook" },
+  { key: "facilitate", label: "Facilitate one activity live" },
+  { key: "interpret", label: "Interpret what emerged" },
+];
+
+const SESSION_OPTIONS: Array<{ v: ActivitySession; l: string }> = [
+  { v: "session_1", l: "Session 1" },
+  { v: "session_2", l: "Session 2" },
+  { v: "session_3", l: "Session 3" },
+  { v: "between", l: "Between-session" },
+];
+
+function defaultActivityDecision(a: PlaybookActivity): { include: boolean; mode: ActivityMode; session: ActivitySession } {
+  return {
+    include: true,
+    mode: a.kind === "workspace" ? "live" : "homework",
+    session: "session_1",
+  };
+}
+
+function PlaybookDeepFacilitation({
+  session,
+  intervention,
+  onAdvance,
+  onSaved,
+}: {
+  session: any;
+  intervention: InterventionRow | undefined;
+  onAdvance: () => void | Promise<void>;
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateSession);
+  const [tab, setTab] = useState<PlaybookDeepSubTab>("plan");
+
+  const rawList = intervention?.default_activity_list;
+  const activities: PlaybookActivity[] = Array.isArray(rawList) ? (rawList as PlaybookActivity[]) : [];
+
+  const plan = (session.playbook_facilitation_plan ?? {}) as { rationale?: string; activities?: Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }> };
+  const activityRun = (session.playbook_activity_run ?? {}) as { activity_n?: number; activity_label?: string; started_at?: string };
+  const interp = (session.playbook_interpretation ?? {}) as Record<string, any>;
+
+  async function savePlanPatch(patch: Record<string, unknown>) {
+    try {
+      await save({ data: { sessionId: session.id, playbookFacilitationPlanPatch: patch } });
+      onSaved();
+    } catch (e: any) { toast.error(e?.message ?? "Could not save"); }
+  }
+  async function saveRunPatch(patch: Record<string, unknown>) {
+    try {
+      await save({ data: { sessionId: session.id, playbookActivityRunPatch: patch } });
+      onSaved();
+    } catch (e: any) { toast.error(e?.message ?? "Could not save"); }
+  }
+  async function saveInterpPatch(patch: Record<string, unknown>) {
+    try {
+      await save({ data: { sessionId: session.id, playbookInterpretationPatch: patch } });
+      onSaved();
+    } catch (e: any) { toast.error(e?.message ?? "Could not save"); }
+  }
+
+  return (
+    <div>
+      <div className="flex gap-4 border-b border-ink/20 mb-6">
+        {PLAYBOOK_DEEP_SUBTABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`pb-2 -mb-px text-xs uppercase tracking-[0.12em] transition-colors ${
+                active ? "border-b border-ink text-ink font-medium" : "text-muted-foreground hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "plan" && (
+        <PlaybookPlan activities={activities} plan={plan} onSave={savePlanPatch} />
+      )}
+      {tab === "facilitate" && (
+        <PlaybookFacilitate
+          session={session}
+          activities={activities}
+          plan={plan}
+          activityRun={activityRun}
+          onSaveRun={saveRunPatch}
+          onSaved={onSaved}
+        />
+      )}
+      {tab === "interpret" && (
+        <PlaybookInterpret
+          activityRun={activityRun}
+          interpretation={interp}
+          onSave={saveInterpPatch}
+          onAdvance={onAdvance}
+        />
+      )}
+    </div>
+  );
+}
+
+function PlaybookPlan({
+  activities,
+  plan,
+  onSave,
+}: {
+  activities: PlaybookActivity[];
+  plan: { rationale?: string; activities?: Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }> };
+  onSave: (patch: Record<string, unknown>) => Promise<void>;
+}) {
+  const [rationale, setRationale] = useState<string>(plan.rationale ?? "");
+  const [decisions, setDecisions] = useState<Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }>>(() => {
+    const seed: Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }> = {};
+    for (const a of activities) {
+      const stored = plan.activities?.[String(a.n)];
+      seed[String(a.n)] = stored ?? defaultActivityDecision(a);
+    }
+    return seed;
+  });
+
+  // Group by section preserving activity order.
+  const sections = useMemo(() => {
+    const map = new Map<string, PlaybookActivity[]>();
+    for (const a of activities) {
+      const list = map.get(a.section) ?? [];
+      list.push(a);
+      map.set(a.section, list);
+    }
+    return Array.from(map.entries());
+  }, [activities]);
+
+  function updateDecision(n: number, patch: Partial<{ include: boolean; mode: ActivityMode; session: ActivitySession }>) {
+    setDecisions((prev) => {
+      const key = String(n);
+      const merged = { ...prev[key], ...patch };
+      // If include=false, force mode=skip
+      if (patch.include === false) merged.mode = "skip";
+      // If include=true toggled on, restore default mode if currently skip
+      if (patch.include === true && prev[key]?.mode === "skip") {
+        const a = activities.find((x) => x.n === n);
+        merged.mode = a ? defaultActivityDecision(a).mode : "live";
+      }
+      const next = { ...prev, [key]: merged };
+      onSave({ activities: { ...(plan.activities ?? {}), ...next } });
+      return next;
+    });
+  }
+
+  if (activities.length === 0) {
+    return (
+      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
+        No activity list configured for this Playbook.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">Facilitation rationale</label>
+        <p className="text-xs text-muted-foreground mb-2">Why this sequencing and pacing? Which activities matter most for this team, and which are lower priority given what you diagnosed in Chapter 1?</p>
+        <textarea
+          value={rationale}
+          onChange={(e) => setRationale(e.target.value)}
+          onBlur={() => onSave({ rationale })}
+          rows={4}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      {sections.map(([section, acts]) => (
+        <div key={section}>
+          <div className="text-sm font-medium mb-2 border-b border-ink/20 pb-1">{section}</div>
+          <div className="space-y-2">
+            {acts.map((a) => {
+              const d = decisions[String(a.n)];
+              const muted = !d?.include;
+              return (
+                <div key={a.n} className={`border border-ink/20 p-3 flex flex-wrap items-center gap-3 ${muted ? "opacity-50" : ""}`}>
+                  <label className="flex items-center gap-2 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={d?.include ?? true}
+                      onChange={(e) => updateDecision(a.n, { include: e.target.checked })}
+                    />
+                    <span className="text-sm">
+                      <span className="text-muted-foreground mr-1">{a.n}.</span>
+                      {a.label}
+                      <span className="text-xs text-muted-foreground ml-2">· {a.kind} · {a.minutes} min</span>
+                    </span>
+                  </label>
+                  {d?.include && (
+                    <>
+                      <div className="flex gap-1">
+                        {(["live", "homework", "skip"] as ActivityMode[]).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => updateDecision(a.n, { mode: m })}
+                            className={`text-xs px-2 py-1 border ${d.mode === m ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
+                          >
+                            {m === "live" ? "Live" : m === "homework" ? "Homework" : "Skip"}
+                          </button>
+                        ))}
+                      </div>
+                      <select
+                        value={d.session}
+                        onChange={(e) => updateDecision(a.n, { session: e.target.value as ActivitySession })}
+                        className="text-xs border border-ink/30 px-2 py-1"
+                      >
+                        {SESSION_OPTIONS.map((o) => (
+                          <option key={o.v} value={o.v}>{o.l}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlaybookFacilitate({
+  session,
+  activities,
+  plan,
+  activityRun,
+  onSaveRun,
+  onSaved,
+}: {
+  session: any;
+  activities: PlaybookActivity[];
+  plan: { activities?: Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }> };
+  activityRun: { activity_n?: number; activity_label?: string; started_at?: string };
+  onSaveRun: (patch: Record<string, unknown>) => Promise<void>;
+  onSaved: () => void;
+}) {
+  const liveActivities = activities.filter((a) => plan.activities?.[String(a.n)]?.mode === "live");
+
+  if (liveActivities.length === 0) {
+    return (
+      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
+        Mark at least one activity as "Live" in Plan the Playbook to facilitate it here.
+      </div>
+    );
+  }
+
+  const selectedN = activityRun.activity_n;
+  const selected = activities.find((a) => a.n === selectedN);
+
+  async function pick(n: number) {
+    const a = activities.find((x) => x.n === n);
+    if (!a) return;
+    const patch: Record<string, unknown> = {
+      activity_n: n,
+      activity_label: a.label,
+    };
+    if (!activityRun.started_at) patch.started_at = new Date().toISOString();
+    await onSaveRun(patch);
+  }
+
+  return (
+    <div>
+      <div className="mb-4">
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">
+          Which activity are you facilitating live right now?
+        </label>
+        <select
+          value={selectedN ?? ""}
+          onChange={(e) => pick(Number(e.target.value))}
+          className="border border-ink/30 px-3 py-2 text-sm"
+        >
+          <option value="">Select an activity…</option>
+          {liveActivities.map((a) => (
+            <option key={a.n} value={a.n}>
+              {a.n}. {a.label} ({a.minutes} min · {a.kind})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selected && (
+        <>
+          <div className="border border-ink p-3 mb-4 text-xs bg-paper">
+            <div className="font-medium text-sm">
+              Facilitating: Activity {selected.n} — {selected.label}
+            </div>
+            <div className="text-muted-foreground mt-1">
+              This is a {selected.minutes}-min {selected.kind === "workspace" ? "workspace" : "e-learning"} activity from your Playbook plan.
+            </div>
+          </div>
+          <ApplicationStep session={session} onSaved={onSaved} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function PlaybookInterpret({
+  activityRun,
+  interpretation,
+  onSave,
+  onAdvance,
+}: {
+  activityRun: { activity_n?: number };
+  interpretation: Record<string, any>;
+  onSave: (patch: Record<string, unknown>) => Promise<void>;
+  onAdvance: () => void | Promise<void>;
+}) {
+  const [surfaced, setSurfaced] = useState<string>(interpretation.surfaced ?? "");
+  const [landing, setLanding] = useState<string>(interpretation.landing ?? "");
+  const [landingWhy, setLandingWhy] = useState<string>(interpretation.landing_explanation ?? "");
+  const [ready, setReady] = useState<string>(interpretation.ready_for_next ?? "");
+  const [readyBlock, setReadyBlock] = useState<string>(interpretation.ready_blocker ?? "");
+  const [homework, setHomework] = useState<string>(interpretation.homework ?? "");
+
+  if (!activityRun.activity_n) {
+    return (
+      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
+        Facilitate an activity in the previous sub-tab before interpreting.
+      </div>
+    );
+  }
+
+  function saveAll(overrides: Record<string, unknown> = {}) {
+    onSave({
+      surfaced, landing, landing_explanation: landingWhy,
+      ready_for_next: ready, ready_blocker: readyBlock,
+      homework,
+      ...overrides,
+    });
+  }
+
+  const canContinue =
+    surfaced.trim().length > 0 &&
+    !!landing && landingWhy.trim().length > 0 &&
+    !!ready;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What did this activity actually surface?</label>
+        <p className="text-xs text-muted-foreground mb-2">What did the team produce, what did they wrestle with, what did they say that told you the exercise did or didn't land?</p>
+        <textarea
+          value={surfaced}
+          onChange={(e) => setSurfaced(e.target.value)}
+          onBlur={() => saveAll()}
+          rows={5}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Team hit the exercise well vs went through the motions</div>
+        <div className="flex gap-2 mb-3">
+          {[
+            { v: "hit", l: "Hit it well" },
+            { v: "mixed", l: "Mixed" },
+            { v: "motions", l: "Went through the motions" },
+          ].map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => { setLanding(o.v); saveAll({ landing: o.v }); }}
+              className={`text-sm border px-3 py-1.5 ${landing === o.v ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+        <textarea
+          value={landingWhy}
+          onChange={(e) => setLandingWhy(e.target.value)}
+          onBlur={() => saveAll()}
+          rows={3}
+          placeholder="What did you observe that led you to this read?"
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Ready for the next activity in your plan?</div>
+        <div className="flex gap-2">
+          {[
+            { v: "yes", l: "Yes" },
+            { v: "revisit", l: "Needs revisiting" },
+            { v: "no", l: "No" },
+          ].map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => { setReady(o.v); saveAll({ ready_for_next: o.v }); }}
+              className={`text-sm border px-3 py-1.5 ${ready === o.v ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+        {(ready === "revisit" || ready === "no") && (
+          <textarea
+            value={readyBlock}
+            onChange={(e) => setReadyBlock(e.target.value)}
+            onBlur={() => saveAll()}
+            rows={3}
+            placeholder="What needs to happen before you'd move on?"
+            className="mt-3 w-full border border-ink/30 px-3 py-2 text-sm"
+          />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What should be homework before you reconvene?</label>
+        <p className="text-xs text-muted-foreground mb-2">If anything. Not every activity generates homework — say "nothing" if that's the honest answer.</p>
+        <textarea
+          value={homework}
+          onChange={(e) => setHomework(e.target.value)}
+          onBlur={() => saveAll()}
+          rows={3}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="pt-4 border-t border-ink flex justify-end">
+        <button
+          type="button"
+          disabled={!canContinue}
+          onClick={() => onAdvance()}
+          className="bg-ink text-paper px-6 py-3 text-sm rounded-sm disabled:opacity-40 hover:opacity-90"
+          title={!canContinue ? "Fill surfaced, landing + explanation, and ready-for-next to continue" : ""}
+        >
+          Continue to Chapter 3 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+
 
 
 
