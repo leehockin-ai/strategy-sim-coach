@@ -79,7 +79,7 @@ function MySessionsPage() {
                 stateColor = "var(--secondary)";
                 nextActionText = "Read AI rubric →";
               } else {
-                stateLabel = IN_PROGRESS_LABELS[s.status] ?? "In progress";
+                stateLabel = CHAPTER_IN_PROGRESS_LABELS[chapterForStep(stepFromStatus(s.status))] ?? "In progress";
               }
 
               const linkLabel = nextActionText ?? "Resume →";
