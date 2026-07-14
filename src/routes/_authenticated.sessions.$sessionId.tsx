@@ -616,6 +616,14 @@ function FramingStep({
 
 // ---------- Method: Intervention picker (Chapter 1 · Approach) ----------
 
+type PlaybookActivity = {
+  n: number;
+  section: string;
+  label: string;
+  kind: "elearning" | "workspace" | string;
+  minutes: number;
+};
+
 type InterventionRow = {
   slug: string;
   label: string;
@@ -625,6 +633,7 @@ type InterventionRow = {
   phase: string | null;
   is_deep_vertical: boolean;
   sort_order: number;
+  default_activity_list?: PlaybookActivity[] | null;
 };
 
 type PathwayType = "pre_playbook" | "playbook" | "evidence_gathering" | "deliberate_pause";
