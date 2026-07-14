@@ -349,7 +349,7 @@ export const listInterventions = createServerFn({ method: "GET" })
   .handler(async () => {
     const { data, error } = await supabaseAdmin
       .from("interventions")
-      .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order")
+      .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order, default_activity_list")
       .order("sort_order", { ascending: true });
     if (error) throw new Error(error.message);
     return { interventions: data ?? [] };
