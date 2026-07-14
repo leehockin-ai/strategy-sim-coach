@@ -138,7 +138,13 @@ function SessionPage() {
           />
         )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
-        {renderKey === "application" && <ApplicationStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "application" && (
+          <Chapter2Container
+            session={session}
+            onSaved={onStepSaved}
+            onChangeIntervention={() => setActiveStep("coaching_approach")}
+          />
+        )}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
