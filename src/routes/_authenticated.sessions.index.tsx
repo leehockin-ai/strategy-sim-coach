@@ -3,20 +3,17 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Shell } from "@/components/Shell";
 import { listMySessions } from "@/lib/simulator.functions";
+import { stepFromStatus, chapterForStep } from "@/lib/chapters";
 
 export const Route = createFileRoute("/_authenticated/sessions/")({
   head: () => ({ meta: [{ title: "My sessions · Strategyzer Coach Certification" }] }),
   component: MySessionsPage,
 });
 
-const IN_PROGRESS_LABELS: Record<string, string> = {
-  intake: "Intake",
-  framing: "Framing",
-  method: "Method",
-  methodology: "Method",
-  dialogue: "Dialogue",
-  working_session: "Working session",
-  intervention: "Intervention",
+const CHAPTER_IN_PROGRESS_LABELS: Record<string, string> = {
+  scope: "Scoping the engagement",
+  apply: "Applying the Playbook",
+  progress: "Progressing the engagement",
 };
 
 // Reviewer-decision statuses → "Assessment ready" (the sign-off has landed).
@@ -82,7 +79,7 @@ function MySessionsPage() {
                 stateColor = "var(--secondary)";
                 nextActionText = "Read AI rubric →";
               } else {
-                stateLabel = IN_PROGRESS_LABELS[s.status] ?? "In progress";
+                stateLabel = CHAPTER_IN_PROGRESS_LABELS[chapterForStep(stepFromStatus(s.status))] ?? "In progress";
               }
 
               const linkLabel = nextActionText ?? "Resume →";
