@@ -1896,13 +1896,17 @@ function defaultActivityDecision(a: PlaybookActivity): { include: boolean; mode:
 function PlaybookDeepFacilitation({
   session,
   intervention,
+  interventionLabel,
   onAdvance,
   onSaved,
+  onBackToApproach,
 }: {
   session: any;
   intervention: InterventionRow | undefined;
+  interventionLabel: string;
   onAdvance: () => void | Promise<void>;
   onSaved: () => void;
+  onBackToApproach: () => void;
 }) {
   const save = useServerFn(updateSession);
   const [tab, setTab] = useState<PlaybookDeepSubTab>("plan");
@@ -1913,6 +1917,8 @@ function PlaybookDeepFacilitation({
   const plan = (session.playbook_facilitation_plan ?? {}) as { rationale?: string; activities?: Record<string, { include: boolean; mode: ActivityMode; session: ActivitySession }> };
   const activityRun = (session.playbook_activity_run ?? {}) as { activity_n?: number; activity_label?: string; started_at?: string };
   const interp = (session.playbook_interpretation ?? {}) as Record<string, any>;
+
+  const scenarioTitle: string = session.scenarios?.title ?? "Scenario";
 
   async function savePlanPatch(patch: Record<string, unknown>) {
     try {
@@ -1934,48 +1940,86 @@ function PlaybookDeepFacilitation({
   }
 
   return (
-    <div>
-      <div className="flex gap-4 border-b border-ink/20 mb-6">
-        {PLAYBOOK_DEEP_SUBTABS.map((t) => {
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`pb-2 -mb-px text-xs uppercase tracking-[0.12em] transition-colors ${
-                active ? "border-b border-ink text-ink font-medium" : "text-muted-foreground hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+    <div className="platform-scope -mx-6 md:-mx-10 mb-6">
+      {/* 5.1a — Platform header banner */}
+      <div
+        className="px-6 md:px-10 py-8 md:py-10"
+        style={{ background: "var(--platform-blue)", color: "#FFFFFF" }}
+      >
+        <div className="mx-auto max-w-[1400px]">
+          <div className="text-xs opacity-60 mb-2">
+            Coach Compass · {scenarioTitle} · Chapter 2
+          </div>
+          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-3" style={{ fontFamily: "var(--platform-font)" }}>
+            {interventionLabel}
+          </h2>
+          <button
+            onClick={onBackToApproach}
+            className="text-sm opacity-90 hover:opacity-100 hover:underline underline-offset-2"
+          >
+            ← Back to Chapter 1 · Approach
+          </button>
+        </div>
       </div>
 
-      {tab === "plan" && (
-        <PlaybookPlan activities={activities} plan={plan} onSave={savePlanPatch} />
-      )}
-      {tab === "facilitate" && (
-        <PlaybookFacilitate
-          session={session}
-          activities={activities}
-          plan={plan}
-          activityRun={activityRun}
-          onSaveRun={saveRunPatch}
-          onSaved={onSaved}
-        />
-      )}
-      {tab === "interpret" && (
-        <PlaybookInterpret
-          activityRun={activityRun}
-          interpretation={interp}
-          onSave={saveInterpPatch}
-          onAdvance={onAdvance}
-        />
-      )}
+      {/* 5.1b — Platform sub-tab bar */}
+      <div
+        className="px-6 md:px-10"
+        style={{ background: "var(--platform-surface)", borderBottom: "1px solid var(--platform-border)" }}
+      >
+        <div className="mx-auto max-w-[1400px] flex gap-6">
+          {PLAYBOOK_DEEP_SUBTABS.map((t) => {
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className="py-4 text-base transition-colors"
+                style={{
+                  color: active ? "var(--platform-blue)" : "var(--platform-muted)",
+                  fontWeight: active ? 600 : 500,
+                  borderBottom: active ? "2px solid var(--platform-blue)" : "2px solid transparent",
+                  marginBottom: "-1px",
+                  fontFamily: "var(--platform-font)",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 5.1c — Main content area */}
+      <div className="px-6 md:px-10 py-8" style={{ background: "var(--platform-bg)", minHeight: "400px" }}>
+        <div className="mx-auto max-w-[1400px]">
+          {tab === "plan" && (
+            <PlaybookPlan activities={activities} plan={plan} onSave={savePlanPatch} />
+          )}
+          {tab === "facilitate" && (
+            <PlaybookFacilitate
+              session={session}
+              activities={activities}
+              plan={plan}
+              activityRun={activityRun}
+              onSaveRun={saveRunPatch}
+              onSaved={onSaved}
+            />
+          )}
+          {tab === "interpret" && (
+            <PlaybookInterpret
+              activityRun={activityRun}
+              interpretation={interp}
+              onSave={saveInterpPatch}
+              onAdvance={onAdvance}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
 
 function PlaybookPlan({
   activities,
