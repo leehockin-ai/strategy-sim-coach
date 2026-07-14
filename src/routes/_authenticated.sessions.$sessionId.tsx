@@ -1256,7 +1256,14 @@ function Chapter2Container({
   let body: React.ReactNode;
 
   if (pathwayType === "pre_playbook") {
-    body = <Chapter2Placeholder title="Alignment workspace" note="The alignment workspace will render here after Stage 4." interventionLabel={label} />;
+    body = (
+      <AlignmentWorkspace
+        session={session}
+        interventions={interventions}
+        onAdvance={onAdvanceToChapter3}
+        onSaved={onSaved}
+      />
+    );
   } else if (pathwayType === "evidence_gathering") {
     body = <Chapter2Placeholder title="Evidence-gathering plan" note="The evidence-gathering shell will render here after Stage 6." interventionLabel={label} />;
   } else if (pathwayType === "deliberate_pause") {
