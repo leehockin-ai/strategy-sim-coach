@@ -143,6 +143,7 @@ function SessionPage() {
             session={session}
             onSaved={onStepSaved}
             onChangeIntervention={() => setActiveStep("coaching_approach")}
+            onAdvanceToChapter3={() => goToChapter("progress")}
           />
         )}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
