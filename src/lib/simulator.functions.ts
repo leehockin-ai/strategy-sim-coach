@@ -273,6 +273,10 @@ export const updateSession = createServerFn({ method: "POST" })
     decision?: string;
     status?: string;
     dialogueCommitments?: string;
+    chosenInterventionSlug?: string;
+    interventionRationale?: string;
+    commitIntervention?: boolean;
+    alignmentWorkspacePatch?: Record<string, unknown>;
   }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -283,6 +287,10 @@ export const updateSession = createServerFn({ method: "POST" })
       decision: z.string().max(60).optional(),
       status: z.string().max(40).optional(),
       dialogueCommitments: z.string().max(8000).optional(),
+      chosenInterventionSlug: z.string().max(120).optional(),
+      interventionRationale: z.string().max(8000).optional(),
+      commitIntervention: z.boolean().optional(),
+      alignmentWorkspacePatch: z.record(z.string(), z.unknown()).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
@@ -295,6 +303,19 @@ export const updateSession = createServerFn({ method: "POST" })
     if (data.decision !== undefined) patch.decision = data.decision;
     if (data.status !== undefined) patch.status = data.status;
     if (data.dialogueCommitments !== undefined) patch.dialogue_commitments = data.dialogueCommitments;
+    if (data.chosenInterventionSlug !== undefined) patch.chosen_intervention_slug = data.chosenInterventionSlug;
+    if (data.interventionRationale !== undefined) patch.intervention_rationale = data.interventionRationale;
+    if (data.commitIntervention) patch.intervention_committed_at = new Date().toISOString();
+
+    if (data.alignmentWorkspacePatch !== undefined) {
+      const { data: existing } = await supabaseAdmin
+        .from("sessions")
+        .select("alignment_workspace")
+        .eq("id", data.sessionId)
+        .single();
+      const prev = ((existing as any)?.alignment_workspace ?? {}) as Record<string, unknown>;
+      patch.alignment_workspace = { ...prev, ...data.alignmentWorkspacePatch };
+    }
 
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
@@ -304,6 +325,17 @@ export const updateSession = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return { session };
+  });
+
+export const listInterventions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from("interventions")
+      .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order")
+      .order("sort_order", { ascending: true });
+    if (error) throw new Error(error.message);
+    return { interventions: data ?? [] };
   });
 
 

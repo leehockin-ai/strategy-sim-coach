@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell } from "@/lib/simulator.functions";
+import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
@@ -107,6 +107,9 @@ function SessionPage() {
   const isLastStepOfChapter = stepIdxInChapter === chapter.steps.length - 1;
   const nextChapter = CHAPTERS.find((c) => c.index === (chapter.index + 1)) ?? null;
   const showChapterTransition = isLastStepOfChapter && nextChapter !== null && chapter.index < 3;
+  // MethodStep (coaching_approach) renders its own commit-and-continue button
+  // because the commit write must happen atomically with the chapter advance.
+  const suppressSharedContinue = activeStep === "coaching_approach";
 
   return (
     <Shell>
@@ -126,13 +129,20 @@ function SessionPage() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
         <ChapterBanner chapter={activeChapter} />
         {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={onStepSaved} onRefresh={refetch} />}
-        {renderKey === "method" && <MethodStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "method" && (
+          <MethodStep
+            session={session}
+            onSaved={onStepSaved}
+            onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined}
+            nextChapterLabel={nextChapter ? `Chapter ${nextChapter.index} — ${nextChapter.label}` : undefined}
+          />
+        )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
         {renderKey === "application" && <ApplicationStep session={session} onSaved={onStepSaved} />}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
-        {showChapterTransition && nextChapter && (
+        {showChapterTransition && nextChapter && !suppressSharedContinue && (
           <div className="mt-12 border-t border-ink pt-8 flex justify-end">
             <button
               onClick={() => goToChapter(nextChapter.key)}
@@ -597,101 +607,199 @@ function FramingStep({
   );
 }
 
-// ---------- Method: Playbook diagnosis & selection ----------
+// ---------- Method: Intervention picker (Chapter 1 · Approach) ----------
 
-function MethodStep({ session, onSaved }: { session: any; onSaved: () => void }) {
-  // Parse stored "choice::engagement" format. New: choice may also be
-  // "multi:id1,id2" or "none" — restraint is a valid coaching call.
-  const storedRaw: string = session.methodology_choice ?? "";
-  const [storedChoice, storedEngagement] = storedRaw.includes("::") ? storedRaw.split("::") : [storedRaw, ENGAGEMENT_MODELS[0].id];
+type InterventionRow = {
+  slug: string;
+  label: string;
+  short_description: string;
+  long_description: string;
+  pathway_type: "pre_playbook" | "playbook" | "evidence_gathering" | "deliberate_pause" | string;
+  phase: string | null;
+  is_deep_vertical: boolean;
+  sort_order: number;
+};
 
-  const initialMode: "single" | "multi" | "none" =
-    storedChoice === "none" ? "none" : storedChoice.startsWith("multi:") ? "multi" : "single";
-  const initialSingle = initialMode === "single" ? storedChoice : "";
-  const initialMulti = initialMode === "multi" ? storedChoice.replace(/^multi:/, "").split(",").filter(Boolean) : [];
+type PathwayType = "pre_playbook" | "playbook" | "evidence_gathering" | "deliberate_pause";
 
-  const [mode, setMode] = useState<"single" | "multi" | "none">(initialMode);
-  const [choice, setChoice] = useState<string>(initialSingle);
-  const [multi, setMulti] = useState<string[]>(initialMulti);
-  const [rationale, setRationale] = useState<string>(session.methodology_rationale ?? "");
-  const [engagement, setEngagement] = useState<string>(storedEngagement || ENGAGEMENT_MODELS[0].id);
+const PATHWAY_CARDS: Array<{ type: PathwayType; title: string; descriptor: string }> = [
+  { type: "pre_playbook", title: "The team isn't ready for methodology yet", descriptor: "Alignment, sponsor commitment, or scope negotiation must happen before any Playbook makes sense." },
+  { type: "playbook", title: "Run a Strategyzer Playbook", descriptor: "The team is aligned and ready. Select a Playbook that fits the phase they're in." },
+  { type: "evidence_gathering", title: "Send the team to gather evidence first", descriptor: "No live intervention yet. The team needs to run interviews, do ecosystem mapping, or gather artifacts before methodology work will land." },
+  { type: "deliberate_pause", title: "Deliberate pause", descriptor: "No intervention is the right move right now. Specify what would need to be true before you'd re-engage." },
+];
+
+const PHASE_LABEL: Record<string, string> = {
+  discovery: "Discovery",
+  design: "Design",
+  test: "Test",
+};
+
+function MethodStep({
+  session,
+  onSaved,
+  onCommitAndAdvance,
+  nextChapterLabel,
+}: {
+  session: any;
+  onSaved: () => void;
+  onCommitAndAdvance?: () => void | Promise<void>;
+  nextChapterLabel?: string;
+}) {
+  const fetchInterventions = useServerFn(listInterventions);
+  const { data: iData } = useQuery({
+    queryKey: ["interventions"],
+    queryFn: () => fetchInterventions(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const interventions = (iData?.interventions ?? []) as InterventionRow[];
+
+  const storedSlug: string = session.chosen_intervention_slug ?? "";
+  const alignmentWs: Record<string, unknown> = (session.alignment_workspace ?? {}) as Record<string, unknown>;
+  const storedBespoke: string = (alignmentWs["bespoke_alignment_description"] as string) ?? "";
+
+  const initialPathway: PathwayType | "" = (() => {
+    if (!storedSlug) return "";
+    if (storedSlug === "bespoke_alignment") return "pre_playbook";
+    const row = (iData?.interventions ?? []).find((r: InterventionRow) => r.slug === storedSlug);
+    return (row?.pathway_type as PathwayType) ?? "";
+  })();
+
+  const [pathway, setPathway] = useState<PathwayType | "">(initialPathway);
+  const [slug, setSlug] = useState<string>(storedSlug);
+  const [bespokeText, setBespokeText] = useState<string>(storedBespoke);
+  const [rationale, setRationale] = useState<string>(session.intervention_rationale ?? session.methodology_rationale ?? "");
   const [suggestion, setSuggestion] = useState<any>(null);
+
+  // Re-derive pathway once interventions load (needed when initial render had no rows).
+  useEffect(() => {
+    if (pathway || !storedSlug || interventions.length === 0) return;
+    if (storedSlug === "bespoke_alignment") { setPathway("pre_playbook"); return; }
+    const row = interventions.find((r) => r.slug === storedSlug);
+    if (row) setPathway(row.pathway_type as PathwayType);
+  }, [interventions, storedSlug, pathway]);
+
   const save = useServerFn(updateSession);
   const suggest = useServerFn(suggestPlaybook);
+
+  // Backward-compat: keep methodology_choice populated so Chapter 2/3 keep working.
+  function backcompatMethodology(): string {
+    if (pathway === "playbook" && slug) return slug;
+    return "none";
+  }
+
+  const hasDraft = rationale.trim().length >= 40 && !!pathway && (
+    pathway === "evidence_gathering" ||
+    pathway === "deliberate_pause" ||
+    (pathway === "pre_playbook" && (slug === "team_alignment_map" || (slug === "bespoke_alignment" && bespokeText.trim().length > 0))) ||
+    (pathway === "playbook" && !!slug)
+  );
 
   const suggestMut = useMutation({
     mutationFn: () =>
       suggest({
         data: {
           sessionId: session.id,
-          mode,
+          mode: pathway || "single",
           candidateDraft: {
-            choice: mode === "single" ? choice : mode === "multi" ? `multi:${multi.join(",")}` : "none",
+            choice: pathway === "pre_playbook" && slug === "bespoke_alignment"
+              ? `bespoke_alignment: ${bespokeText}`
+              : (slug || pathway || ""),
             rationale,
           },
         } as any,
       }),
-    onSuccess: (res) => setSuggestion(res.suggestion),
+    onSuccess: (res: any) => setSuggestion(res.suggestion),
     onError: (e: any) => toast.error(e.message ?? "Could not generate suggestion"),
   });
 
-  const hasDraft =
-    rationale.trim().length >= 40 &&
-    (mode === "none" || (mode === "single" && !!choice) || (mode === "multi" && multi.length > 0));
+  const canCommit =
+    !!pathway &&
+    rationale.trim().length > 0 &&
+    (
+      pathway === "evidence_gathering" ||
+      pathway === "deliberate_pause" ||
+      (pathway === "pre_playbook" && (
+        slug === "team_alignment_map" ||
+        (slug === "bespoke_alignment" && bespokeText.trim().length > 0)
+      )) ||
+      (pathway === "playbook" && !!slug)
+    );
 
-  function encodedChoice(): string {
-    if (mode === "none") return "none";
-    if (mode === "multi") return `multi:${multi.join(",")}`;
-    return choice;
+  function buildSaveData(commit: boolean) {
+    const effectiveSlug = pathway === "evidence_gathering"
+      ? "evidence_gathering"
+      : pathway === "deliberate_pause"
+        ? "deliberate_pause"
+        : slug;
+    const alignmentPatch = (pathway === "pre_playbook" && slug === "bespoke_alignment")
+      ? { bespoke_alignment_description: bespokeText }
+      : undefined;
+    return {
+      sessionId: session.id,
+      chosenInterventionSlug: effectiveSlug,
+      interventionRationale: rationale,
+      methodologyChoice: backcompatMethodology(),
+      methodologyRationale: rationale,
+      ...(alignmentPatch ? { alignmentWorkspacePatch: alignmentPatch } : {}),
+      ...(commit ? { commitIntervention: true, status: "method" } : {}),
+    };
   }
 
-  const mut = useMutation({
-    mutationFn: () => save({ data: {
-      sessionId: session.id,
-      methodologyChoice: `${encodedChoice()}::${engagement}`,
-      methodologyRationale: rationale,
-      status: "method",
-    } }),
-    onSuccess: () => { toast.success("Coaching strategy saved"); onSaved(); },
-    onError: (e: any) => toast.error(e.message),
+  const saveDraftMut = useMutation({
+    mutationFn: () => save({ data: buildSaveData(false) as any }),
+    onSuccess: () => { toast.success("Draft saved"); onSaved(); },
+    onError: (e: any) => toast.error(e.message ?? "Save failed"),
   });
 
-  const canSave =
-    rationale.trim().length > 0 &&
-    (mode === "none" || (mode === "single" && choice) || (mode === "multi" && multi.length > 0));
+  const commitMut = useMutation({
+    mutationFn: () => save({ data: buildSaveData(true) as any }),
+    onSuccess: async () => {
+      toast.success("Intervention committed");
+      if (onCommitAndAdvance) await onCommitAndAdvance();
+    },
+    onError: (e: any) => toast.error(e.message ?? "Commit failed"),
+  });
 
-  const selectedPb = PLAYBOOKS.find((p) => p.id === choice);
-
-  function toggleMulti(id: string) {
-    setMulti((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  // Group Playbook interventions by phase (Discovery/Design/Test).
+  const playbookRows = interventions.filter((r) => r.pathway_type === "playbook");
+  const byPhase: Record<string, InterventionRow[]> = {};
+  for (const r of playbookRows) {
+    const p = r.phase ?? "other";
+    (byPhase[p] ??= []).push(r);
   }
+  const teamAlignment = interventions.find((r) => r.slug === "team_alignment_map");
 
   return (
     <StepShell
-      title="Choose your coaching approach"
-      hint="How are you going to work with this team? Pick the smallest useful Strategyzer intervention — one playbook, a sequenced combination, or none yet if evidence is too thin. Decide methodology fit, sequencing, and working style (workshop · guided coaching · evidence gathering) before you enter the room. This is the approach you'll activate in Live Playbook Facilitation."
+      title="Choose your intervention"
+      hint="Pick the pathway that fits what you diagnosed in Framing and Stakeholders — then pick a specific intervention (or write your own alignment approach). Your rationale is what reviewers assess; the commit happens when you continue to Chapter 2."
     >
-      {/* Mode selector — single / multi / none */}
-      <div className="grid md:grid-cols-3 gap-2 mb-6">
-        {[
-          { id: "single", label: "One playbook", sub: "A single primary intervention" },
-          { id: "multi", label: "Sequenced combination", sub: "A short orchestration of playbooks" },
-          { id: "none", label: "No playbook yet", sub: "Gather more evidence first" },
-        ].map((m) => {
-          const active = mode === m.id;
+      {/* Pathway cards */}
+      <div className="grid md:grid-cols-2 gap-3 mb-6">
+        {PATHWAY_CARDS.map((c) => {
+          const active = pathway === c.type;
           return (
             <button
-              key={m.id}
-              onClick={() => setMode(m.id as any)}
-              className={`text-left p-3 border border-ink ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+              key={c.type}
+              type="button"
+              onClick={() => {
+                setPathway(c.type);
+                // Reset second-level selection when pathway changes.
+                if (c.type === "evidence_gathering") setSlug("evidence_gathering");
+                else if (c.type === "deliberate_pause") setSlug("deliberate_pause");
+                else setSlug("");
+              }}
+              className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
             >
-              <div className="text-sm font-medium">{m.label}</div>
-              <div className="text-[11px] opacity-80 mt-0.5">{m.sub}</div>
+              <div className="text-sm font-medium mb-1">{c.title}</div>
+              <p className="text-xs opacity-80 leading-relaxed">{c.descriptor}</p>
             </button>
           );
         })}
       </div>
 
+      {/* AI second opinion — logged for reviewer */}
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
           <div className="font-medium mb-1 flex items-center gap-2">
@@ -701,14 +809,13 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
           <div className="text-xs opacity-80">
             {hasDraft
               ? "You've drafted your own reasoning. Pressure-test it against the AI — your reviewer will see both."
-              : mode === "none"
-                ? "Draft your evidence-gathering rationale first, then pressure-test it. AI assistance is logged and factored into your Coaching Strategy score."
-                : "Draft your own playbook choice and rationale first, then pressure-test with AI. Every suggestion shown is recorded."}
+              : "Draft your own intervention and rationale first, then pressure-test with AI. Every suggestion shown is recorded."}
           </div>
         </div>
         <button
+          type="button"
           onClick={() => suggestMut.mutate()}
-          disabled={suggestMut.isPending}
+          disabled={suggestMut.isPending || !pathway}
           className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
         >
           {suggestMut.isPending ? "Thinking…" : hasDraft ? "Compare" : "Suggest"}
@@ -720,7 +827,7 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
           <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI suggestion · confidence {suggestion.confidence ?? "—"}</div>
           {suggestion.playbookId && (
             <div className="font-medium mb-1">
-              → {PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
+              → {interventions.find((r) => r.slug === suggestion.playbookId)?.label ?? PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
             </div>
           )}
           {suggestion.rationale && <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>}
@@ -737,96 +844,131 @@ function MethodStep({ session, onSaved }: { session: any; onSaved: () => void })
         </div>
       )}
 
-      {mode !== "none" && (
-        <div className="grid md:grid-cols-2 gap-3 mb-6">
-          {PLAYBOOKS.map((p) => {
-            const active = mode === "single" ? choice === p.id : multi.includes(p.id);
+      {/* Second level: specific intervention picker */}
+      {pathway === "pre_playbook" && (
+        <div className="mb-6 space-y-3">
+          <label className="text-xs uppercase tracking-[0.12em] block">Pick an alignment intervention</label>
+          {teamAlignment && (
+            <button
+              type="button"
+              onClick={() => setSlug("team_alignment_map")}
+              className={`w-full text-left border border-ink p-4 ${slug === "team_alignment_map" ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="font-medium text-sm">Team Alignment Map</div>
+                <span className="text-[10px] uppercase tracking-[0.14em] opacity-70 px-1.5 py-0.5 border border-current">Suggested default</span>
+              </div>
+              <p className="text-xs opacity-80">{teamAlignment.short_description}</p>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setSlug("bespoke_alignment")}
+            className={`w-full text-left border border-ink p-4 ${slug === "bespoke_alignment" ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+          >
+            <div className="font-medium text-sm mb-1">Or describe a different alignment intervention you'd propose</div>
+            <p className="text-xs opacity-80">Write your own alignment approach — sponsor commitment work, scope renegotiation, stakeholder mapping, whatever fits.</p>
+          </button>
+          {slug === "bespoke_alignment" && (
+            <textarea
+              value={bespokeText}
+              onChange={(e) => setBespokeText(e.target.value)}
+              rows={4}
+              placeholder="Describe the alignment work you'd propose. Who's in the room, what you're producing, what has to be true when you leave."
+              className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
+            />
+          )}
+        </div>
+      )}
+
+      {pathway === "playbook" && (
+        <div className="mb-6 space-y-4">
+          <label className="text-xs uppercase tracking-[0.12em] block">Pick a Strategyzer Playbook</label>
+          {(["discovery", "design", "test"] as const).map((phase) => {
+            const rows = byPhase[phase] ?? [];
+            if (rows.length === 0) return null;
             return (
-              <button
-                key={p.id}
-                onClick={() => mode === "single" ? setChoice(p.id) : toggleMulti(p.id)}
-                className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="w-8 h-8 border border-current" style={{ backgroundColor: p.accent }} />
-                  <span className="text-[10px] uppercase tracking-[0.14em] opacity-70">{p.diagnosis}{mode === "multi" && active ? ` · #${multi.indexOf(p.id) + 1}` : ""}</span>
+              <div key={phase}>
+                <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-2">{PHASE_LABEL[phase]}</div>
+                <div className="grid md:grid-cols-2 gap-2">
+                  {rows.map((r) => {
+                    const active = slug === r.slug;
+                    return (
+                      <button
+                        key={r.slug}
+                        type="button"
+                        onClick={() => setSlug(r.slug)}
+                        className={`text-left border border-ink p-3 ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+                      >
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <span className="text-sm font-medium">{r.label}</span>
+                          {r.is_deep_vertical && (
+                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Deep vertical</span>
+                          )}
+                        </div>
+                        <p className="text-xs opacity-80 leading-relaxed">{r.short_description}</p>
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="font-medium mb-1">{p.name}</div>
-                <p className="text-xs opacity-80 italic mb-2">"{p.whenToUse}"</p>
-                <ul className="text-[11px] opacity-70 space-y-0.5">
-                  {p.signals.map((s) => <li key={s}>· {s}</li>)}
-                </ul>
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-60 mt-3">Outcome → {p.outcome}</div>
-              </button>
+              </div>
             );
           })}
         </div>
       )}
 
-      {mode === "none" && (
-        <div className="border border-ink p-4 mb-6" style={{ backgroundColor: "var(--brand-lime)" }}>
-          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-1">Restraint is a coaching move</div>
+      {(pathway === "evidence_gathering" || pathway === "deliberate_pause") && (
+        <div className="mb-6 border border-ink p-4" style={{ backgroundColor: "var(--brand-lime)" }}>
+          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-1">
+            {pathway === "evidence_gathering" ? "Restraint through evidence" : "Restraint through pause"}
+          </div>
           <p className="text-sm leading-relaxed">
-            Reaching for a playbook before the team has shared evidence is a common failure mode. Document what evidence
-            you need first, who would generate it, and what would trigger you to commit to a methodology. The simulator
-            will reward this decision if your rationale shows judgment, not avoidance.
+            No specific picker here — commit to the pathway and use the rationale below to spell out what evidence you need
+            or what would have to be true before you re-engage.
           </p>
         </div>
       )}
 
-      {selectedPb && mode === "single" && (
-        <a
-          href={selectedPb.libraryUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 text-xs underline mb-6 hover:opacity-70"
-        >
-          Open "{selectedPb.name}" in Strategyzer playbook library ↗
-        </a>
-      )}
-
-      <label className="text-xs uppercase tracking-[0.12em] mb-2 block">Engagement model</label>
-      <div className="grid md:grid-cols-2 gap-2 mb-6">
-        {ENGAGEMENT_MODELS.map((m) => {
-          const active = engagement === m.id;
-          return (
-            <button
-              key={m.id}
-              onClick={() => setEngagement(m.id)}
-              className={`text-left border border-ink p-3 ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-            >
-              <div className="text-sm font-medium mb-1">{m.name}</div>
-              <div className="text-[11px] opacity-80 mb-1"><span className="uppercase tracking-wider opacity-70">Best for:</span> {m.bestFor}</div>
-              <div className="text-[11px] opacity-80"><span className="uppercase tracking-wider opacity-70">Structure:</span> {m.structure}</div>
-            </button>
-          );
-        })}
-      </div>
-
+      {/* Rationale */}
       <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
-        Your reasoning — sequencing, scope, evidence focus, restraint
+        Why does this intervention fit? <span className="text-red-600">*</span>
       </label>
       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
-        This is what's scored on Coaching Strategy. Reviewers compare your reasoning to any AI suggestions you consulted.
+        Ground your reasoning in what you diagnosed in Framing and Stakeholders. Required before you continue to Chapter 2.
       </p>
       <div className="relative">
         <textarea
           value={rationale}
           onChange={(e) => setRationale(e.target.value)}
           rows={5}
-          placeholder={mode === "none"
-            ? "What evidence are you missing? Who would generate it, by when? What would have to be true to commit to a playbook?"
-            : "Why this approach for this team right now. What sequencing or restraint matters. What would change your mind."}
+          placeholder="Sequencing, scope, evidence focus, restraint. What sequencing matters. What would change your mind."
           className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary"
         />
         <div className="absolute top-2 right-2">
           <VoiceInput onTranscript={(c) => setRationale((p) => appendTranscript(p, c))} />
         </div>
       </div>
-      <div className="mt-4 flex justify-end">
-        <button onClick={() => mut.mutate()} disabled={mut.isPending || !canSave} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-          {mut.isPending ? "Saving…" : "Save coaching strategy"}
+
+      <div className="mt-6 flex justify-between items-center gap-3">
+        <button
+          type="button"
+          onClick={() => saveDraftMut.mutate()}
+          disabled={saveDraftMut.isPending || !pathway}
+          className="border border-ink px-4 py-2 text-sm rounded-sm hover:bg-secondary disabled:opacity-50"
+        >
+          {saveDraftMut.isPending ? "Saving…" : "Save draft"}
         </button>
+        {onCommitAndAdvance && (
+          <button
+            type="button"
+            onClick={() => commitMut.mutate()}
+            disabled={commitMut.isPending || !canCommit}
+            className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
+            title={!canCommit ? "Pick an intervention and write a rationale first." : undefined}
+          >
+            {commitMut.isPending ? "Committing…" : `Continue to ${nextChapterLabel ?? "Chapter 2"} →`}
+          </button>
+        )}
       </div>
     </StepShell>
   );
