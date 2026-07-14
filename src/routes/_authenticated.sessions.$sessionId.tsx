@@ -143,6 +143,7 @@ function SessionPage() {
             session={session}
             onSaved={onStepSaved}
             onChangeIntervention={() => setActiveStep("coaching_approach")}
+            onAdvanceToChapter3={() => goToChapter("progress")}
           />
         )}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
@@ -1174,10 +1175,12 @@ function Chapter2Container({
   session,
   onSaved,
   onChangeIntervention,
+  onAdvanceToChapter3,
 }: {
   session: any;
   onSaved: () => void;
   onChangeIntervention: () => void;
+  onAdvanceToChapter3: () => void | Promise<void>;
 }) {
   const fetchInterventions = useServerFn(listInterventions);
   const { data: iData, isLoading } = useQuery({
@@ -1253,7 +1256,14 @@ function Chapter2Container({
   let body: React.ReactNode;
 
   if (pathwayType === "pre_playbook") {
-    body = <Chapter2Placeholder title="Alignment workspace" note="The alignment workspace will render here after Stage 4." interventionLabel={label} />;
+    body = (
+      <AlignmentWorkspace
+        session={session}
+        interventions={interventions}
+        onAdvance={onAdvanceToChapter3}
+        onSaved={onSaved}
+      />
+    );
   } else if (pathwayType === "evidence_gathering") {
     body = <Chapter2Placeholder title="Evidence-gathering plan" note="The evidence-gathering shell will render here after Stage 6." interventionLabel={label} />;
   } else if (pathwayType === "deliberate_pause") {
@@ -1293,7 +1303,544 @@ function Chapter2Placeholder({ title, note, interventionLabel }: { title: string
   );
 }
 
+
+// ============ Alignment Workspace (pre_playbook pathway) ============
+
+type AlignmentSubTab = "setup" | "facilitate" | "interpret";
+
+const ALIGNMENT_SUBTABS: Array<{ key: AlignmentSubTab; label: string }> = [
+  { key: "setup", label: "Set up the session" },
+  { key: "facilitate", label: "Facilitate the session" },
+  { key: "interpret", label: "Interpret alignment state" },
+];
+
+const QUADRANTS: Array<{ key: "objectives" | "commitments" | "resources" | "risks"; title: string; hint: string }> = [
+  { key: "objectives", title: "Objectives", hint: "What is this team trying to achieve together?" },
+  { key: "commitments", title: "Commitments", hint: "What is each stakeholder committing to?" },
+  { key: "resources", title: "Resources", hint: "What does the team have (or lack) to succeed?" },
+  { key: "risks", title: "Risks", hint: "What could derail this?" },
+];
+
+function AlignmentWorkspace({
+  session,
+  interventions,
+  onAdvance,
+  onSaved,
+}: {
+  session: any;
+  interventions: InterventionRow[];
+  onAdvance: () => void | Promise<void>;
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateSession);
+  const [tab, setTab] = useState<AlignmentSubTab>("setup");
+
+  const ws = (session.alignment_workspace ?? {}) as Record<string, any>;
+  const setup = (ws.setup ?? {}) as Record<string, any>;
+  const facilitation = (ws.facilitation ?? {}) as Record<string, any>;
+  const interpretation = (ws.interpretation ?? {}) as Record<string, any>;
+
+  async function persistSection(section: "setup" | "facilitation" | "interpretation", next: Record<string, any>) {
+    try {
+      await save({ data: { sessionId: session.id, alignmentWorkspacePatch: { [section]: next } } });
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save");
+    }
+  }
+
+  return (
+    <div>
+      {/* thin sub-tab bar — visually distinct from Chapter 1 sub-tabs */}
+      <div className="flex gap-4 border-b border-ink/20 mb-6">
+        {ALIGNMENT_SUBTABS.map((t) => {
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`pb-2 -mb-px text-xs uppercase tracking-[0.12em] transition-colors ${
+                active
+                  ? "border-b border-ink text-ink font-medium"
+                  : "text-muted-foreground hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "setup" && (
+        <AlignmentSetup
+          session={session}
+          setup={setup}
+          onSave={(next) => persistSection("setup", next)}
+        />
+      )}
+      {tab === "facilitate" && (
+        <AlignmentFacilitate
+          session={session}
+          facilitation={facilitation}
+          onSave={(next) => persistSection("facilitation", next)}
+        />
+      )}
+      {tab === "interpret" && (
+        <AlignmentInterpret
+          interpretation={interpretation}
+          interventions={interventions}
+          onSave={(next) => persistSection("interpretation", next)}
+          onAdvance={onAdvance}
+        />
+      )}
+    </div>
+  );
+}
+
+function AlignmentSetup({
+  session,
+  setup,
+  onSave,
+}: {
+  session: any;
+  setup: Record<string, any>;
+  onSave: (next: Record<string, any>) => Promise<void>;
+}) {
+  const stakeholders: Array<{ name: string; role?: string }> = session.scenarios?.stakeholders ?? [];
+
+  // Seed alignment_gaps from framing + dialogue commitments on first render if empty.
+  const seededGaps = useMemo(() => {
+    const bits: string[] = [];
+    if (session.framing_notes) bits.push(`From Framing:\n${session.framing_notes}`);
+    if (session.dialogue_commitments) bits.push(`From Stakeholder workspace:\n${session.dialogue_commitments}`);
+    return bits.join("\n\n");
+  }, [session.framing_notes, session.dialogue_commitments]);
+
+  const [whoInRoom, setWhoInRoom] = useState<string[]>(setup.who_in_room ?? []);
+  const [otherAttendees, setOtherAttendees] = useState<string>(setup.other_attendees ?? "");
+  const [framing, setFraming] = useState<string>(setup.framing_brought ?? "");
+  const [gaps, setGaps] = useState<string>(setup.alignment_gaps ?? seededGaps);
+  const [successLooks, setSuccessLooks] = useState<string>(setup.aligned_enough_definition ?? "");
+
+  const build = () => ({
+    who_in_room: whoInRoom,
+    other_attendees: otherAttendees,
+    framing_brought: framing,
+    alignment_gaps: gaps,
+    aligned_enough_definition: successLooks,
+  });
+
+  function togglePerson(name: string) {
+    setWhoInRoom((prev) => {
+      const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];
+      onSave({ ...build(), who_in_room: next });
+      return next;
+    });
+  }
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">Who's in the room?</label>
+        <div className="flex flex-wrap gap-2">
+          {stakeholders.map((s) => {
+            const active = whoInRoom.includes(s.name);
+            return (
+              <button
+                key={s.name}
+                type="button"
+                onClick={() => togglePerson(s.name)}
+                className={`text-xs px-3 py-1.5 border ${active ? "border-ink bg-ink text-paper" : "border-ink/40 text-ink hover:border-ink"}`}
+              >
+                {s.name}{s.role ? ` · ${s.role}` : ""}
+              </button>
+            );
+          })}
+        </div>
+        <input
+          value={otherAttendees}
+          onChange={(e) => setOtherAttendees(e.target.value)}
+          onBlur={() => onSave(build())}
+          placeholder="Other people not listed above (comma separated)"
+          className="mt-3 w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What framing are you bringing?</label>
+        <p className="text-xs text-muted-foreground mb-2">How are you opening this session? What are you telling the team you're here to do together?</p>
+        <textarea
+          value={framing}
+          onChange={(e) => setFraming(e.target.value)}
+          onBlur={() => onSave(build())}
+          rows={4}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What alignment gaps did you diagnose in Chapter 1?</label>
+        <textarea
+          value={gaps}
+          onChange={(e) => setGaps(e.target.value)}
+          onBlur={() => onSave(build())}
+          rows={6}
+          placeholder="What's not aligned in this team? What did you observe in Framing and Stakeholders that told you methodology work isn't ready yet?"
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What would 'aligned enough to proceed' look like?</label>
+        <p className="text-xs text-muted-foreground mb-2">How will you know this alignment session worked? What does the team need to agree on before you'd feel confident moving to strategic work?</p>
+        <textarea
+          value={successLooks}
+          onChange={(e) => setSuccessLooks(e.target.value)}
+          onBlur={() => onSave(build())}
+          rows={3}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+function AlignmentFacilitate({
+  session,
+  facilitation,
+  onSave,
+}: {
+  session: any;
+  facilitation: Record<string, any>;
+  onSave: (next: Record<string, any>) => Promise<void>;
+}) {
+  const stakeholders: Array<{ name: string; role?: string }> = session.scenarios?.stakeholders ?? [];
+  const [values, setValues] = useState<Record<string, string>>({
+    objectives: facilitation.objectives ?? "",
+    commitments: facilitation.commitments ?? "",
+    resources: facilitation.resources ?? "",
+    risks: facilitation.risks ?? "",
+    misalignment_observed: facilitation.misalignment_observed ?? "",
+  });
+  const [surfaceOpen, setSurfaceOpen] = useState<string | null>(null);
+
+  function updateField(key: string, v: string) {
+    setValues((prev) => ({ ...prev, [key]: v }));
+  }
+  function saveAll() {
+    onSave({ ...values });
+  }
+
+  return (
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {QUADRANTS.map((q) => (
+          <div key={q.key} className="border border-ink p-4 bg-paper">
+            <div className="text-sm font-medium mb-1">{q.title}</div>
+            <div className="text-xs text-muted-foreground mb-3">{q.hint}</div>
+            <textarea
+              value={values[q.key]}
+              onChange={(e) => updateField(q.key, e.target.value)}
+              onBlur={saveAll}
+              rows={5}
+              className="w-full border border-ink/30 px-3 py-2 text-sm"
+              placeholder="Capture what emerged during facilitation…"
+            />
+            <button
+              type="button"
+              onClick={() => setSurfaceOpen(surfaceOpen === q.key ? null : q.key)}
+              className="mt-2 text-xs underline underline-offset-2 hover:opacity-70"
+            >
+              {surfaceOpen === q.key ? "Close stakeholder view" : "Surface a stakeholder view →"}
+            </button>
+            {surfaceOpen === q.key && (
+              <SurfaceStakeholderView
+                sessionId={session.id}
+                stakeholders={stakeholders}
+                phase={`alignment:${q.key}`}
+                quadrantHint={q.hint}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">Misalignment observed</label>
+        <p className="text-xs text-muted-foreground mb-2">Capture moments during facilitation where the room disagreed or where a stakeholder's position surprised you. This is high signal for how well the alignment work is landing.</p>
+        <textarea
+          value={values.misalignment_observed}
+          onChange={(e) => updateField("misalignment_observed", e.target.value)}
+          onBlur={saveAll}
+          rows={4}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SurfaceStakeholderView({
+  sessionId,
+  stakeholders,
+  phase,
+  quadrantHint,
+}: {
+  sessionId: string;
+  stakeholders: Array<{ name: string; role?: string }>;
+  phase: string;
+  quadrantHint: string;
+}) {
+  const send = useServerFn(sendStakeholderMessage);
+  const [target, setTarget] = useState<string>(stakeholders[0]?.name ?? "");
+  const [q, setQ] = useState<string>("");
+  const [exchanges, setExchanges] = useState<Array<{ q: string; reply: string; who: string }>>([]);
+  const [busy, setBusy] = useState(false);
+
+  async function ask() {
+    if (!target || !q.trim()) return;
+    setBusy(true);
+    try {
+      const res: any = await send({ data: { sessionId, stakeholderName: target, candidateMessage: q, phase } });
+      setExchanges((prev) => [...prev, { q, reply: res?.message?.content ?? "…", who: target }]);
+      setQ("");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Stakeholder didn't respond");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-ink/20 pt-3 space-y-2">
+      <div className="flex gap-2">
+        <select
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          className="border border-ink/30 px-2 py-1 text-xs"
+        >
+          {stakeholders.map((s) => (
+            <option key={s.name} value={s.name}>{s.name}</option>
+          ))}
+        </select>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={`Ask ${target || "them"} about: ${quadrantHint}`}
+          className="flex-1 border border-ink/30 px-2 py-1 text-xs"
+          onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
+        />
+        <button
+          type="button"
+          disabled={busy || !q.trim()}
+          onClick={ask}
+          className="bg-ink text-paper text-xs px-3 py-1 disabled:opacity-40"
+        >
+          {busy ? "…" : "Ask"}
+        </button>
+      </div>
+      {exchanges.map((ex, i) => (
+        <div key={i} className="text-xs bg-paper/60 border border-ink/10 p-2">
+          <div className="text-muted-foreground">Coach → {ex.who}: {ex.q}</div>
+          <div className="mt-1"><span className="font-medium">{ex.who}:</span> {ex.reply}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AlignmentInterpret({
+  interpretation,
+  interventions,
+  onSave,
+  onAdvance,
+}: {
+  interpretation: Record<string, any>;
+  interventions: InterventionRow[];
+  onSave: (next: Record<string, any>) => Promise<void>;
+  onAdvance: () => void | Promise<void>;
+}) {
+  const [readiness, setReadiness] = useState<string>(interpretation.readiness ?? "");
+  const [ambiguous, setAmbiguous] = useState<string>(interpretation.ambiguous ?? "");
+  const [commitments, setCommitments] = useState<Array<{ who: string; what: string }>>(
+    interpretation.commitments ?? []
+  );
+  const [nextMove, setNextMove] = useState<string>(interpretation.next_move ?? "");
+  const [nextPlaybookSlug, setNextPlaybookSlug] = useState<string>(interpretation.next_playbook_slug ?? "");
+  const [nextMoveRationale, setNextMoveRationale] = useState<string>(interpretation.next_move_rationale ?? "");
+
+  const playbookOptions = interventions.filter((i) => i.pathway_type === "playbook");
+
+  const build = () => ({
+    readiness,
+    ambiguous,
+    commitments,
+    next_move: nextMove,
+    next_playbook_slug: nextMove === "playbook" ? nextPlaybookSlug : "",
+    next_move_rationale: nextMoveRationale,
+  });
+
+  function saveNow(overrides: Partial<ReturnType<typeof build>> = {}) {
+    onSave({ ...build(), ...overrides });
+  }
+
+  function addRow() {
+    const next = [...commitments, { who: "", what: "" }];
+    setCommitments(next);
+    saveNow({ commitments: next });
+  }
+  function removeRow(i: number) {
+    const next = commitments.filter((_, idx) => idx !== i);
+    setCommitments(next);
+    saveNow({ commitments: next });
+  }
+  function updateRow(i: number, field: "who" | "what", v: string) {
+    const next = commitments.map((c, idx) => (idx === i ? { ...c, [field]: v } : c));
+    setCommitments(next);
+  }
+
+  const canContinue = !!readiness && !!nextMove && nextMoveRationale.trim().length > 0 &&
+    (nextMove !== "playbook" || !!nextPlaybookSlug);
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">
+          Is the team aligned enough to move to strategic work?
+        </div>
+        <div className="flex gap-3">
+          {[
+            { v: "yes", l: "Yes" },
+            { v: "partially", l: "Partially" },
+            { v: "no", l: "No" },
+          ].map((o) => (
+            <label key={o.v} className={`text-sm border px-3 py-1.5 cursor-pointer ${readiness === o.v ? "border-ink bg-ink text-paper" : "border-ink/40"}`}>
+              <input
+                type="radio"
+                className="sr-only"
+                name="readiness"
+                checked={readiness === o.v}
+                onChange={() => { setReadiness(o.v); saveNow({ readiness: o.v }); }}
+              />
+              {o.l}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What's still ambiguous?</label>
+        <textarea
+          value={ambiguous}
+          onChange={(e) => setAmbiguous(e.target.value)}
+          onBlur={() => saveNow()}
+          rows={3}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Who committed to what?</div>
+        <div className="space-y-2">
+          {commitments.map((c, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <input
+                value={c.who}
+                onChange={(e) => updateRow(i, "who", e.target.value)}
+                onBlur={() => saveNow()}
+                placeholder="Stakeholder name"
+                className="w-48 border border-ink/30 px-2 py-1 text-sm"
+              />
+              <textarea
+                value={c.what}
+                onChange={(e) => updateRow(i, "what", e.target.value)}
+                onBlur={() => saveNow()}
+                rows={2}
+                className="flex-1 border border-ink/30 px-2 py-1 text-sm"
+                placeholder="Commitment"
+              />
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="text-xs text-muted-foreground hover:text-ink"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addRow}
+            className="text-xs border border-ink/40 px-3 py-1 hover:border-ink"
+          >
+            + Add commitment
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">What's the next move?</div>
+        <div className="space-y-2">
+          {[
+            { v: "playbook", l: "Move to a Strategyzer Playbook" },
+            { v: "another_alignment", l: "Run another alignment session" },
+            { v: "escalate", l: "Escalate to sponsor / senior stakeholder" },
+            { v: "pause", l: "Pause the engagement" },
+          ].map((o) => (
+            <label key={o.v} className="flex items-start gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="next_move"
+                checked={nextMove === o.v}
+                onChange={() => { setNextMove(o.v); saveNow({ next_move: o.v, next_playbook_slug: o.v === "playbook" ? nextPlaybookSlug : "" }); }}
+                className="mt-1"
+              />
+              <span>{o.l}</span>
+            </label>
+          ))}
+        </div>
+        {nextMove === "playbook" && (
+          <select
+            value={nextPlaybookSlug}
+            onChange={(e) => { setNextPlaybookSlug(e.target.value); saveNow({ next_playbook_slug: e.target.value }); }}
+            className="mt-3 border border-ink/30 px-3 py-2 text-sm"
+          >
+            <option value="">Select a Playbook…</option>
+            {playbookOptions.map((p) => (
+              <option key={p.slug} value={p.slug}>{p.label}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">Why is this the right next move given what surfaced today?</label>
+        <textarea
+          value={nextMoveRationale}
+          onChange={(e) => setNextMoveRationale(e.target.value)}
+          onBlur={() => saveNow()}
+          rows={4}
+          className="w-full border border-ink/30 px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="pt-4 border-t border-ink flex justify-end">
+        <button
+          type="button"
+          disabled={!canContinue}
+          onClick={() => onAdvance()}
+          className="bg-ink text-paper px-6 py-3 text-sm rounded-sm disabled:opacity-40 hover:opacity-90"
+          title={!canContinue ? "Fill readiness, next move, and rationale to continue" : ""}
+        >
+          Continue to Chapter 3 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+
 
 
   const canvas = canvasForPlaybook(session.methodology_choice);

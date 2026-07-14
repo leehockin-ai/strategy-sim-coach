@@ -341,11 +341,12 @@ export const listInterventions = createServerFn({ method: "GET" })
 
 export const sendStakeholderMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; stakeholderName: string; candidateMessage: string }) =>
+  .inputValidator((d: { sessionId: string; stakeholderName: string; candidateMessage: string; phase?: string }) =>
     z.object({
       sessionId: z.string().uuid(),
       stakeholderName: z.string().min(1).max(120),
       candidateMessage: z.string().min(1).max(4000),
+      phase: z.string().max(80).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
@@ -358,7 +359,9 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
       role: "candidate",
       stakeholder_name: data.stakeholderName,
       content: data.candidateMessage,
+      ...(data.phase ? { phase: data.phase } : {}),
     });
+
 
     const { data: session, error: sErr } = await supabaseAdmin
       .from("sessions")
@@ -452,9 +455,11 @@ Hard rules:
         role: "stakeholder",
         stakeholder_name: persona.name,
         content: reply,
+        ...(data.phase ? { phase: data.phase } : {}),
       })
       .select()
       .single();
+
 
     return { message: saved };
   });
