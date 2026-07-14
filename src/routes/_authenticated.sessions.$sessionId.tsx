@@ -107,6 +107,9 @@ function SessionPage() {
   const isLastStepOfChapter = stepIdxInChapter === chapter.steps.length - 1;
   const nextChapter = CHAPTERS.find((c) => c.index === (chapter.index + 1)) ?? null;
   const showChapterTransition = isLastStepOfChapter && nextChapter !== null && chapter.index < 3;
+  // MethodStep (coaching_approach) renders its own commit-and-continue button
+  // because the commit write must happen atomically with the chapter advance.
+  const suppressSharedContinue = activeStep === "coaching_approach";
 
   return (
     <Shell>
@@ -126,13 +129,20 @@ function SessionPage() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
         <ChapterBanner chapter={activeChapter} />
         {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={onStepSaved} onRefresh={refetch} />}
-        {renderKey === "method" && <MethodStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "method" && (
+          <MethodStep
+            session={session}
+            onSaved={onStepSaved}
+            onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined}
+            nextChapterLabel={nextChapter ? `Chapter ${nextChapter.index} — ${nextChapter.label}` : undefined}
+          />
+        )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
         {renderKey === "application" && <ApplicationStep session={session} onSaved={onStepSaved} />}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
-        {showChapterTransition && nextChapter && (
+        {showChapterTransition && nextChapter && !suppressSharedContinue && (
           <div className="mt-12 border-t border-ink pt-8 flex justify-end">
             <button
               onClick={() => goToChapter(nextChapter.key)}
