@@ -1278,7 +1278,15 @@ function Chapter2Container({
   } else if (pathwayType === "deliberate_pause") {
     body = <Chapter2Placeholder title="Deliberate pause" note="The deliberate-pause shell will render here after Stage 6." interventionLabel={label} />;
   } else if (pathwayType === "playbook" && slug === "competing_on_business_models") {
-    body = <Chapter2Placeholder title="Deep Playbook facilitation — Competing on Business Models" note="The deep facilitation experience will render here after Stage 5." interventionLabel={label} />;
+    const row = interventions.find((r) => r.slug === slug);
+    body = (
+      <PlaybookDeepFacilitation
+        session={session}
+        intervention={row}
+        onAdvance={onAdvanceToChapter3}
+        onSaved={onSaved}
+      />
+    );
   } else if (pathwayType === "playbook" && isDeepVertical) {
     body = (
       <>
