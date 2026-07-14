@@ -1164,6 +1164,7 @@ const CONFIDENCE_OPTIONS: { v: NonNullable<CellMeta["confidence"]>; l: string; c
 ];
 
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+
   const canvas = canvasForPlaybook(session.methodology_choice);
   const initial = (session.application_canvas as Record<string, string> | null) ?? {};
   const [cells, setCells] = useState<Record<string, string>>(initial);
