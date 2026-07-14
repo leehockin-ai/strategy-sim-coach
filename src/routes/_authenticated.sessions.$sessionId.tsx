@@ -138,7 +138,13 @@ function SessionPage() {
           />
         )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
-        {renderKey === "application" && <ApplicationStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "application" && (
+          <Chapter2Container
+            session={session}
+            onSaved={onStepSaved}
+            onChangeIntervention={() => setActiveStep("coaching_approach")}
+          />
+        )}
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
@@ -1157,7 +1163,139 @@ const CONFIDENCE_OPTIONS: { v: NonNullable<CellMeta["confidence"]>; l: string; c
   { v: "strong",   l: "Strong",       c: "var(--brand-lime)" },
 ];
 
+const PATHWAY_PLAIN: Record<string, string> = {
+  pre_playbook: "Pre-Playbook alignment work",
+  playbook: "Strategyzer Playbook facilitation",
+  evidence_gathering: "Evidence gathering",
+  deliberate_pause: "Deliberate pause",
+};
+
+function Chapter2Container({
+  session,
+  onSaved,
+  onChangeIntervention,
+}: {
+  session: any;
+  onSaved: () => void;
+  onChangeIntervention: () => void;
+}) {
+  const fetchInterventions = useServerFn(listInterventions);
+  const { data: iData, isLoading } = useQuery({
+    queryKey: ["interventions"],
+    queryFn: () => fetchInterventions(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const interventions = (iData?.interventions ?? []) as InterventionRow[];
+  const slug: string = session.chosen_intervention_slug ?? "";
+
+  if (!slug) {
+    return (
+      <div className="border border-ink p-6 bg-paper max-w-2xl">
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No intervention committed yet</div>
+        <p className="text-sm mb-4">
+          You haven't committed to an intervention yet — return to Chapter 1 → Approach to make a choice
+          before starting the working session.
+        </p>
+        <button
+          onClick={onChangeIntervention}
+          className="bg-ink text-paper px-4 py-2 text-sm rounded-sm hover:opacity-90"
+        >
+          Go to Chapter 1 · Approach →
+        </button>
+      </div>
+    );
+  }
+
+  // Resolve intervention metadata. bespoke_alignment is synthetic (not in the table).
+  let label: string;
+  let pathwayType: string;
+  let isDeepVertical = false;
+
+  if (slug === "bespoke_alignment") {
+    label = "Custom alignment approach";
+    pathwayType = "pre_playbook";
+    isDeepVertical = true;
+  } else {
+    const row = interventions.find((r) => r.slug === slug);
+    if (!row) {
+      if (isLoading) {
+        return <div className="p-6 text-sm text-muted-foreground">Loading intervention…</div>;
+      }
+      // Slug exists but not in table — likely a legacy playbook slug. Treat as shallow playbook.
+      label = slug;
+      pathwayType = "playbook";
+      isDeepVertical = false;
+    } else {
+      label = row.label;
+      pathwayType = row.pathway_type;
+      isDeepVertical = !!row.is_deep_vertical;
+    }
+  }
+
+  const banner = (
+    <div className="border border-ink p-4 mb-6 flex flex-wrap items-center justify-between gap-3 bg-paper">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          Chapter 2 · {PATHWAY_PLAIN[pathwayType] ?? pathwayType}
+        </div>
+        <div className="text-sm font-medium mt-0.5">{label}</div>
+      </div>
+      <button
+        onClick={onChangeIntervention}
+        className="text-xs underline underline-offset-2 hover:opacity-70"
+      >
+        Change intervention
+      </button>
+    </div>
+  );
+
+  // Route by pathway_type + deep-vertical flag.
+  let body: React.ReactNode;
+
+  if (pathwayType === "pre_playbook") {
+    body = <Chapter2Placeholder title="Alignment workspace" note="The alignment workspace will render here after Stage 4." interventionLabel={label} />;
+  } else if (pathwayType === "evidence_gathering") {
+    body = <Chapter2Placeholder title="Evidence-gathering plan" note="The evidence-gathering shell will render here after Stage 6." interventionLabel={label} />;
+  } else if (pathwayType === "deliberate_pause") {
+    body = <Chapter2Placeholder title="Deliberate pause" note="The deliberate-pause shell will render here after Stage 6." interventionLabel={label} />;
+  } else if (pathwayType === "playbook" && slug === "competing_on_business_models") {
+    body = <Chapter2Placeholder title="Deep Playbook facilitation — Competing on Business Models" note="The deep facilitation experience will render here after Stage 5." interventionLabel={label} />;
+  } else if (pathwayType === "playbook" && isDeepVertical) {
+    body = (
+      <>
+        <div className="border border-ink p-3 mb-4 text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
+          Deep facilitation for this Playbook is coming soon. For now, facilitate the working session using the existing tools.
+        </div>
+        <ApplicationStep session={session} onSaved={onSaved} />
+      </>
+    );
+  } else if (pathwayType === "playbook") {
+    body = <ApplicationStep session={session} onSaved={onSaved} />;
+  } else {
+    body = <Chapter2Placeholder title="Unknown pathway" note={`Pathway type "${pathwayType}" has no configured Chapter 2 view.`} interventionLabel={label} />;
+  }
+
+  return (
+    <div>
+      {banner}
+      {body}
+    </div>
+  );
+}
+
+function Chapter2Placeholder({ title, note, interventionLabel }: { title: string; note: string; interventionLabel: string }) {
+  return (
+    <div className="border border-dashed border-ink p-8 bg-paper">
+      <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Coming next · {title}</div>
+      <div className="text-sm mb-1"><span className="font-medium">Intervention:</span> {interventionLabel}</div>
+      <p className="text-sm text-muted-foreground">{note}</p>
+    </div>
+  );
+}
+
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+
+
   const canvas = canvasForPlaybook(session.methodology_choice);
   const initial = (session.application_canvas as Record<string, string> | null) ?? {};
   const [cells, setCells] = useState<Record<string, string>>(initial);
