@@ -1175,10 +1175,12 @@ function Chapter2Container({
   session,
   onSaved,
   onChangeIntervention,
+  onAdvanceToChapter3,
 }: {
   session: any;
   onSaved: () => void;
   onChangeIntervention: () => void;
+  onAdvanceToChapter3: () => void | Promise<void>;
 }) {
   const fetchInterventions = useServerFn(listInterventions);
   const { data: iData, isLoading } = useQuery({
