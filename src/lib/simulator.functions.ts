@@ -277,6 +277,9 @@ export const updateSession = createServerFn({ method: "POST" })
     interventionRationale?: string;
     commitIntervention?: boolean;
     alignmentWorkspacePatch?: Record<string, unknown>;
+    playbookFacilitationPlanPatch?: Record<string, unknown>;
+    playbookActivityRunPatch?: Record<string, unknown>;
+    playbookInterpretationPatch?: Record<string, unknown>;
   }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -291,6 +294,9 @@ export const updateSession = createServerFn({ method: "POST" })
       interventionRationale: z.string().max(8000).optional(),
       commitIntervention: z.boolean().optional(),
       alignmentWorkspacePatch: z.record(z.string(), z.unknown()).optional(),
+      playbookFacilitationPlanPatch: z.record(z.string(), z.unknown()).optional(),
+      playbookActivityRunPatch: z.record(z.string(), z.unknown()).optional(),
+      playbookInterpretationPatch: z.record(z.string(), z.unknown()).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
@@ -307,15 +313,26 @@ export const updateSession = createServerFn({ method: "POST" })
     if (data.interventionRationale !== undefined) patch.intervention_rationale = data.interventionRationale;
     if (data.commitIntervention) patch.intervention_committed_at = new Date().toISOString();
 
-    if (data.alignmentWorkspacePatch !== undefined) {
+    const jsonbColumnPatches: Array<[string, Record<string, unknown> | undefined]> = [
+      ["alignment_workspace", data.alignmentWorkspacePatch],
+      ["playbook_facilitation_plan", data.playbookFacilitationPlanPatch],
+      ["playbook_activity_run", data.playbookActivityRunPatch],
+      ["playbook_interpretation", data.playbookInterpretationPatch],
+    ];
+    const activePatches = jsonbColumnPatches.filter(([, v]) => v !== undefined);
+    if (activePatches.length > 0) {
+      const cols = activePatches.map(([c]) => c).join(", ");
       const { data: existing } = await supabaseAdmin
         .from("sessions")
-        .select("alignment_workspace")
+        .select(cols)
         .eq("id", data.sessionId)
         .single();
-      const prev = ((existing as any)?.alignment_workspace ?? {}) as Record<string, unknown>;
-      patch.alignment_workspace = { ...prev, ...data.alignmentWorkspacePatch };
+      for (const [col, incoming] of activePatches) {
+        const prev = ((existing as any)?.[col] ?? {}) as Record<string, unknown>;
+        patch[col] = { ...prev, ...(incoming as Record<string, unknown>) };
+      }
     }
+
 
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
@@ -332,7 +349,7 @@ export const listInterventions = createServerFn({ method: "GET" })
   .handler(async () => {
     const { data, error } = await supabaseAdmin
       .from("interventions")
-      .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order")
+      .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order, default_activity_list")
       .order("sort_order", { ascending: true });
     if (error) throw new Error(error.message);
     return { interventions: data ?? [] };
