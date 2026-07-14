@@ -455,9 +455,11 @@ Hard rules:
         role: "stakeholder",
         stakeholder_name: persona.name,
         content: reply,
+        ...(data.phase ? { phase: data.phase } : {}),
       })
       .select()
       .single();
+
 
     return { message: saved };
   });
