@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useRef, useEffect } from "react";
+import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
@@ -2021,6 +2022,19 @@ function PlaybookDeepFacilitation({
 }
 
 
+const SECTION_SUBTITLES: Record<string, string> = {
+  "Get started with the Business Model Canvas":
+    "Learn what the Business Model Canvas is and get started using it to describe your business model.",
+  "Level up your business model":
+    "Sharpen your Canvas with patterns and finer analysis of how your model creates and captures value.",
+  "Business model connections":
+    "Understand how the building blocks of your Canvas interact and reinforce (or undermine) each other.",
+  "Competing on business models":
+    "Compare and challenge your business model against competitors and design stronger alternatives.",
+};
+
+const ACTIVITY_DESCRIPTION_FALLBACK = "Apply what you've just learned through a simple exercise.";
+
 function PlaybookPlan({
   activities,
   plan,
@@ -2040,7 +2054,6 @@ function PlaybookPlan({
     return seed;
   });
 
-  // Group by section preserving activity order.
   const sections = useMemo(() => {
     const map = new Map<string, PlaybookActivity[]>();
     for (const a of activities) {
@@ -2055,9 +2068,7 @@ function PlaybookPlan({
     setDecisions((prev) => {
       const key = String(n);
       const merged = { ...prev[key], ...patch };
-      // If include=false, force mode=skip
       if (patch.include === false) merged.mode = "skip";
-      // If include=true toggled on, restore default mode if currently skip
       if (patch.include === true && prev[key]?.mode === "skip") {
         const a = activities.find((x) => x.n === n);
         merged.mode = a ? defaultActivityDecision(a).mode : "live";
@@ -2070,81 +2081,209 @@ function PlaybookPlan({
 
   if (activities.length === 0) {
     return (
-      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
+      <div
+        className="p-6 text-sm"
+        style={{
+          background: "var(--platform-surface)",
+          border: "1px solid var(--platform-border)",
+          borderRadius: "var(--platform-radius)",
+          color: "var(--platform-muted)",
+        }}
+      >
         No activity list configured for this Playbook.
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">Facilitation rationale</label>
-        <p className="text-xs text-muted-foreground mb-2">Why this sequencing and pacing? Which activities matter most for this team, and which are lower priority given what you diagnosed in Chapter 1?</p>
+    <div className="space-y-10 max-w-5xl mx-auto">
+      {/* Rationale card */}
+      <div
+        className="p-8"
+        style={{
+          background: "var(--platform-surface)",
+          border: "1px solid var(--platform-border)",
+          borderRadius: "var(--platform-radius)",
+        }}
+      >
+        <h3
+          className="mb-2"
+          style={{ fontSize: 20, fontWeight: 600, color: "var(--platform-ink)", letterSpacing: "-0.01em" }}
+        >
+          Your facilitation plan
+        </h3>
+        <p className="mb-4" style={{ fontSize: 14, color: "var(--platform-muted)", maxWidth: "60ch", lineHeight: 1.55 }}>
+          Why this sequencing and pacing? Which activities matter most for this team, and which are lower priority given what you diagnosed in Chapter 1?
+        </p>
         <textarea
           value={rationale}
           onChange={(e) => setRationale(e.target.value)}
           onBlur={() => onSave({ rationale })}
-          rows={4}
-          className="w-full border border-ink/30 px-3 py-2 text-sm"
+          rows={5}
+          className="w-full"
+          style={{
+            minHeight: 120,
+            padding: 16,
+            fontFamily: "var(--platform-font)",
+            fontSize: 14,
+            lineHeight: 1.55,
+            color: "var(--platform-ink)",
+            background: "var(--platform-surface)",
+            border: "1px solid var(--platform-border)",
+            borderRadius: "var(--platform-radius)",
+            outline: "none",
+            resize: "vertical",
+          }}
         />
       </div>
 
+      {/* Section blocks */}
       {sections.map(([section, acts]) => (
-        <div key={section}>
-          <div className="text-sm font-medium mb-2 border-b border-ink/20 pb-1">{section}</div>
-          <div className="space-y-2">
+        <section key={section}>
+          <h2 style={{ fontSize: 26, fontWeight: 600, color: "var(--platform-ink)", letterSpacing: "-0.015em" }}>
+            {section}
+          </h2>
+          <p className="mt-1 mb-4" style={{ fontSize: 14, color: "var(--platform-muted)", maxWidth: "70ch" }}>
+            {SECTION_SUBTITLES[section] ?? "Work through these activities together with the team."}
+          </p>
+          <div>
             {acts.map((a) => {
-              const d = decisions[String(a.n)];
-              const muted = !d?.include;
+              const d = decisions[String(a.n)] ?? defaultActivityDecision(a);
+              const isWorkspace = a.kind === "workspace";
+              const thumbBg = isWorkspace ? "var(--platform-blue)" : "var(--platform-aqua)";
+              const Icon = isWorkspace ? SquarePen : GraduationCap;
+              const dimmed = !d.include;
               return (
-                <div key={a.n} className={`border border-ink/20 p-3 flex flex-wrap items-center gap-3 ${muted ? "opacity-50" : ""}`}>
-                  <label className="flex items-center gap-2 min-w-0 flex-1">
-                    <input
-                      type="checkbox"
-                      checked={d?.include ?? true}
-                      onChange={(e) => updateDecision(a.n, { include: e.target.checked })}
-                    />
-                    <span className="text-sm">
-                      <span className="text-muted-foreground mr-1">{a.n}.</span>
+                <div
+                  key={a.n}
+                  className="flex gap-6 py-6"
+                  style={{ borderBottom: "1px solid var(--platform-border)" }}
+                >
+                  {/* Thumbnail */}
+                  <div
+                    className="relative shrink-0 flex items-center justify-center"
+                    style={{
+                      width: "var(--platform-thumb-size)",
+                      height: "var(--platform-thumb-size)",
+                      background: thumbBg,
+                      borderRadius: "var(--platform-radius)",
+                      opacity: dimmed ? 0.45 : 1,
+                    }}
+                  >
+                    <Icon size={46} color="#fff" strokeWidth={2.25} />
+                    <div
+                      className="absolute flex items-center justify-center"
+                      style={{
+                        top: 8,
+                        left: 8,
+                        width: 24,
+                        height: 24,
+                        background: "var(--platform-badge-bg)",
+                        borderRadius: "999px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: "var(--platform-ink)",
+                        boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                      }}
+                    >
+                      {a.n}
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0" style={{ opacity: dimmed ? 0.5 : 1 }}>
+                    <div style={{ fontSize: 18, fontWeight: 600, color: "var(--platform-blue)", lineHeight: 1.3 }}>
                       {a.label}
-                      <span className="text-xs text-muted-foreground ml-2">· {a.kind} · {a.minutes} min</span>
-                    </span>
-                  </label>
-                  {d?.include && (
-                    <>
-                      <div className="flex gap-1">
-                        {(["live", "homework", "skip"] as ActivityMode[]).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => updateDecision(a.n, { mode: m })}
-                            className={`text-xs px-2 py-1 border ${d.mode === m ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
-                          >
-                            {m === "live" ? "Live" : m === "homework" ? "Homework" : "Skip"}
-                          </button>
-                        ))}
+                    </div>
+                    <div className="mt-1" style={{ fontSize: 14, color: "var(--platform-muted)", lineHeight: 1.5 }}>
+                      {ACTIVITY_DESCRIPTION_FALLBACK}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2" style={{ color: "var(--platform-muted)" }}>
+                      <Clock size={14} strokeWidth={2} />
+                      <span style={{ fontSize: 13 }}>{a.minutes} min</span>
+                      <span style={{ fontSize: 13 }}>·</span>
+                      <span style={{ fontSize: 13, textTransform: "capitalize" }}>
+                        {isWorkspace ? "Workspace" : "E-learning"}
+                      </span>
+                    </div>
+
+                    {/* Coach decisions */}
+                    <div className="mt-4 flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-2" style={{ fontSize: 13, color: "var(--platform-ink)" }}>
+                        <input
+                          type="checkbox"
+                          checked={d.include}
+                          onChange={(e) => updateDecision(a.n, { include: e.target.checked })}
+                          style={{ accentColor: "var(--platform-blue)" }}
+                        />
+                        Include
+                      </label>
+
+                      <div
+                        className="flex"
+                        style={{
+                          border: "1px solid var(--platform-border)",
+                          borderRadius: "var(--platform-radius-pill)",
+                          overflow: "hidden",
+                          background: "var(--platform-surface)",
+                        }}
+                      >
+                        {(["live", "homework", "skip"] as ActivityMode[]).map((m) => {
+                          const active = d.mode === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              disabled={!d.include && m !== "skip"}
+                              onClick={() => updateDecision(a.n, { mode: m })}
+                              style={{
+                                padding: "6px 14px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                fontFamily: "var(--platform-font)",
+                                background: active ? "var(--platform-blue)" : "transparent",
+                                color: active ? "#fff" : "var(--platform-muted)",
+                                border: "none",
+                                cursor: d.include || m === "skip" ? "pointer" : "not-allowed",
+                              }}
+                            >
+                              {m === "live" ? "Live" : m === "homework" ? "Homework" : "Skip"}
+                            </button>
+                          );
+                        })}
                       </div>
+
                       <select
                         value={d.session}
+                        disabled={!d.include}
                         onChange={(e) => updateDecision(a.n, { session: e.target.value as ActivitySession })}
-                        className="text-xs border border-ink/30 px-2 py-1"
+                        style={{
+                          padding: "6px 12px",
+                          fontSize: 13,
+                          fontFamily: "var(--platform-font)",
+                          color: "var(--platform-ink)",
+                          background: "var(--platform-surface)",
+                          border: "1px solid var(--platform-border)",
+                          borderRadius: "var(--platform-radius)",
+                          outline: "none",
+                        }}
                       >
                         {SESSION_OPTIONS.map((o) => (
                           <option key={o.v} value={o.v}>{o.l}</option>
                         ))}
                       </select>
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       ))}
     </div>
   );
 }
+
 
 function PlaybookFacilitate({
   session,
