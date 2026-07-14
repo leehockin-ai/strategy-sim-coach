@@ -29,26 +29,38 @@ export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   component: SessionPage,
 });
 
-type Step = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
+import { CHAPTERS, chapterForStep, chapterMeta, stepFromStatus, STEP_LABELS, CHAPTER_ENTRY_STATUS, type ChapterKey, type StepKey } from "@/lib/chapters";
 
-const STEPS: { key: Step; label: string; sub: string }[] = [
-  { key: "framing",      label: "Situation Framing",          sub: "Diagnose ambiguity, evidence, and success expectations" },
-  { key: "method",       label: "Coaching Approach",          sub: "Choose the smallest useful Strategyzer intervention" },
-  { key: "dialogue",     label: "Stakeholder Workspace",      sub: "Surface political reality, readiness, and resistance before facilitating" },
-  { key: "application",  label: "Live Playbook Facilitation", sub: "Run a real Strategyzer working session with the team" },
-  { key: "intervention", label: "Next-Step Judgment",         sub: "What should happen now based on what emerged?" },
-  { key: "playbook",     label: "Engagement Orchestration",   sub: "Design the smallest responsible pathway forward" },
-];
+// Map from StepKey (UI grouping) → local render key used by the switch below.
+type RenderKey = "framing" | "method" | "dialogue" | "application" | "intervention" | "playbook";
+const RENDER_KEY: Record<StepKey, RenderKey> = {
+  framing: "framing",
+  coaching_approach: "method",
+  stakeholder_workspace: "dialogue",
+  live_playbook: "application",
+  next_step_judgment: "intervention",
+  engagement_orchestration: "playbook",
+};
 
 function SessionPage() {
   const { sessionId } = Route.useParams();
   const fetchSession = useServerFn(getSession);
+  const save = useServerFn(updateSession);
+  const qc = useQueryClient();
   const { data, refetch, isLoading } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession({ data: { sessionId } }),
   });
 
-  const [step, setStep] = useState<Step>("framing");
+  const initialStep: StepKey = data ? stepFromStatus((data.session as any).status) : "framing";
+  const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (data && !initialized) {
+      setActiveStep(stepFromStatus((data.session as any).status));
+      setInitialized(true);
+    }
+  }, [data, initialized]);
 
   if (isLoading || !data) {
     return <Shell><div className="p-10 text-sm text-muted-foreground">Loading session…</div></Shell>;
@@ -57,111 +69,165 @@ function SessionPage() {
   const session: any = data.session;
   const scenario = session.scenarios;
 
-  // Free navigation by design. Saving never auto-advances — the coach chooses
-  // when to move on, or to return to a prior section. Stakeholder Workspace is
-  // always one click away via the StepNav and the floating "Revisit
-  // stakeholders" affordance below.
+  const activeChapter: ChapterKey = chapterForStep(activeStep);
+  const chapter = chapterMeta(activeChapter);
+  const furthestStep = stepFromStatus(session.status);
+  const furthestChapter = chapterMeta(chapterForStep(furthestStep));
+
   const refreshOnly = () => { refetch(); };
+
+  // Advance sub-tab within a chapter on save; at the last sub-tab of the
+  // chapter, do nothing — the coach clicks the "Continue to Chapter X" button.
+  function onStepSaved() {
+    refetch();
+    const idx = chapter.steps.indexOf(activeStep);
+    if (idx >= 0 && idx < chapter.steps.length - 1) {
+      setActiveStep(chapter.steps[idx + 1]);
+    }
+  }
+
+  async function goToChapter(targetKey: ChapterKey) {
+    const target = chapterMeta(targetKey);
+    const nextStep = target.steps[0];
+    setActiveStep(nextStep);
+    // Only persist status when moving forward past the furthest reached.
+    if (target.index > furthestChapter.index) {
+      try {
+        await save({ data: { sessionId: session.id, status: CHAPTER_ENTRY_STATUS[targetKey] as any } });
+        qc.invalidateQueries({ queryKey: ["session", session.id] });
+        qc.invalidateQueries({ queryKey: ["my-sessions"] });
+      } catch (e: any) {
+        toast.error(e?.message ?? "Could not advance chapter");
+      }
+    }
+  }
+
+  const renderKey = RENDER_KEY[activeStep];
+  const stepIdxInChapter = chapter.steps.indexOf(activeStep);
+  const isLastStepOfChapter = stepIdxInChapter === chapter.steps.length - 1;
+  const nextChapter = CHAPTERS.find((c) => c.index === (chapter.index + 1)) ?? null;
+  const showChapterTransition = isLastStepOfChapter && nextChapter !== null && chapter.index < 3;
 
   return (
     <Shell>
       <ScenarioHeader scenario={scenario} session={session} />
-      <StepNav step={step} onChange={setStep} />
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        {step === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
-        {step === "method" && <MethodStep session={session} onSaved={refreshOnly} />}
-        {step === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
-        {step === "application" && <ApplicationStep session={session} onSaved={refreshOnly} />}
-        {step === "intervention" && <InterventionStep session={session} onSaved={refreshOnly} />}
-        {step === "playbook" && <EngagementPathwayStep session={session} onSaved={refetch} />}
-      </div>
-      {step !== "dialogue" && step !== "framing" && (
-        <button
-          onClick={() => setStep("dialogue")}
-          className="fixed bottom-6 right-6 z-40 bg-ink text-paper px-4 py-3 text-xs uppercase tracking-[0.12em] rounded-sm shadow-[3px_3px_0_var(--ink)] border border-ink hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_var(--ink)] transition-transform"
-          title="Stakeholder dialogue is persistent — return any time to clarify, negotiate scope, or surface resistance"
-        >
-          ↩ Revisit stakeholders
-        </button>
+      <ChapterNav
+        activeChapter={activeChapter}
+        furthestChapterIndex={furthestChapter.index}
+        onChange={(k) => setActiveStep(chapterMeta(k).steps[0])}
+      />
+      {chapter.steps.length > 1 && (
+        <SubTabNav
+          steps={chapter.steps}
+          active={activeStep}
+          onChange={setActiveStep}
+        />
       )}
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
+        <ChapterBanner chapter={activeChapter} />
+        {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={onStepSaved} onRefresh={refetch} />}
+        {renderKey === "method" && <MethodStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
+        {renderKey === "application" && <ApplicationStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
+        {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
+
+        {showChapterTransition && nextChapter && (
+          <div className="mt-12 border-t border-ink pt-8 flex justify-end">
+            <button
+              onClick={() => goToChapter(nextChapter.key)}
+              className="bg-ink text-paper px-6 py-3 text-sm rounded-sm hover:opacity-90"
+            >
+              Continue to Chapter {nextChapter.index} — {nextChapter.label} →
+            </button>
+          </div>
+        )}
+      </div>
     </Shell>
   );
 }
 
 function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) {
-  return (
-    <section className="hairline-b" style={{ backgroundColor: "var(--brand-blue)" }}>
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10 text-paper">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-xs uppercase tracking-[0.14em] opacity-70 marker-num">
-            Session · {session.id.slice(0, 8)}
-          </span>
-          <span className="text-xs uppercase tracking-[0.14em] opacity-70">{scenario.industry}</span>
-        </div>
-        <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
-        <p className="max-w-3xl opacity-90 leading-relaxed">{scenario.context}</p>
-
-        {(scenario.success_definition || scenario.success_pressure) && (
-          <div className="mt-6 grid md:grid-cols-2 gap-4 max-w-4xl">
-            {scenario.success_definition && (
-              <div className="border border-paper/40 p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">What the team believes success looks like</div>
-                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_definition}</p>
-              </div>
-            )}
-            {scenario.success_pressure && (
-              <div className="border border-paper/40 p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Pressure shaping that belief</div>
-                <p className="text-sm opacity-90 leading-relaxed">{scenario.success_pressure}</p>
-              </div>
-            )}
-            {Array.isArray(scenario.unrealistic_aspects) && scenario.unrealistic_aspects.length > 0 && (
-              <div className="md:col-span-2 border border-paper/40 p-4" style={{ backgroundColor: "rgba(0,0,0,0.18)" }}>
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Where their success picture may be off — for you to surface, not assume</div>
-                <ul className="text-sm opacity-90 leading-relaxed list-disc pl-4 space-y-0.5">
-                  {scenario.unrealistic_aspects.map((u: string, i: number) => <li key={i}>{u}</li>)}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="mt-6 grid md:grid-cols-3 gap-4">
-          {(scenario.stakeholders as any[]).map((s) => (
-            <div key={s.name} className="border border-paper/40 p-4">
-              <div className="text-xs uppercase opacity-70 mb-1">{s.role}</div>
-              <div className="font-medium mb-2">{s.name}</div>
-              <p className="text-sm opacity-80 leading-relaxed">{s.posture}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function StepNav({ step, onChange }: { step: Step; onChange: (s: Step) => void }) {
-  return (
-    <div className="hairline-b sticky top-0 bg-paper z-30">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10">
-        <div className="flex">
-          {STEPS.map((s, i) => {
-            const active = s.key === step;
-            return (
-              <button
-                key={s.key}
-                onClick={() => onChange(s.key)}
-                className={`flex-1 py-4 text-left border-r border-ink last:border-r-0 px-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-              >
-                <div className="flex items-baseline gap-3">
-                  <span className="marker-num text-xs opacity-70">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="text-sm font-medium">{s.label}</span>
-                </div>
+...
                 <div className={`text-[10px] mt-1 ml-7 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{s.sub}</div>
               </button>
             );
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChapterNav({
+  activeChapter, furthestChapterIndex, onChange,
+}: { activeChapter: ChapterKey; furthestChapterIndex: number; onChange: (k: ChapterKey) => void }) {
+  return (
+    <div className="hairline-b sticky top-0 bg-paper z-30">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10">
+        <div className="flex">
+          {CHAPTERS.map((c) => {
+            const active = c.key === activeChapter;
+            const reachable = c.index <= furthestChapterIndex;
+            const disabled = !reachable && !active;
+            return (
+              <button
+                key={c.key}
+                onClick={() => !disabled && onChange(c.key)}
+                disabled={disabled}
+                className={`flex-1 py-4 text-left border-r border-ink last:border-r-0 px-5 transition-colors ${active ? "bg-ink text-paper" : disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-secondary"}`}
+              >
+                <div className="marker-num text-[10px] uppercase tracking-[0.14em] opacity-70">
+                  {String(c.index).padStart(2, "0")} · Chapter {c.index}
+                </div>
+                <div className="text-base font-medium mt-1">{c.label}</div>
+                <div className={`text-[11px] mt-1 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{c.descriptor}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubTabNav({
+  steps, active, onChange,
+}: { steps: StepKey[]; active: StepKey; onChange: (s: StepKey) => void }) {
+  return (
+    <div className="hairline-b bg-paper">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10">
+        <div className="flex gap-6">
+          {steps.map((s) => {
+            const on = s === active;
+            return (
+              <button
+                key={s}
+                onClick={() => onChange(s)}
+                className={`py-3 text-xs uppercase tracking-[0.12em] border-b-2 transition-colors ${on ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}
+              >
+                {STEP_LABELS[s]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChapterBanner({ chapter }: { chapter: ChapterKey }) {
+  const meta = chapterMeta(chapter);
+  const isApply = chapter === "apply";
+  const descriptor = isApply
+    ? "You've scoped the engagement. Now facilitate the Playbook activity with the team. Ask questions, redirect solution-jumping, and produce meaningful — not necessarily complete — output. Know when enough has been achieved."
+    : meta.descriptor;
+  return (
+    <div className="mb-8 border-l-2 border-ink pl-4">
+      <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground marker-num">
+        Chapter {meta.index} · {meta.label}
+      </div>
+      <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{descriptor}</p>
     </div>
   );
 }
