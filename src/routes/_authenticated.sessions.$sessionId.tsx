@@ -2304,8 +2304,43 @@ function PlaybookFacilitate({
 
   if (liveActivities.length === 0) {
     return (
-      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
-        Mark at least one activity as "Live" in Plan the Playbook to facilitate it here.
+      <div
+        className="mx-auto max-w-2xl"
+        style={{
+          background: "var(--platform-surface)",
+          border: "1px solid var(--platform-border)",
+          borderRadius: "var(--platform-radius)",
+          padding: "32px 36px",
+          fontFamily: "var(--platform-font)",
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "4px 12px",
+            borderRadius: "var(--platform-radius-pill)",
+            background: "color-mix(in oklab, var(--platform-blue) 10%, transparent)",
+            color: "var(--platform-blue)",
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            marginBottom: 16,
+          }}
+        >
+          Nothing to facilitate yet
+        </div>
+        <h3 style={{ fontSize: 22, fontWeight: 600, color: "var(--platform-ink)", marginBottom: 10, letterSpacing: "-0.01em" }}>
+          Pick which activities you'll run live
+        </h3>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--platform-muted)", marginBottom: 20 }}>
+          Head back to <span style={{ color: "var(--platform-blue)", fontWeight: 500 }}>Plan the Playbook</span> and
+          mark at least one activity as <span style={{ fontWeight: 600, color: "var(--platform-ink)" }}>Live</span>.
+          Live activities are the ones you'll facilitate with the team in this session — everything else runs as
+          homework or gets skipped. Once one is marked Live, it will appear here ready to run.
+        </p>
       </div>
     );
   }
@@ -2325,36 +2360,119 @@ function PlaybookFacilitate({
   }
 
   return (
-    <div>
-      <div className="mb-4">
-        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">
-          Which activity are you facilitating live right now?
-        </label>
-        <select
-          value={selectedN ?? ""}
-          onChange={(e) => pick(Number(e.target.value))}
-          className="border border-ink/30 px-3 py-2 text-sm"
+    <div style={{ fontFamily: "var(--platform-font)" }}>
+      {/* Activity picker — Platform-styled pill group */}
+      <div style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "var(--platform-muted)",
+            marginBottom: 10,
+          }}
         >
-          <option value="">Select an activity…</option>
-          {liveActivities.map((a) => (
-            <option key={a.n} value={a.n}>
-              {a.n}. {a.label} ({a.minutes} min · {a.kind})
-            </option>
-          ))}
-        </select>
+          Which live activity are you running now?
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {liveActivities.map((a) => {
+            const isActive = a.n === selectedN;
+            const isWorkspace = a.kind === "workspace";
+            return (
+              <button
+                key={a.n}
+                type="button"
+                onClick={() => pick(a.n)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "10px 16px",
+                  borderRadius: "var(--platform-radius-pill)",
+                  border: isActive ? "1px solid var(--platform-blue)" : "1px solid var(--platform-border)",
+                  background: isActive ? "var(--platform-blue)" : "var(--platform-surface)",
+                  color: isActive ? "#FFFFFF" : "var(--platform-ink)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  fontFamily: "var(--platform-font)",
+                  cursor: "pointer",
+                  transition: "all 120ms ease",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 22,
+                    height: 22,
+                    borderRadius: "999px",
+                    background: isActive ? "#FFFFFF" : (isWorkspace ? "var(--platform-blue)" : "var(--platform-aqua)"),
+                    color: isActive ? "var(--platform-blue)" : "#FFFFFF",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {a.n}
+                </span>
+                <span>{a.label}</span>
+                <span style={{ opacity: 0.7, fontSize: 12 }}>· {a.minutes} min</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {selected && (
         <>
-          <div className="border border-ink p-3 mb-4 text-xs bg-paper">
-            <div className="font-medium text-sm">
-              Facilitating: Activity {selected.n} — {selected.label}
+          {/* Now-facilitating header card */}
+          <div
+            style={{
+              background: "var(--platform-surface)",
+              border: "1px solid var(--platform-border)",
+              borderRadius: "var(--platform-radius)",
+              padding: "18px 22px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              fontFamily: "var(--platform-font)",
+            }}
+          >
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: "var(--platform-radius)",
+                background: selected.kind === "workspace" ? "var(--platform-blue)" : "var(--platform-aqua)",
+                color: "#FFFFFF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {selected.kind === "workspace" ? <SquarePen size={22} strokeWidth={1.75} /> : <GraduationCap size={22} strokeWidth={1.75} />}
             </div>
-            <div className="text-muted-foreground mt-1">
-              This is a {selected.minutes}-min {selected.kind === "workspace" ? "workspace" : "e-learning"} activity from your Playbook plan.
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--platform-muted)", marginBottom: 2 }}>
+                Now facilitating · Activity {selected.n}
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "var(--platform-blue)", letterSpacing: "-0.01em" }}>
+                {selected.label}
+              </div>
+            </div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--platform-muted)", fontSize: 13, flexShrink: 0 }}>
+              <Clock size={14} strokeWidth={1.75} />
+              {selected.minutes} min · {selected.kind === "workspace" ? "Workspace" : "E-learning"}
             </div>
           </div>
-          <ApplicationStep session={session} onSaved={onSaved} />
+
+          {/* Working session — Coach Compass UI. Font-family reset marks the intentional seam. */}
+          <div style={{ fontFamily: "var(--font-sans)", color: "var(--ink)" }}>
+            <ApplicationStep session={session} onSaved={onSaved} />
+          </div>
         </>
       )}
     </div>
