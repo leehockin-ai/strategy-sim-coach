@@ -66,6 +66,20 @@ export const SECTION_RUBRIC = [
     focus:
       "How responsibly did the coach ORCHESTRATE Strategyzer methodology over time across the 5 pathway sections (Situation Summary, Immediate Intervention, Pathway, Risks, Success Criteria)? Reward sequencing coherence, methodology restraint, lightweight executable interventions, evidence progression, stakeholder readiness awareness, and reframing of unrealistic success criteria. Penalize framework stacking, bloated multi-week plans, sales/upsell framing, polished consulting language without operational detail, and assuming smooth progress. Multiple valid pathways exist — judge coherence, not a single 'correct' sequence.",
   },
+  {
+    key: "intervention_fit",
+    label: "Intervention Fit",
+    step: "Chapter 1 → 2 handoff",
+    focus:
+      "Was the committed intervention's pathway_type (pre_playbook / evidence_gathering / deliberate_pause / playbook) the right choice given what Chapter 1 surfaced? Judge FIT of the pathway to the situation — not how it was later executed. Use chosen_intervention_slug and the resolved intervention row (pathway_type) as the authoritative signal; methodology_choice is legacy context only.",
+  },
+  {
+    key: "intervention_execution",
+    label: "Intervention Execution",
+    step: "Chapter 2 workspace",
+    focus:
+      "How well did the coach EXECUTE the committed pathway in its Chapter 2 workspace? Score only the workspace(s) that match pathway_type (alignment, evidence-gathering plan, pause justification, or Playbook facilitation/run/interpretation). Reward fit-for-pathway execution, restraint, evidence rigor, honesty about what didn't land. Penalize empty workspaces on the committed pathway, consulting theater, and workspace-as-form-to-fill.",
+  },
 ] as const;
 
 // Legacy export so the report page still imports cleanly.
