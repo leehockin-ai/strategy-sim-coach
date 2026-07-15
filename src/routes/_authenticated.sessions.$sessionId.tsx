@@ -1205,7 +1205,12 @@ function Chapter2Container({
     staleTime: 5 * 60 * 1000,
   });
   const interventions = (iData?.interventions ?? []) as InterventionRow[];
-  const slug: string = session.chosen_intervention_slug ?? "";
+  // Backward-compat: derive slug from legacy methodology_choice for sessions
+  // that predate the intervention picker.
+  const legacyMethodology: string = ((session.methodology_choice as string | null) ?? "").trim();
+  const slug: string =
+    (session.chosen_intervention_slug as string | null | undefined) ||
+    (legacyMethodology && legacyMethodology !== "none" ? legacyMethodology : "");
 
   if (!slug) {
     return (
