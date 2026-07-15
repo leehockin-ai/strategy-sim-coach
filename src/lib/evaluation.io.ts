@@ -120,7 +120,10 @@ export type SectionKey =
   | "working_session_facilitation"
   | "methodological_soundness"
   | "intervention_discipline"
-  | "engagement_pathway";
+  | "engagement_pathway"
+  | "intervention_fit"
+  | "intervention_execution";
+
 
 function renderAssistanceLog(log: any[] | null | undefined): string {
   if (!log || log.length === 0) {
