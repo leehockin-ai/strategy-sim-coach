@@ -66,6 +66,20 @@ export const SECTION_RUBRIC = [
     focus:
       "How responsibly did the coach ORCHESTRATE Strategyzer methodology over time across the 5 pathway sections (Situation Summary, Immediate Intervention, Pathway, Risks, Success Criteria)? Reward sequencing coherence, methodology restraint, lightweight executable interventions, evidence progression, stakeholder readiness awareness, and reframing of unrealistic success criteria. Penalize framework stacking, bloated multi-week plans, sales/upsell framing, polished consulting language without operational detail, and assuming smooth progress. Multiple valid pathways exist — judge coherence, not a single 'correct' sequence.",
   },
+  {
+    key: "intervention_fit",
+    label: "Intervention Fit",
+    step: "Chapter 1 → 2 handoff",
+    focus:
+      "Was the committed intervention's pathway_type (pre_playbook / evidence_gathering / deliberate_pause / playbook) the right choice given what Chapter 1 surfaced? Judge FIT of the pathway to the situation — not how it was later executed. Use chosen_intervention_slug and the resolved intervention row (pathway_type) as the authoritative signal; methodology_choice is legacy context only.",
+  },
+  {
+    key: "intervention_execution",
+    label: "Intervention Execution",
+    step: "Chapter 2 workspace",
+    focus:
+      "How well did the coach EXECUTE the committed pathway in its Chapter 2 workspace? Score only the workspace(s) that match pathway_type (alignment, evidence-gathering plan, pause justification, or Playbook facilitation/run/interpretation). Reward fit-for-pathway execution, restraint, evidence rigor, honesty about what didn't land. Penalize empty workspaces on the committed pathway, consulting theater, and workspace-as-form-to-fill.",
+  },
 ] as const;
 
 // Legacy export so the report page still imports cleanly.
@@ -387,6 +401,28 @@ export const generateEvaluation = createServerFn({ method: "POST" })
 
     const s = session as unknown as SessionForEval & { id: string };
     const turns = transcript as TranscriptTurn[] | null;
+
+    // Resolve the committed intervention row so the intervention_fit and
+    // intervention_execution dimensions can read pathway_type directly
+    // instead of inferring pathway from the legacy methodology_choice string.
+    s.resolved_intervention = null;
+    const slug = (s as any).chosen_intervention_slug as string | null | undefined;
+    if (slug) {
+      const { data: ivRow } = await supabaseAdmin
+        .from("interventions")
+        .select("slug, label, pathway_type, is_deep_vertical")
+        .eq("slug", slug)
+        .maybeSingle();
+      if (ivRow) {
+        s.resolved_intervention = {
+          slug: ivRow.slug,
+          label: ivRow.label,
+          pathway_type: ivRow.pathway_type,
+          is_deep_vertical: !!ivRow.is_deep_vertical,
+        };
+      }
+    }
+
     const inputQualitySignals = extractInputQualitySignals(s, turns);
 
     // STAGE A: per-section fan-out (parallel, blind to each other)
@@ -398,6 +434,7 @@ export const generateEvaluation = createServerFn({ method: "POST" })
       })
     );
     const sections: Record<string, SectionVerdict> = Object.fromEntries(sectionResults);
+
 
     // STAGE B: skills (parallel with each other; uses transcript + canvas)
     const transcriptText = renderTranscript(turns);

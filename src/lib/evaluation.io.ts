@@ -14,7 +14,26 @@ export type SessionForEval = {
   decision: string | null;
   playbook_suggestions: any[] | null;
   scenarios: { title: string; summary: string; context?: string; ambiguity_factors?: string[] };
+  // Post-Patch-1 intervention model. The evaluator MUST rely on these
+  // fields (and the resolved intervention row) rather than the legacy
+  // `methodology_choice` string when judging pathway-fit and execution.
+  chosen_intervention_slug: string | null;
+  intervention_rationale: string | null;
+  intervention_committed_at: string | null;
+  alignment_workspace: Record<string, any> | null;
+  evidence_gathering_plan: Record<string, any> | null;
+  pause_justification: Record<string, any> | null;
+  playbook_facilitation_plan: Record<string, any> | null;
+  playbook_activity_run: Record<string, any> | null;
+  playbook_interpretation: Record<string, any> | null;
+  resolved_intervention: {
+    slug: string;
+    label: string;
+    pathway_type: string;   // pre_playbook | playbook | evidence_gathering | deliberate_pause
+    is_deep_vertical: boolean;
+  } | null;
 };
+
 
 export type TranscriptTurn = {
   role: string;
@@ -101,7 +120,10 @@ export type SectionKey =
   | "working_session_facilitation"
   | "methodological_soundness"
   | "intervention_discipline"
-  | "engagement_pathway";
+  | "engagement_pathway"
+  | "intervention_fit"
+  | "intervention_execution";
+
 
 function renderAssistanceLog(log: any[] | null | undefined): string {
   if (!log || log.length === 0) {
@@ -229,5 +251,95 @@ ${s.playbook_application?.success_criteria || "(empty success criteria)"}
 ${s.intervention_recommendation || "(none)"}
 
 Score on Strategyzer methodological rigor: evidence over opinion, test before scale, customer-first sequencing (ecosystem → profile → value map), discovery vs delivery, jobs/pains/gains being customer-not-team-centric, VPC/BMC understanding. Flag framework name-dropping without substance, skipped sequencing, and the VPC-misapplied-to-internal-team-issues failure pattern.`;
+
+    case "intervention_fit": {
+      // Post-Patch-1: pathway_type on the resolved intervention row is the
+      // authoritative signal for what the coach committed to running.
+      // `methodology_choice: "none"` is NO LONGER a reliable indicator of
+      // "no playbook" — coaches can pick evidence_gathering, deliberate_pause,
+      // pre_playbook (alignment), or a specific playbook via the intervention
+      // picker. Do not infer pathway from methodology_choice alone.
+      const iv = s.resolved_intervention;
+      return `${header}── SCENARIO AMBIGUITY ──
+${(scenario.ambiguity_factors ?? []).map((a) => `• ${a}`).join("\n") || "(none specified)"}
+
+── FRAMING (Step 1) ──
+${s.framing_notes || "(none)"}
+
+── STAKEHOLDER COMMITMENTS CAPTURED (Step 3) ──
+${s.dialogue_commitments || "(none captured)"}
+
+── COMMITTED INTERVENTION (authoritative — from the intervention picker) ──
+Chosen slug: ${s.chosen_intervention_slug || "(none committed)"}
+Resolved intervention: ${iv ? `${iv.label} (pathway_type=${iv.pathway_type}${iv.is_deep_vertical ? ", deep_vertical" : ""})` : "(no resolved intervention row)"}
+Committed at: ${s.intervention_committed_at || "(not committed)"}
+Rationale: ${s.intervention_rationale || "(none)"}
+
+── LEGACY methodology_choice (kept for backwards compat only — do NOT use as primary pathway signal) ──
+${s.methodology_choice || "(none)"} — ${s.methodology_rationale || "(no rationale)"}
+
+Score ONLY on INTERVENTION FIT: given what Chapter 1 surfaced (ambiguity, framing, stakeholder state, evidence quality), was the committed pathway_type the right choice? Reward:
+• pre_playbook (alignment) when the team is misaligned or the sponsor question is unclear
+• evidence_gathering when the team lacks the customer/market evidence a Playbook would need to land
+• deliberate_pause when neither is ready and restraint serves the client better than activity
+• a specific playbook only when framing + stakeholder readiness genuinely support it
+Penalize: jumping to a playbook on top of unresolved alignment, evidence, or sponsor questions; picking evidence_gathering / pause as avoidance rather than judgment; a rationale that doesn't reference what Chapter 1 actually surfaced. Ignore HOW the intervention was executed — that is the intervention_execution section.`;
+    }
+
+    case "intervention_execution": {
+      // Different pathway_types have different execution artifacts. Route
+      // the prompt to whichever workspace is populated for this pathway.
+      const iv = s.resolved_intervention;
+      const pt = iv?.pathway_type ?? "(unknown — no intervention committed)";
+      const alignment = s.alignment_workspace ?? {};
+      const evidence = s.evidence_gathering_plan ?? {};
+      const pause = s.pause_justification ?? {};
+      const pbPlan = s.playbook_facilitation_plan ?? {};
+      const pbRun = s.playbook_activity_run ?? {};
+      const pbInterp = s.playbook_interpretation ?? {};
+      const dump = (o: Record<string, any>) =>
+        Object.keys(o).length === 0
+          ? "  (empty)"
+          : Object.entries(o)
+              .map(([k, v]) => `  • ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+              .join("\n");
+
+      return `${header}── COMMITTED INTERVENTION ──
+${iv ? `${iv.label} — pathway_type=${pt}${iv.is_deep_vertical ? " (deep vertical)" : ""}` : "(no intervention committed)"}
+
+── PRE_PLAYBOOK / ALIGNMENT WORKSPACE ──
+setup:
+${dump((alignment as any).setup ?? {})}
+facilitation:
+${dump((alignment as any).facilitation ?? {})}
+interpretation:
+${dump((alignment as any).interpretation ?? {})}
+
+── EVIDENCE_GATHERING PLAN ──
+${dump(evidence)}
+
+── DELIBERATE_PAUSE JUSTIFICATION ──
+${dump(pause)}
+
+── PLAYBOOK FACILITATION PLAN (deep vertical) ──
+${dump(pbPlan)}
+
+── PLAYBOOK ACTIVITY RUN (deep vertical) ──
+${dump(pbRun)}
+
+── PLAYBOOK INTERPRETATION (deep vertical) ──
+${dump(pbInterp)}
+
+── STAKEHOLDER TRANSCRIPT (for facilitation quality context) ──
+${transcript}
+
+Score ONLY on INTERVENTION EXECUTION for the pathway_type above — judge the workspace(s) that match this pathway and IGNORE the others:
+• pre_playbook: quality of setup framing, alignment gaps named, aligned-enough definition, misalignment surfaced during facilitation, honest interpretation of where the team landed
+• evidence_gathering: sharp evidence goals, realistic moves, named owners, bounded cadence, observable readiness signal, credible return trigger
+• deliberate_pause: rationale grounded in observed Chapter 1 signals, concrete re-engage preconditions, signals watched, client-facing communication that frames restraint as service, real revisit checkpoint
+• playbook: facilitation-plan coherence, activity-run quality (specificity, evidence flags, ambiguity honesty), interpretation that connects what emerged to a next move
+Reward: fit-for-pathway execution, restraint, evidence rigor, honesty about what didn't land. Penalize: empty workspaces on the committed pathway, consulting-theater language, forcing a playbook when the workspace shows the team wasn't ready, treating the workspace as a form to fill.`;
+    }
   }
 }
+
