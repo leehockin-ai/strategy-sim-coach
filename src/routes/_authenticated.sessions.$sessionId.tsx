@@ -1343,6 +1343,255 @@ function Chapter2Placeholder({ title, note, interventionLabel }: { title: string
 }
 
 
+// ============ Evidence-gathering skeleton (evidence_gathering pathway) ============
+
+function EvidenceGatheringWorkspace({
+  session,
+  interventionLabel,
+  onAdvance,
+  onSaved,
+}: {
+  session: any;
+  interventionLabel: string;
+  onAdvance: () => void | Promise<void>;
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateSession);
+  const plan = (session.evidence_gathering_plan ?? {}) as Record<string, string>;
+
+  const [values, setValues] = useState<Record<string, string>>({
+    evidence_goals: plan.evidence_goals ?? "",
+    moves: plan.moves ?? "",
+    owners: plan.owners ?? "",
+    cadence: plan.cadence ?? "",
+    readiness_signal: plan.readiness_signal ?? "",
+    return_trigger: plan.return_trigger ?? "",
+  });
+
+  async function persist(next: Record<string, string>) {
+    try {
+      await save({ data: { sessionId: session.id, evidenceGatheringPlanPatch: next } });
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save");
+    }
+  }
+
+  function field(
+    key: keyof typeof values,
+    label: string,
+    hint: string,
+    placeholder: string,
+    rows = 4,
+  ) {
+    return (
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">{label}</label>
+        <p className="text-xs text-muted-foreground mb-2">{hint}</p>
+        <textarea
+          value={values[key]}
+          onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.value }))}
+          onBlur={() => persist(values)}
+          rows={rows}
+          placeholder={placeholder}
+          className="w-full border border-ink/30 px-3 py-2 text-sm bg-paper"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Chapter 2 · Evidence-gathering</div>
+        <h2 className="text-xl font-medium mt-1">Send the team to gather evidence first</h2>
+        <p className="text-sm text-muted-foreground mt-2">
+          No live Playbook right now. Design the evidence sprint that must land before methodology work will
+          be worth activating. What you write here becomes the brief the team runs on — and the signal you'll
+          watch for to know they're ready.
+        </p>
+      </div>
+
+      {field(
+        "evidence_goals",
+        "Evidence goals",
+        "What must you learn before a Playbook is worth running? Be specific — questions, not topics.",
+        "e.g. Do the three target segments actually have the pain we assumed? What's the current buying process?",
+        5,
+      )}
+      {field(
+        "moves",
+        "Evidence-gathering moves",
+        "Interviews, ecosystem mapping, artifact review, competitive teardown, shadowing. What's the shortest path to the answers above?",
+        "e.g. 8 customer interviews across the two priority segments · desk research on incumbent offers · one sponsor debrief",
+        5,
+      )}
+      {field(
+        "owners",
+        "Who runs each move",
+        "Named owners on the client side. Coach role: design, debrief, don't execute.",
+        "e.g. PM owns interviews · analyst owns desk research · you facilitate debrief",
+        3,
+      )}
+      {field(
+        "cadence",
+        "Timeframe & cadence",
+        "How long is the sprint, and when do you check in? Keep it bounded — evidence-gathering without a stop date drifts.",
+        "e.g. two weeks · weekly 30-min sync · debrief workshop day 15",
+        3,
+      )}
+      {field(
+        "readiness_signal",
+        "Readiness signal for a Playbook",
+        "What evidence, in the team's own words, would tell you it's time to activate a Playbook — and which one?",
+        "e.g. converging pain across ≥5 interviews · one segment clearly worth prioritising · sponsor aligned on scope",
+        4,
+      )}
+      {field(
+        "return_trigger",
+        "Return trigger",
+        "What would bring you back into the room? What would tell you evidence-gathering isn't producing clarity and you need to intervene differently?",
+        "e.g. week 2 with no convergence → escalate to sponsor and reframe · new stakeholder resistance → return to dialogue",
+        3,
+      )}
+
+      <div className="pt-4 border-t border-ink/20 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-muted-foreground">
+          Intervention on record: <span className="font-medium text-ink">{interventionLabel}</span>
+        </div>
+        <button
+          onClick={() => onAdvance()}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-ink text-sm font-medium bg-ink text-paper hover:opacity-90"
+        >
+          Continue to Chapter 3 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+// ============ Deliberate-pause skeleton (deliberate_pause pathway) ============
+
+function DeliberatePauseWorkspace({
+  session,
+  interventionLabel,
+  onAdvance,
+  onSaved,
+}: {
+  session: any;
+  interventionLabel: string;
+  onAdvance: () => void | Promise<void>;
+  onSaved: () => void;
+}) {
+  const save = useServerFn(updateSession);
+  const pause = (session.pause_justification ?? {}) as Record<string, string>;
+
+  const [values, setValues] = useState<Record<string, string>>({
+    rationale: pause.rationale ?? "",
+    preconditions: pause.preconditions ?? "",
+    signals_watching: pause.signals_watching ?? "",
+    client_communication: pause.client_communication ?? "",
+    revisit_checkpoint: pause.revisit_checkpoint ?? "",
+  });
+
+  async function persist(next: Record<string, string>) {
+    try {
+      await save({ data: { sessionId: session.id, pauseJustificationPatch: next } });
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Could not save");
+    }
+  }
+
+  function field(
+    key: keyof typeof values,
+    label: string,
+    hint: string,
+    placeholder: string,
+    rows = 4,
+  ) {
+    return (
+      <div>
+        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">{label}</label>
+        <p className="text-xs text-muted-foreground mb-2">{hint}</p>
+        <textarea
+          value={values[key]}
+          onChange={(e) => setValues((p) => ({ ...p, [key]: e.target.value }))}
+          onBlur={() => persist(values)}
+          rows={rows}
+          placeholder={placeholder}
+          className="w-full border border-ink/30 px-3 py-2 text-sm bg-paper"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-6">
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Chapter 2 · Deliberate pause</div>
+        <h2 className="text-xl font-medium mt-1">No intervention is the right move right now</h2>
+        <p className="text-sm text-muted-foreground mt-2">
+          Restraint is a judgment, not a stall. Spell out why pausing serves the client better than facilitating,
+          and what would need to be true before you'd re-engage. This is what the evaluator will read.
+        </p>
+      </div>
+
+      {field(
+        "rationale",
+        "Why pause is the right move",
+        "What in Chapter 1 told you a Playbook here would be premature, misaligned, or actively harmful? Ground it in what you observed.",
+        "e.g. sponsor and team disagree on the problem · no clear decision to enable · methodology would formalise misalignment",
+        5,
+      )}
+      {field(
+        "preconditions",
+        "What would need to change before you'd re-engage",
+        "Concrete preconditions — not aspirations. What has to be true about the client before methodology work will land?",
+        "e.g. sponsor commits to a single strategic question · a decision-owner is named · the team has time protected",
+        5,
+      )}
+      {field(
+        "signals_watching",
+        "Signals you're watching for",
+        "What observable moves from the client will tell you the preconditions are being met — or that things are getting worse?",
+        "e.g. sponsor calls to reopen scope · new hire fills the decision gap · team asks for a workshop unprompted",
+        4,
+      )}
+      {field(
+        "client_communication",
+        "What you tell the client",
+        "In the client's language — how you name the pause without sounding like you're walking away. Restraint framed as service.",
+        "e.g. 'We'd be doing you a disservice running a Playbook on top of an unresolved sponsor question. Let's fix that first.'",
+        4,
+      )}
+      {field(
+        "revisit_checkpoint",
+        "Revisit checkpoint",
+        "When do you come back to this? A time-bound checkpoint keeps a pause from becoming abandonment.",
+        "e.g. 30-day check-in with sponsor · reopen if the strategy review lands · re-scope after Q2 planning",
+        3,
+      )}
+
+      <div className="pt-4 border-t border-ink/20 flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs text-muted-foreground">
+          Intervention on record: <span className="font-medium text-ink">{interventionLabel}</span>
+        </div>
+        <button
+          onClick={() => onAdvance()}
+          className="inline-flex items-center gap-2 px-4 py-2 border border-ink text-sm font-medium bg-ink text-paper hover:opacity-90"
+        >
+          Continue to Chapter 3 →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
+
+
 // ============ Alignment Workspace (pre_playbook pathway) ============
 
 type AlignmentSubTab = "setup" | "facilitate" | "interpret";
