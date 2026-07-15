@@ -406,12 +406,20 @@ export const generateEvaluation = createServerFn({ method: "POST" })
     // intervention_execution dimensions can read pathway_type directly
     // instead of inferring pathway from the legacy methodology_choice string.
     s.resolved_intervention = null;
-    const slug = (s as any).chosen_intervention_slug as string | null | undefined;
-    if (slug) {
+    // Backward-compat: pre-Patch-1 sessions have methodology_choice but no
+    // chosen_intervention_slug. Fall back to the legacy field so the
+    // intervention_fit / intervention_execution dimensions can still resolve
+    // a pathway_type for older sessions.
+    const explicitSlug = (s as any).chosen_intervention_slug as string | null | undefined;
+    const legacyChoice = ((s as any).methodology_choice as string | null | undefined) ?? "";
+    const resolvedSlug =
+      explicitSlug ||
+      (legacyChoice && legacyChoice !== "none" ? legacyChoice : null);
+    if (resolvedSlug) {
       const { data: ivRow } = await supabaseAdmin
         .from("interventions")
         .select("slug, label, pathway_type, is_deep_vertical")
-        .eq("slug", slug)
+        .eq("slug", resolvedSlug)
         .maybeSingle();
       if (ivRow) {
         s.resolved_intervention = {
