@@ -1278,9 +1278,23 @@ function Chapter2Container({
       />
     );
   } else if (pathwayType === "evidence_gathering") {
-    body = <Chapter2Placeholder title="Evidence-gathering plan" note="The evidence-gathering shell will render here after Stage 6." interventionLabel={label} />;
+    body = (
+      <EvidenceGatheringWorkspace
+        session={session}
+        interventionLabel={label}
+        onAdvance={onAdvanceToChapter3}
+        onSaved={onSaved}
+      />
+    );
   } else if (pathwayType === "deliberate_pause") {
-    body = <Chapter2Placeholder title="Deliberate pause" note="The deliberate-pause shell will render here after Stage 6." interventionLabel={label} />;
+    body = (
+      <DeliberatePauseWorkspace
+        session={session}
+        interventionLabel={label}
+        onAdvance={onAdvanceToChapter3}
+        onSaved={onSaved}
+      />
+    );
   } else if (pathwayType === "playbook" && slug === "competing_on_business_models") {
     const row = interventions.find((r) => r.slug === slug);
     suppressBanner = true;
