@@ -2499,8 +2499,32 @@ function PlaybookInterpret({
 
   if (!activityRun.activity_n) {
     return (
-      <div className="border border-dashed border-ink p-6 text-sm text-muted-foreground">
-        Facilitate an activity in the previous sub-tab before interpreting.
+      <div
+        className="p-8"
+        style={{
+          background: "var(--platform-surface)",
+          border: "1px solid var(--platform-border)",
+          borderRadius: "var(--platform-radius)",
+          fontFamily: "var(--platform-font)",
+        }}
+      >
+        <div
+          className="inline-flex items-center px-3 py-1 mb-4 text-xs font-medium"
+          style={{
+            background: "var(--platform-blue)",
+            color: "#fff",
+            borderRadius: "var(--platform-radius-pill)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          Nothing to interpret yet
+        </div>
+        <h3 className="text-[22px] font-semibold mb-2" style={{ color: "var(--platform-ink)" }}>
+          Facilitate an activity first
+        </h3>
+        <p className="text-sm max-w-xl" style={{ color: "var(--platform-muted)" }}>
+          Open the Facilitate sub-tab and run at least one activity with the team. Once you've done that, come back here to capture what surfaced and decide what comes next.
+        </p>
       </div>
     );
   }
@@ -2519,36 +2543,93 @@ function PlaybookInterpret({
     !!landing && landingWhy.trim().length > 0 &&
     !!ready;
 
+  const cardStyle: React.CSSProperties = {
+    background: "var(--platform-surface)",
+    border: "1px solid var(--platform-border)",
+    borderRadius: "var(--platform-radius)",
+    fontFamily: "var(--platform-font)",
+  };
+  const textareaStyle: React.CSSProperties = {
+    background: "#fff",
+    border: "1px solid var(--platform-border)",
+    borderRadius: "var(--platform-radius)",
+    color: "var(--platform-ink)",
+    fontFamily: "var(--platform-font)",
+    fontSize: "14px",
+    lineHeight: 1.55,
+    padding: "10px 12px",
+    width: "100%",
+    outline: "none",
+  };
+
+  function Pill({
+    active,
+    onClick,
+    children,
+  }: {
+    active: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+  }) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="text-sm px-4 py-2 transition-colors"
+        style={{
+          background: active ? "var(--platform-blue)" : "#fff",
+          color: active ? "#fff" : "var(--platform-ink)",
+          border: `1px solid ${active ? "var(--platform-blue)" : "var(--platform-border)"}`,
+          borderRadius: "var(--platform-radius-pill)",
+          fontFamily: "var(--platform-font)",
+          fontWeight: active ? 600 : 500,
+        }}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
-    <div className="space-y-6 max-w-3xl">
-      <div>
-        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What did this activity actually surface?</label>
-        <p className="text-xs text-muted-foreground mb-2">What did the team produce, what did they wrestle with, what did they say that told you the exercise did or didn't land?</p>
+    <div
+      className="space-y-6 max-w-3xl mx-auto"
+      style={{ fontFamily: "var(--platform-font)", color: "var(--platform-ink)" }}
+    >
+      {/* Field 1 — surfaced */}
+      <div className="p-6" style={cardStyle}>
+        <label className="block text-[18px] font-semibold mb-1" style={{ color: "var(--platform-blue)" }}>
+          What did this activity actually surface?
+        </label>
+        <p className="text-sm mb-3" style={{ color: "var(--platform-muted)" }}>
+          What did the team produce, what did they wrestle with, what did they say that told you the exercise did or didn't land?
+        </p>
         <textarea
           value={surfaced}
           onChange={(e) => setSurfaced(e.target.value)}
           onBlur={() => saveAll()}
           rows={5}
-          className="w-full border border-ink/30 px-3 py-2 text-sm"
+          style={textareaStyle}
         />
       </div>
 
-      <div>
-        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Team hit the exercise well vs went through the motions</div>
-        <div className="flex gap-2 mb-3">
+      {/* Field 2 — engagement read */}
+      <div className="p-6" style={cardStyle}>
+        <div className="text-[18px] font-semibold mb-3" style={{ color: "var(--platform-blue)" }}>
+          Team hit the exercise well vs went through the motions
+        </div>
+        <div className="flex flex-wrap gap-2 mb-4">
           {[
             { v: "hit", l: "Hit it well" },
             { v: "mixed", l: "Mixed" },
             { v: "motions", l: "Went through the motions" },
           ].map((o) => (
-            <button
+            <Pill
               key={o.v}
-              type="button"
+              active={landing === o.v}
               onClick={() => { setLanding(o.v); saveAll({ landing: o.v }); }}
-              className={`text-sm border px-3 py-1.5 ${landing === o.v ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
             >
               {o.l}
-            </button>
+            </Pill>
           ))}
         </div>
         <textarea
@@ -2557,26 +2638,28 @@ function PlaybookInterpret({
           onBlur={() => saveAll()}
           rows={3}
           placeholder="What did you observe that led you to this read?"
-          className="w-full border border-ink/30 px-3 py-2 text-sm"
+          style={textareaStyle}
         />
       </div>
 
-      <div>
-        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">Ready for the next activity in your plan?</div>
-        <div className="flex gap-2">
+      {/* Field 3 — ready for next */}
+      <div className="p-6" style={cardStyle}>
+        <div className="text-[18px] font-semibold mb-3" style={{ color: "var(--platform-blue)" }}>
+          Ready for the next activity in your plan?
+        </div>
+        <div className="flex flex-wrap gap-2">
           {[
             { v: "yes", l: "Yes" },
             { v: "revisit", l: "Needs revisiting" },
             { v: "no", l: "No" },
           ].map((o) => (
-            <button
+            <Pill
               key={o.v}
-              type="button"
+              active={ready === o.v}
               onClick={() => { setReady(o.v); saveAll({ ready_for_next: o.v }); }}
-              className={`text-sm border px-3 py-1.5 ${ready === o.v ? "border-ink bg-ink text-paper" : "border-ink/40"}`}
             >
               {o.l}
-            </button>
+            </Pill>
           ))}
         </div>
         {(ready === "revisit" || ready === "no") && (
@@ -2586,29 +2669,43 @@ function PlaybookInterpret({
             onBlur={() => saveAll()}
             rows={3}
             placeholder="What needs to happen before you'd move on?"
-            className="mt-3 w-full border border-ink/30 px-3 py-2 text-sm"
+            style={{ ...textareaStyle, marginTop: "12px" }}
           />
         )}
       </div>
 
-      <div>
-        <label className="block text-xs uppercase tracking-[0.12em] font-medium mb-2">What should be homework before you reconvene?</label>
-        <p className="text-xs text-muted-foreground mb-2">If anything. Not every activity generates homework — say "nothing" if that's the honest answer.</p>
+      {/* Field 4 — homework */}
+      <div className="p-6" style={cardStyle}>
+        <label className="block text-[18px] font-semibold mb-1" style={{ color: "var(--platform-blue)" }}>
+          What should be homework before you reconvene?
+        </label>
+        <p className="text-sm mb-3" style={{ color: "var(--platform-muted)" }}>
+          If anything. Not every activity generates homework — say "nothing" if that's the honest answer.
+        </p>
         <textarea
           value={homework}
           onChange={(e) => setHomework(e.target.value)}
           onBlur={() => saveAll()}
           rows={3}
-          className="w-full border border-ink/30 px-3 py-2 text-sm"
+          style={textareaStyle}
         />
       </div>
 
-      <div className="pt-4 border-t border-ink flex justify-end">
+      {/* Continue */}
+      <div className="pt-2 flex justify-end">
         <button
           type="button"
           disabled={!canContinue}
           onClick={() => onAdvance()}
-          className="bg-ink text-paper px-6 py-3 text-sm rounded-sm disabled:opacity-40 hover:opacity-90"
+          className="px-6 py-3 text-sm font-semibold transition-opacity"
+          style={{
+            background: "var(--platform-blue)",
+            color: "#fff",
+            borderRadius: "var(--platform-radius-pill)",
+            fontFamily: "var(--platform-font)",
+            opacity: canContinue ? 1 : 0.4,
+            cursor: canContinue ? "pointer" : "not-allowed",
+          }}
           title={!canContinue ? "Fill surfaced, landing + explanation, and ready-for-next to continue" : ""}
         >
           Continue to Chapter 3 →
