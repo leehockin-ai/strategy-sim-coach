@@ -671,7 +671,13 @@ function MethodStep({
   });
   const interventions = (iData?.interventions ?? []) as InterventionRow[];
 
-  const storedSlug: string = session.chosen_intervention_slug ?? "";
+  // Backward-compat: pre-Patch-1 sessions have methodology_choice but no
+  // chosen_intervention_slug. If the legacy field looks like a playbook slug,
+  // seed the picker with it so the coach isn't forced to re-pick.
+  const legacyMethodology: string = ((session.methodology_choice as string | null) ?? "").trim();
+  const storedSlug: string =
+    (session.chosen_intervention_slug as string | null | undefined) ||
+    (legacyMethodology && legacyMethodology !== "none" ? legacyMethodology : "");
   const alignmentWs: Record<string, unknown> = (session.alignment_workspace ?? {}) as Record<string, unknown>;
   const storedBespoke: string = (alignmentWs["bespoke_alignment_description"] as string) ?? "";
 
