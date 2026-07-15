@@ -280,6 +280,8 @@ export const updateSession = createServerFn({ method: "POST" })
     playbookFacilitationPlanPatch?: Record<string, unknown>;
     playbookActivityRunPatch?: Record<string, unknown>;
     playbookInterpretationPatch?: Record<string, unknown>;
+    evidenceGatheringPlanPatch?: Record<string, unknown>;
+    pauseJustificationPatch?: Record<string, unknown>;
   }) =>
     z.object({
       sessionId: z.string().uuid(),
@@ -297,6 +299,8 @@ export const updateSession = createServerFn({ method: "POST" })
       playbookFacilitationPlanPatch: z.record(z.string(), z.unknown()).optional(),
       playbookActivityRunPatch: z.record(z.string(), z.unknown()).optional(),
       playbookInterpretationPatch: z.record(z.string(), z.unknown()).optional(),
+      evidenceGatheringPlanPatch: z.record(z.string(), z.unknown()).optional(),
+      pauseJustificationPatch: z.record(z.string(), z.unknown()).optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
@@ -318,6 +322,8 @@ export const updateSession = createServerFn({ method: "POST" })
       ["playbook_facilitation_plan", data.playbookFacilitationPlanPatch],
       ["playbook_activity_run", data.playbookActivityRunPatch],
       ["playbook_interpretation", data.playbookInterpretationPatch],
+      ["evidence_gathering_plan", data.evidenceGatheringPlanPatch],
+      ["pause_justification", data.pauseJustificationPatch],
     ];
     const activePatches = jsonbColumnPatches.filter(([, v]) => v !== undefined);
     if (activePatches.length > 0) {
