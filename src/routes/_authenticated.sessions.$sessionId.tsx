@@ -2137,29 +2137,48 @@ function PlaybookPlan({
         />
       </div>
 
-      {/* Section blocks */}
+      {/* Section blocks — each section is a single --platform-surface container
+          with the section header at top and activity rows separated by hairline
+          dividers, matching the Platform's "one card per section" pattern. */}
       {sections.map(([section, acts]) => (
-        <section key={section}>
-          <h2 style={{ fontSize: 26, fontWeight: 600, color: "var(--platform-ink)", letterSpacing: "-0.015em" }}>
-            {section}
-          </h2>
-          <p className="mt-1 mb-4" style={{ fontSize: 14, color: "var(--platform-muted)", maxWidth: "70ch" }}>
-            {SECTION_SUBTITLES[section] ?? "Work through these activities together with the team."}
-          </p>
+        <section
+          key={section}
+          style={{
+            background: "var(--platform-surface)",
+            border: "1px solid var(--platform-border)",
+            borderRadius: "var(--platform-radius)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Section header — inside the container, hairline separator below */}
+          <div
+            className="px-6 py-5"
+            style={{ borderBottom: "1px solid var(--platform-border)" }}
+          >
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--platform-ink)", letterSpacing: "-0.01em" }}>
+              {section}
+            </h2>
+            <p className="mt-1" style={{ fontSize: 13, color: "var(--platform-muted)", maxWidth: "70ch", lineHeight: 1.5 }}>
+              {SECTION_SUBTITLES[section] ?? "Work through these activities together with the team."}
+            </p>
+          </div>
+
+          {/* Activity rows — hairline dividers between, no border on last row */}
           <div>
-            {acts.map((a) => {
+            {acts.map((a, idx) => {
               const d = decisions[String(a.n)] ?? defaultActivityDecision(a);
               const isWorkspace = a.kind === "workspace";
               const thumbBg = isWorkspace ? "var(--platform-blue)" : "var(--platform-aqua)";
               const Icon = isWorkspace ? SquarePen : GraduationCap;
               const dimmed = !d.include;
+              const isLast = idx === acts.length - 1;
               return (
                 <div
                   key={a.n}
-                  className="flex gap-6 py-6"
-                  style={{ borderBottom: "1px solid var(--platform-border)" }}
+                  className="flex gap-5 px-6 py-5"
+                  style={{ borderBottom: isLast ? "none" : "1px solid var(--platform-border)" }}
                 >
-                  {/* Thumbnail */}
+                  {/* Thumbnail (72px) */}
                   <div
                     className="relative shrink-0 flex items-center justify-center"
                     style={{
@@ -2170,17 +2189,17 @@ function PlaybookPlan({
                       opacity: dimmed ? 0.45 : 1,
                     }}
                   >
-                    <Icon size={46} color="#fff" strokeWidth={2.25} />
+                    <Icon size={32} color="#fff" strokeWidth={2.25} />
                     <div
                       className="absolute flex items-center justify-center"
                       style={{
-                        top: 8,
-                        left: 8,
-                        width: 24,
-                        height: 24,
+                        top: 6,
+                        left: 6,
+                        width: 20,
+                        height: 20,
                         background: "var(--platform-badge-bg)",
                         borderRadius: "999px",
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 600,
                         color: "var(--platform-ink)",
                         boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
@@ -2192,23 +2211,23 @@ function PlaybookPlan({
 
                   {/* Content */}
                   <div className="flex-1 min-w-0" style={{ opacity: dimmed ? 0.5 : 1 }}>
-                    <div style={{ fontSize: 18, fontWeight: 600, color: "var(--platform-blue)", lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--platform-blue)", lineHeight: 1.3 }}>
                       {a.label}
                     </div>
-                    <div className="mt-1" style={{ fontSize: 14, color: "var(--platform-muted)", lineHeight: 1.5 }}>
+                    <div className="mt-1" style={{ fontSize: 13, color: "var(--platform-muted)", lineHeight: 1.5 }}>
                       {ACTIVITY_DESCRIPTION_FALLBACK}
                     </div>
                     <div className="mt-2 flex items-center gap-2" style={{ color: "var(--platform-muted)" }}>
-                      <Clock size={14} strokeWidth={2} />
-                      <span style={{ fontSize: 13 }}>{a.minutes} min</span>
-                      <span style={{ fontSize: 13 }}>·</span>
-                      <span style={{ fontSize: 13, textTransform: "capitalize" }}>
+                      <Clock size={13} strokeWidth={2} />
+                      <span style={{ fontSize: 12 }}>{a.minutes} min</span>
+                      <span style={{ fontSize: 12 }}>·</span>
+                      <span style={{ fontSize: 12, textTransform: "capitalize" }}>
                         {isWorkspace ? "Workspace" : "E-learning"}
                       </span>
                     </div>
 
                     {/* Coach decisions */}
-                    <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <div className="mt-3 flex flex-wrap items-center gap-4">
                       <label className="flex items-center gap-2" style={{ fontSize: 13, color: "var(--platform-ink)" }}>
                         <input
                           type="checkbox"
