@@ -14,7 +14,26 @@ export type SessionForEval = {
   decision: string | null;
   playbook_suggestions: any[] | null;
   scenarios: { title: string; summary: string; context?: string; ambiguity_factors?: string[] };
+  // Post-Patch-1 intervention model. The evaluator MUST rely on these
+  // fields (and the resolved intervention row) rather than the legacy
+  // `methodology_choice` string when judging pathway-fit and execution.
+  chosen_intervention_slug: string | null;
+  intervention_rationale: string | null;
+  intervention_committed_at: string | null;
+  alignment_workspace: Record<string, any> | null;
+  evidence_gathering_plan: Record<string, any> | null;
+  pause_justification: Record<string, any> | null;
+  playbook_facilitation_plan: Record<string, any> | null;
+  playbook_activity_run: Record<string, any> | null;
+  playbook_interpretation: Record<string, any> | null;
+  resolved_intervention: {
+    slug: string;
+    label: string;
+    pathway_type: string;   // pre_playbook | playbook | evidence_gathering | deliberate_pause
+    is_deep_vertical: boolean;
+  } | null;
 };
+
 
 export type TranscriptTurn = {
   role: string;
