@@ -30,7 +30,7 @@
   /* Sizing */
   --platform-radius: 8px;           /* card corners */
   --platform-radius-pill: 999px;    /* buttons, pills */
-  --platform-thumb-size: 96px;      /* activity thumbnail size */
+  --platform-thumb-size: 72px;      /* activity thumbnail size */
 }
 
 /* Apply the design tokens to elements inside .platform-scope */
