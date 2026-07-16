@@ -359,8 +359,15 @@ export const getSessionForReviewer = createServerFn({ method: "POST" })
       .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
     const { data: evaluation } = await supabaseAdmin
       .from("evaluations").select("*").eq("session_id", data.sessionId).maybeSingle();
-    return { session, messages: messages ?? [], evaluation };
+    const { data: stakeholderStates } = await supabaseAdmin
+      .from("stakeholder_states" as any)
+      .select("*")
+      .eq("session_id", data.sessionId)
+      .order("stakeholder_id", { ascending: true })
+      .order("turn_index", { ascending: true });
+    return { session, messages: messages ?? [], evaluation, stakeholderStates: stakeholderStates ?? [] };
   });
+
 
 export const getSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
