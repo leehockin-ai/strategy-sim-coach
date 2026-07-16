@@ -32,7 +32,18 @@ export type SessionForEval = {
     pathway_type: string;   // pre_playbook | playbook | evidence_gathering | deliberate_pause
     is_deep_vertical: boolean;
   } | null;
+  // Patch 3: hidden per-stakeholder state trajectory. Fed as CONTEXT to the
+  // Stakeholder Navigation section prompt. Reviewer's judgment, not a formula.
+  stakeholder_state_trajectory?: Array<{
+    stakeholder_id: string;
+    engagement: string;
+    trust: string;
+    guardedness: string;
+    turn_index: number;
+    reasoning: string;
+  }>;
 };
+
 
 
 export type TranscriptTurn = {
