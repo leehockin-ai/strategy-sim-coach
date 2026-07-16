@@ -356,7 +356,7 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
 
 // ────────────────────────────── tabs ─────────────────────────────────
 
-function ContextTab({ scenario, session, evaluation }: any) {
+function ContextTab({ scenario, session, evaluation, stakeholderStates }: any) {
   const stakeholders = (scenario?.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
   return (
     <div className="space-y-6">
@@ -376,6 +376,7 @@ function ContextTab({ scenario, session, evaluation }: any) {
           ))}
         </div>
       </div>
+      <StakeholderTrajectory states={stakeholderStates ?? []} />
       {evaluation?.overall_summary && (
         <div className="border border-ink p-5" style={{ backgroundColor: "var(--secondary)" }}>
           <SectionLabel>AI overall summary</SectionLabel>
@@ -385,6 +386,91 @@ function ContextTab({ scenario, session, evaluation }: any) {
     </div>
   );
 }
+
+const STATE_COLOR: Record<string, string> = {
+  low: "var(--brand-red)",
+  medium: "var(--brand-yellow, #f5d547)",
+  high: "var(--brand-lime)",
+  open: "var(--brand-lime)",
+  measured: "var(--brand-yellow, #f5d547)",
+  guarded: "var(--brand-red)",
+};
+
+function StatePill({ value }: { value: string }) {
+  return (
+    <span
+      className="text-[10px] uppercase tracking-[0.12em] px-1.5 py-0.5 border border-ink whitespace-nowrap"
+      style={{ backgroundColor: STATE_COLOR[value] ?? "transparent" }}
+    >
+      {value}
+    </span>
+  );
+}
+
+function StakeholderTrajectory({ states }: { states: any[] }) {
+  const byStakeholder = new Map<string, any[]>();
+  for (const s of states) {
+    if (!byStakeholder.has(s.stakeholder_id)) byStakeholder.set(s.stakeholder_id, []);
+    byStakeholder.get(s.stakeholder_id)!.push(s);
+  }
+  const stakeholderIds = Array.from(byStakeholder.keys());
+
+  return (
+    <details className="border border-ink p-0">
+      <summary className="cursor-pointer px-4 py-3 hairline-b flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-[0.12em]">Stakeholder state trajectory (reviewer only)</span>
+        <span className="text-xs text-muted-foreground">
+          {stakeholderIds.length > 0
+            ? `${stakeholderIds.length} stakeholder${stakeholderIds.length === 1 ? "" : "s"} · ${states.length} state row${states.length === 1 ? "" : "s"}`
+            : "no state recorded"}
+        </span>
+      </summary>
+      <div className="p-4 space-y-5">
+        <p className="text-xs text-muted-foreground max-w-2xl">
+          Hidden engagement / trust / guardedness state after each coach turn. Not a scoring formula — use as
+          calibration context for the Stakeholder Navigation rubric section. A cold end-state may still be the
+          right coaching outcome depending on what the coach was navigating.
+        </p>
+        {stakeholderIds.length === 0 && (
+          <p className="text-sm text-muted-foreground">No trajectory rows recorded for this session.</p>
+        )}
+        {stakeholderIds.map((sid) => {
+          const rows = byStakeholder.get(sid)!;
+          return (
+            <div key={sid}>
+              <div className="text-sm font-medium mb-1">{sid}</div>
+              <div className="overflow-x-auto">
+                <table className="text-xs border-collapse w-full">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="border border-ink px-2 py-1 w-14">Turn</th>
+                      <th className="border border-ink px-2 py-1">Engagement</th>
+                      <th className="border border-ink px-2 py-1">Trust</th>
+                      <th className="border border-ink px-2 py-1">Guardedness</th>
+                      <th className="border border-ink px-2 py-1">Reasoning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.turn_index}>
+                        <td className="border border-ink px-2 py-1 tabular-nums">{r.turn_index}</td>
+                        <td className="border border-ink px-2 py-1"><StatePill value={r.engagement} /></td>
+                        <td className="border border-ink px-2 py-1"><StatePill value={r.trust} /></td>
+                        <td className="border border-ink px-2 py-1"><StatePill value={r.guardedness} /></td>
+                        <td className="border border-ink px-2 py-1">{r.reasoning || <span className="text-muted-foreground">—</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 
 function InputsTab({ session, messages }: { session: any; messages: any[] }) {
   const transcript = messages.filter((m) => m.role !== "system");
