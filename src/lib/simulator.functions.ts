@@ -676,8 +676,11 @@ Hard rules:
       .single();
 
 
-    return { message: saved };
+    const totalMs = Date.now() - stateAssessmentStart;
+    console.log(`[sendStakeholderMessage] stakeholder=${persona.name} stateAssessmentMs=${stateAssessmentMs} totalMs=${totalMs}`);
+    return { message: saved, _timing: { stateAssessmentMs, totalMs } };
   });
+
 
 // ---------- Scoping call (group video-call simulation) ----------
 
