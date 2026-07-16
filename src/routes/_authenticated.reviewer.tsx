@@ -327,7 +327,7 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
             </p>
           )}
 
-          {tab === "context" && <ContextTab scenario={scenario} session={session} evaluation={evaluation} />}
+          {tab === "context" && <ContextTab scenario={scenario} session={session} evaluation={evaluation} stakeholderStates={stakeholderStates} />}
           {tab === "inputs" && <InputsTab session={session} messages={messages} />}
           {tab === "rubric" && <RubricTab sections={sections} raw={raw} />}
           {tab === "soft" && <SkillsList items={evaluation?.soft_skills ?? raw.soft_skills ?? []} emptyHint="Soft-skill assessment not generated." />}
