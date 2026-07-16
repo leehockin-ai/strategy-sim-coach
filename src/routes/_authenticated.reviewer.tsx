@@ -275,8 +275,10 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
   const scenario: any = session.scenarios;
   const evaluation: any = data.evaluation;
   const messages: any[] = data.messages ?? [];
+  const stakeholderStates: any[] = (data as any).stakeholderStates ?? [];
   const raw: any = evaluation?.raw_response ?? {};
   const sections: Record<string, any> = raw.sections ?? evaluation?.scores?.sections ?? {};
+
 
   const TABS: Array<[typeof tab, string]> = [
     ["context", "Scenario context"],
