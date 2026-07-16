@@ -135,5 +135,12 @@ export const startSessionFromAssignment = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
+    try {
+      await seedInitialStakeholderStates((session as any).id, ax.scenario_id);
+    } catch (err) {
+      console.error("[beginAssignmentAttempt] seedInitialStakeholderStates failed", err);
+    }
+
     return { sessionId: (session as any).id, resumed: false };
   });
+
