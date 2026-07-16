@@ -508,6 +508,7 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const stateAssessmentStart = Date.now();
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -538,6 +539,56 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
     const persona = stakeholders.find((s) => s.name === data.stakeholderName) ?? stakeholders[0];
 
+    // ── Patch 3: fetch prior hidden state for THIS stakeholder, then run
+    // a state-assessment call before we generate the reply. Serial pipeline;
+    // the reply prompt depends on the assessed state.
+    const { data: priorRows } = await supabaseAdmin
+      .from("stakeholder_states" as any)
+      .select("engagement, trust, guardedness, reasoning, turn_index")
+      .eq("session_id", data.sessionId)
+      .eq("stakeholder_id", persona.name)
+      .order("turn_index", { ascending: false })
+      .limit(1);
+    const priorRow = (priorRows ?? [])[0] as any;
+    const priorState: StakeholderState = priorRow
+      ? {
+          engagement: priorRow.engagement,
+          trust: priorRow.trust,
+          guardedness: priorRow.guardedness,
+          reasoning: priorRow.reasoning ?? "",
+        }
+      : { engagement: "medium", trust: "medium", guardedness: "measured", reasoning: "initial state (no prior row)" };
+    const nextTurnIndex = ((priorRow?.turn_index as number | undefined) ?? 0) + 1;
+
+    const stateAssessmentT0 = Date.now();
+    const assessed = await assessStakeholderStateUpdate({
+      apiKey,
+      priorState,
+      coachTurn: data.candidateMessage,
+      stakeholderPersona: persona,
+    });
+    const stateAssessmentMs = Date.now() - stateAssessmentT0;
+
+    let currentState: StakeholderState;
+    if (assessed) {
+      currentState = assessed;
+      const { error: insErr } = await supabaseAdmin.from("stakeholder_states" as any).insert({
+        session_id: data.sessionId,
+        stakeholder_id: persona.name,
+        engagement: assessed.engagement,
+        trust: assessed.trust,
+        guardedness: assessed.guardedness,
+        turn_index: nextTurnIndex,
+        reasoning: assessed.reasoning,
+      });
+      if (insErr) console.error("[sendStakeholderMessage] state insert failed", insErr);
+    } else {
+      currentState = priorState;
+      console.warn(`[sendStakeholderMessage] state assessment failed for ${persona.name}; carrying prior state forward`);
+    }
+
+    const toneModulator = toneModulatorForState(currentState);
+
     const systemPrompt = `${scenario.system_prompt}
 
 SCENARIO CONTEXT:
@@ -554,11 +605,15 @@ CHARACTER POSTURE: ${persona.posture}
 
 This is a one-on-one between you and the coach, and the coach may return to you multiple times across the engagement. Speak in first person as ${persona.name}.
 
+CURRENT STATE — how you feel about this coach right now (HIDDEN from the coach; let it shape TONE, not content you announce):
+${toneModulator}
+
 Tone and rhythm:
 - Keep replies SHORT (1-3 sentences, ~40 words). Real execs are concise.
 - Do NOT drive the conversation. Answer what was asked, then stop.
 - Do NOT monologue about politics, history, or other stakeholders unless directly asked. Hint, don't dump.
 - It's fine to be uncertain ("I haven't thought about that") or redirect ("ask [other stakeholder]").
+- NEVER explicitly name your engagement, trust, or guardedness level. NEVER say "I trust you less now." Let the coach FEEL it through tone.
 
 Political realism (important):
 - You remember the full prior transcript with the coach. Reference past commitments or things you said before when it's natural.
@@ -573,6 +628,8 @@ What you CAN do:
 
 Hard rules:
 - Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.`;
+
+
 
 
     const chatMessages = [
