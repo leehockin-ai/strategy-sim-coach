@@ -32,7 +32,18 @@ export type SessionForEval = {
     pathway_type: string;   // pre_playbook | playbook | evidence_gathering | deliberate_pause
     is_deep_vertical: boolean;
   } | null;
+  // Patch 3: hidden per-stakeholder state trajectory. Fed as CONTEXT to the
+  // Stakeholder Navigation section prompt. Reviewer's judgment, not a formula.
+  stakeholder_state_trajectory?: Array<{
+    stakeholder_id: string;
+    engagement: string;
+    trust: string;
+    guardedness: string;
+    turn_index: number;
+    reasoning: string;
+  }>;
 };
+
 
 
 export type TranscriptTurn = {
@@ -171,14 +182,35 @@ ${renderAssistanceLog(s.playbook_suggestions)}
 
 Score ONLY on coaching approach: methodology fit-for-purpose, restraint, sequencing logic, smallest-sufficient-intervention. Apply the AI-assistance penalty rule: a candidate who consulted AI BEFORE drafting their own rationale and then mirrored the AI's framing should NOT score above 'competent'. A candidate who drafted first and then diverged from or scoped the AI's suggestion can score 'strong' or 'exemplary'.`;
 
-    case "stakeholder_navigation":
+    case "stakeholder_navigation": {
+      const traj = s.stakeholder_state_trajectory ?? [];
+      const byStakeholder: Record<string, typeof traj> = {};
+      for (const row of traj) {
+        (byStakeholder[row.stakeholder_id] ??= []).push(row);
+      }
+      const trajectoryText = Object.keys(byStakeholder).length === 0
+        ? "(no state trajectory recorded)"
+        : Object.entries(byStakeholder).map(([id, rows]) => {
+            const line = rows
+              .map((r) => `    turn ${r.turn_index}: engagement=${r.engagement}, trust=${r.trust}, guardedness=${r.guardedness} — ${r.reasoning}`)
+              .join("\n");
+            return `  ${id}:\n${line}`;
+          }).join("\n");
+
       return `${header}── STAKEHOLDER TRANSCRIPT (Step 3) ──
 ${transcript}
 
 ── COMMITMENTS & DECISIONS CAPTURED ──
 ${s.dialogue_commitments || "(none captured)"}
 
+── HIDDEN STAKEHOLDER STATE TRAJECTORY (context, not a formula) ──
+This is the hidden per-turn state assessor's read on each stakeholder's engagement / trust / guardedness after each coach turn. The trajectory below is CONTEXT for your reasoning about how the coach navigated stakeholders. Do NOT compute the score directly from the state values — a coach who ended with a cold Marcus might have made the right calls if Marcus was resistant for good reasons. Judge the coach's behavior in relation to the trajectory, not the trajectory alone.
+
+${trajectoryText}
+
 Score ONLY on stakeholder navigation: surfacing resistance, negotiating scope, challenging success expectations, capturing concrete commitments, managing politics without over-pleasing or solution-jumping. Watch specifically for: shuttle diplomacy (relaying messages instead of facilitating joint conversation), missing emotional beats, confrontational language ("cut through the bullshit"-style), failure to capture commitments. Do not score canvas work or pathway artifact here — those are separate sections.`;
+    }
+
 
     case "working_session_facilitation":
       return `${header}── CANDIDATE'S COACHING APPROACH (for context only) ──

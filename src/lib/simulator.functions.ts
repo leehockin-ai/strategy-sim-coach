@@ -117,6 +117,128 @@ async function assertSessionOwner(sessionId: string, userId: string) {
   if (data.owner_id !== userId) throw new Error("Forbidden");
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Stakeholder state (Patch 3): hidden per-stakeholder trust/engagement/
+// guardedness state that accumulates across dialogue turns. Seeded at
+// session creation, updated on every coach turn to a stakeholder.
+// ────────────────────────────────────────────────────────────────────
+export async function seedInitialStakeholderStates(sessionId: string, scenarioId: string) {
+  const { data: scen } = await supabaseAdmin
+    .from("scenarios")
+    .select("stakeholders")
+    .eq("id", scenarioId)
+    .maybeSingle();
+  const stakeholders = ((scen as any)?.stakeholders ?? []) as Array<{ name: string }>;
+  if (stakeholders.length === 0) return;
+  const rows = stakeholders.map((s) => ({
+    session_id: sessionId,
+    stakeholder_id: s.name,
+    engagement: "medium" as const,
+    trust: "medium" as const,
+    guardedness: "measured" as const,
+    turn_index: 0,
+    reasoning: "initial state",
+  }));
+  await supabaseAdmin.from("stakeholder_states" as any).insert(rows as any);
+}
+
+type StakeholderState = {
+  engagement: "low" | "medium" | "high";
+  trust: "low" | "medium" | "high";
+  guardedness: "open" | "measured" | "guarded";
+  reasoning: string;
+};
+
+async function assessStakeholderStateUpdate(input: {
+  apiKey: string;
+  priorState: StakeholderState;
+  coachTurn: string;
+  stakeholderPersona: { name: string; role: string; posture: string };
+}): Promise<StakeholderState | null> {
+  const system = `You track hidden state for a single stakeholder in a coaching simulation.
+
+Given the stakeholder's persona, their PRIOR state (engagement/trust/guardedness), and the coach's most recent single message to them, return the UPDATED state after this one exchange.
+
+State moves gradually — one turn rarely swings state by more than one step. Persona posture matters: a naturally guarded exec doesn't become "open" from one warm question. But a genuinely extractive, dismissive, or manipulative move CAN drop trust or push guardedness up quickly.
+
+Return strict JSON:
+{
+  "engagement": "low" | "medium" | "high",
+  "trust": "low" | "medium" | "high",
+  "guardedness": "open" | "measured" | "guarded",
+  "reasoning": "<one sentence explaining what in the coach's message moved (or held) state>"
+}`;
+  const user = `STAKEHOLDER: ${input.stakeholderPersona.name} — ${input.stakeholderPersona.role}
+POSTURE: ${input.stakeholderPersona.posture}
+
+PRIOR STATE:
+engagement=${input.priorState.engagement}, trust=${input.priorState.trust}, guardedness=${input.priorState.guardedness}
+
+COACH'S MOST RECENT MESSAGE TO ${input.stakeholderPersona.name}:
+${input.coachTurn}`;
+
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${input.apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const raw = json.choices?.[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw);
+    const eng = ["low", "medium", "high"].includes(parsed.engagement) ? parsed.engagement : null;
+    const tr = ["low", "medium", "high"].includes(parsed.trust) ? parsed.trust : null;
+    const gd = ["open", "measured", "guarded"].includes(parsed.guardedness) ? parsed.guardedness : null;
+    if (!eng || !tr || !gd) return null;
+    return {
+      engagement: eng,
+      trust: tr,
+      guardedness: gd,
+      reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning.slice(0, 500) : "",
+    };
+  } catch (err) {
+    console.error("[assessStakeholderStateUpdate] failed", err);
+    return null;
+  }
+}
+
+function toneModulatorForState(state: StakeholderState): string {
+  const parts: string[] = [];
+  // engagement
+  if (state.engagement === "high") {
+    parts.push("You are ENGAGED: you ask clarifying questions of your own, and occasionally offer context the coach didn't explicitly ask for (still concise).");
+  } else if (state.engagement === "low") {
+    parts.push("You are DISENGAGED: replies are minimal. You look for reasons to end the conversation ('I have another call in 5'). You don't volunteer anything.");
+  } else {
+    parts.push("You are MODERATELY engaged: you answer what's asked, professionally, without extra energy or extra reticence.");
+  }
+  // trust
+  if (state.trust === "high") {
+    parts.push("You TRUST the coach: you're candid about doubts, internal politics, and things you're unsure of. You take their questions at face value.");
+  } else if (state.trust === "low") {
+    parts.push("You DISTRUST the coach's motives: you test them. You may deflect direct questions, reframe them back, or ask what they're really trying to get at.");
+  } else {
+    parts.push("You are NEUTRAL on trust: you engage in good faith but don't overshare, and you notice if the coach is fishing.");
+  }
+  // guardedness
+  if (state.guardedness === "open") {
+    parts.push("You are OPEN: replies can run a touch longer (still under 3 sentences). You share context and connect dots when it's genuinely useful.");
+  } else if (state.guardedness === "guarded") {
+    parts.push("You are GUARDED: replies are SHORTER (often one sentence). You don't volunteer information. You respond to what's asked but don't expand.");
+  } else {
+    parts.push("You are MEASURED: you share what's asked but pause before adding more. No monologuing.");
+  }
+  return parts.join("\n");
+}
+
 export const createSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { scenarioId: string; candidateName: string; candidateEmail: string; framingNotes?: string }) =>
@@ -141,8 +263,14 @@ export const createSession = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
+    try {
+      await seedInitialStakeholderStates((session as any).id, data.scenarioId);
+    } catch (err) {
+      console.error("[createSession] seedInitialStakeholderStates failed", err);
+    }
     return { session };
   });
+
 
 export const listMySessions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -231,8 +359,15 @@ export const getSessionForReviewer = createServerFn({ method: "POST" })
       .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
     const { data: evaluation } = await supabaseAdmin
       .from("evaluations").select("*").eq("session_id", data.sessionId).maybeSingle();
-    return { session, messages: messages ?? [], evaluation };
+    const { data: stakeholderStates } = await supabaseAdmin
+      .from("stakeholder_states" as any)
+      .select("*")
+      .eq("session_id", data.sessionId)
+      .order("stakeholder_id", { ascending: true })
+      .order("turn_index", { ascending: true });
+    return { session, messages: messages ?? [], evaluation, stakeholderStates: stakeholderStates ?? [] };
   });
+
 
 export const getSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -373,6 +508,7 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const stateAssessmentStart = Date.now();
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -403,6 +539,56 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
     const persona = stakeholders.find((s) => s.name === data.stakeholderName) ?? stakeholders[0];
 
+    // ── Patch 3: fetch prior hidden state for THIS stakeholder, then run
+    // a state-assessment call before we generate the reply. Serial pipeline;
+    // the reply prompt depends on the assessed state.
+    const { data: priorRows } = await supabaseAdmin
+      .from("stakeholder_states" as any)
+      .select("engagement, trust, guardedness, reasoning, turn_index")
+      .eq("session_id", data.sessionId)
+      .eq("stakeholder_id", persona.name)
+      .order("turn_index", { ascending: false })
+      .limit(1);
+    const priorRow = (priorRows ?? [])[0] as any;
+    const priorState: StakeholderState = priorRow
+      ? {
+          engagement: priorRow.engagement,
+          trust: priorRow.trust,
+          guardedness: priorRow.guardedness,
+          reasoning: priorRow.reasoning ?? "",
+        }
+      : { engagement: "medium", trust: "medium", guardedness: "measured", reasoning: "initial state (no prior row)" };
+    const nextTurnIndex = ((priorRow?.turn_index as number | undefined) ?? 0) + 1;
+
+    const stateAssessmentT0 = Date.now();
+    const assessed = await assessStakeholderStateUpdate({
+      apiKey,
+      priorState,
+      coachTurn: data.candidateMessage,
+      stakeholderPersona: persona,
+    });
+    const stateAssessmentMs = Date.now() - stateAssessmentT0;
+
+    let currentState: StakeholderState;
+    if (assessed) {
+      currentState = assessed;
+      const { error: insErr } = await supabaseAdmin.from("stakeholder_states" as any).insert({
+        session_id: data.sessionId,
+        stakeholder_id: persona.name,
+        engagement: assessed.engagement,
+        trust: assessed.trust,
+        guardedness: assessed.guardedness,
+        turn_index: nextTurnIndex,
+        reasoning: assessed.reasoning,
+      });
+      if (insErr) console.error("[sendStakeholderMessage] state insert failed", insErr);
+    } else {
+      currentState = priorState;
+      console.warn(`[sendStakeholderMessage] state assessment failed for ${persona.name}; carrying prior state forward`);
+    }
+
+    const toneModulator = toneModulatorForState(currentState);
+
     const systemPrompt = `${scenario.system_prompt}
 
 SCENARIO CONTEXT:
@@ -419,11 +605,15 @@ CHARACTER POSTURE: ${persona.posture}
 
 This is a one-on-one between you and the coach, and the coach may return to you multiple times across the engagement. Speak in first person as ${persona.name}.
 
+CURRENT STATE — how you feel about this coach right now (HIDDEN from the coach; let it shape TONE, not content you announce):
+${toneModulator}
+
 Tone and rhythm:
 - Keep replies SHORT (1-3 sentences, ~40 words). Real execs are concise.
 - Do NOT drive the conversation. Answer what was asked, then stop.
 - Do NOT monologue about politics, history, or other stakeholders unless directly asked. Hint, don't dump.
 - It's fine to be uncertain ("I haven't thought about that") or redirect ("ask [other stakeholder]").
+- NEVER explicitly name your engagement, trust, or guardedness level. NEVER say "I trust you less now." Let the coach FEEL it through tone.
 
 Political realism (important):
 - You remember the full prior transcript with the coach. Reference past commitments or things you said before when it's natural.
@@ -438,6 +628,8 @@ What you CAN do:
 
 Hard rules:
 - Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.`;
+
+
 
 
     const chatMessages = [
@@ -484,8 +676,11 @@ Hard rules:
       .single();
 
 
-    return { message: saved };
+    const totalMs = Date.now() - stateAssessmentStart;
+    console.log(`[sendStakeholderMessage] stakeholder=${persona.name} stateAssessmentMs=${stateAssessmentMs} totalMs=${totalMs}`);
+    return { message: saved, _timing: { stateAssessmentMs, totalMs } };
   });
+
 
 // ---------- Scoping call (group video-call simulation) ----------
 

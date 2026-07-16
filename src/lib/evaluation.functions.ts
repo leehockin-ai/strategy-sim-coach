@@ -399,8 +399,16 @@ export const generateEvaluation = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
+    const { data: stakeholderStates } = await supabaseAdmin
+      .from("stakeholder_states" as any)
+      .select("stakeholder_id, engagement, trust, guardedness, turn_index, reasoning")
+      .eq("session_id", data.sessionId)
+      .order("stakeholder_id", { ascending: true })
+      .order("turn_index", { ascending: true });
+
     const s = session as unknown as SessionForEval & { id: string };
     const turns = transcript as TranscriptTurn[] | null;
+    s.stakeholder_state_trajectory = (stakeholderStates ?? []) as any;
 
     // Resolve the committed intervention row so the intervention_fit and
     // intervention_execution dimensions can read pathway_type directly
@@ -433,24 +441,54 @@ export const generateEvaluation = createServerFn({ method: "POST" })
 
     const inputQualitySignals = extractInputQualitySignals(s, turns);
 
-    // STAGE A: per-section fan-out (parallel, blind to each other)
-    const sectionResults = await Promise.all(
+    // STAGE A: per-section fan-out (parallel, blind to each other).
+    // Patch 3: use allSettled so a single failed sub-call doesn't kill the
+    // whole evaluation — surface the failure as a placeholder verdict.
+    const sectionSettled = await Promise.allSettled(
       SECTION_RUBRIC.map(async (sec) => {
         const userPrompt = buildSectionInput(sec.key as SectionKey, s, turns);
         const verdict = await scoreSection(apiKey, sec, userPrompt);
         return [sec.key, verdict] as const;
       })
     );
-    const sections: Record<string, SectionVerdict> = Object.fromEntries(sectionResults);
+    const sections: Record<string, SectionVerdict> = {};
+    sectionSettled.forEach((r, i) => {
+      const sec = SECTION_RUBRIC[i];
+      if (r.status === "fulfilled") {
+        sections[r.value[0]] = r.value[1];
+      } else {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.error(`[generateEvaluation] section ${sec.key} failed:`, msg);
+        sections[sec.key] = {
+          score: 0,
+          verdict: "insufficient",
+          confidence: "low",
+          reviewer_flag: true,
+          evidence: `Section scoring failed — rerun manually. Error: ${msg}`,
+          strengths: [],
+          gaps: [`Automated scoring for this section did not complete.`],
+        };
+      }
+    });
 
 
-    // STAGE B: skills (parallel with each other; uses transcript + canvas)
+    // STAGE B: skills (parallel with each other; uses transcript + canvas).
+    // Same resilience treatment: don't let one skill call kill the evaluation.
     const transcriptText = renderTranscript(turns);
     const canvasText = renderCanvasForPrompt(s.application_canvas);
-    const [softSkills, methodologySkills] = await Promise.all([
+    const skillsSettled = await Promise.allSettled([
       scoreSkills(apiKey, "soft", s, transcriptText, canvasText),
       scoreSkills(apiKey, "methodology", s, transcriptText, canvasText),
     ]);
+    const softSkills: SkillItem[] =
+      skillsSettled[0].status === "fulfilled"
+        ? skillsSettled[0].value
+        : (console.error("[generateEvaluation] soft skills failed:", skillsSettled[0].reason), []);
+    const methodologySkills: SkillItem[] =
+      skillsSettled[1].status === "fulfilled"
+        ? skillsSettled[1].value
+        : (console.error("[generateEvaluation] methodology skills failed:", skillsSettled[1].reason), []);
+
 
     // STAGE C: synthesis from verdicts only (no raw transcript/artifacts)
     const synthesis = await synthesizeFinal(apiKey, {

@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { seedInitialStakeholderStates } from "@/lib/simulator.functions";
+
 
 // ──────────────────────────────────────────────────────────────────
 // Coach: list my assignments across all programs I'm a member of
@@ -133,5 +135,12 @@ export const startSessionFromAssignment = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
+    try {
+      await seedInitialStakeholderStates((session as any).id, ax.scenario_id);
+    } catch (err) {
+      console.error("[beginAssignmentAttempt] seedInitialStakeholderStates failed", err);
+    }
+
     return { sessionId: (session as any).id, resumed: false };
   });
+
