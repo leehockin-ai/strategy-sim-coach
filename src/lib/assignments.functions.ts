@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { seedInitialStakeholderStates } from "@/lib/simulator.functions";
+
 
 // ──────────────────────────────────────────────────────────────────
 // Coach: list my assignments across all programs I'm a member of
