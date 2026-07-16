@@ -496,6 +496,50 @@ export type Database = {
           },
         ]
       }
+      stakeholder_states: {
+        Row: {
+          created_at: string
+          engagement: Database["public"]["Enums"]["stakeholder_engagement"]
+          guardedness: Database["public"]["Enums"]["stakeholder_guardedness"]
+          id: string
+          reasoning: string
+          session_id: string
+          stakeholder_id: string
+          trust: Database["public"]["Enums"]["stakeholder_trust"]
+          turn_index: number
+        }
+        Insert: {
+          created_at?: string
+          engagement: Database["public"]["Enums"]["stakeholder_engagement"]
+          guardedness: Database["public"]["Enums"]["stakeholder_guardedness"]
+          id?: string
+          reasoning?: string
+          session_id: string
+          stakeholder_id: string
+          trust: Database["public"]["Enums"]["stakeholder_trust"]
+          turn_index: number
+        }
+        Update: {
+          created_at?: string
+          engagement?: Database["public"]["Enums"]["stakeholder_engagement"]
+          guardedness?: Database["public"]["Enums"]["stakeholder_guardedness"]
+          id?: string
+          reasoning?: string
+          session_id?: string
+          stakeholder_id?: string
+          trust?: Database["public"]["Enums"]["stakeholder_trust"]
+          turn_index?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stakeholder_states_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -544,6 +588,9 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "reviewer" | "user"
+      stakeholder_engagement: "low" | "medium" | "high"
+      stakeholder_guardedness: "open" | "measured" | "guarded"
+      stakeholder_trust: "low" | "medium" | "high"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -672,6 +719,9 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "reviewer", "user"],
+      stakeholder_engagement: ["low", "medium", "high"],
+      stakeholder_guardedness: ["open", "measured", "guarded"],
+      stakeholder_trust: ["low", "medium", "high"],
     },
   },
 } as const
