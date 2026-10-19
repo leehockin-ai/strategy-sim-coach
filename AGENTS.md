@@ -10,3 +10,4 @@
 - Scope uses existing conversation/intervention engines alongside a candidate-authored brief; an append-only database trigger captures each changed Scope snapshot atomically without historical backfills, allowing a later submitted chapter to reference a frozen revision.
 - An optional Scope sequence records proposed later moves; the existing primary intervention remains Apply's execution contract so Scope changes do not redesign Apply.
 - Scope competencies map into existing isolated evaluator sections using brief, transcripts and revision evidence; no new scoring calls or automatic candidate conclusions.
+- Scope blocks chapter/link exits while brief changes are unsaved; assessment context samples the original and recent revisions without deleting durable evidence to bound model input.

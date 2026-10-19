@@ -64,6 +64,7 @@ function SessionPage() {
   const initialStep: StepKey = data ? stepFromStatus((data.session as any).status) : "framing";
   const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
   const [initialized, setInitialized] = useState(false);
+  const [scopeDirty, setScopeDirty] = useState(false);
   useEffect(() => {
     if (data && !initialized) {
       setActiveStep(stepFromStatus((data.session as any).status));
@@ -96,6 +97,7 @@ function SessionPage() {
   }
 
   async function goToChapter(targetKey: ChapterKey) {
+    if (scopeDirty) { toast.error("Save your engagement brief before leaving Scope."); return; }
     const target = chapterMeta(targetKey);
     const nextStep = target.steps[0];
     setActiveStep(nextStep);
@@ -126,7 +128,7 @@ function SessionPage() {
       <ChapterNav
         activeChapter={activeChapter}
         furthestChapterIndex={furthestChapter.index}
-        onChange={(k) => setActiveStep(chapterMeta(k).steps[0])}
+        onChange={(k) => { if (scopeDirty && k !== "scope") { toast.error("Save your engagement brief before leaving Scope."); return; } setActiveStep(chapterMeta(k).steps[0]); }}
       />
       {activeChapter !== "scope" && chapter.steps.length > 1 && (
         <SubTabNav
@@ -154,7 +156,7 @@ function SessionPage() {
         )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
             </div>
-            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} />
+            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} />
           </div>
         </div>}
         {renderKey === "application" && (

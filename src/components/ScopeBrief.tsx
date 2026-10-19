@@ -9,9 +9,9 @@ import { BRIEF_FIELDS, readEngagementBrief, legacyFraming, type EngagementBrief 
 
 type Message = { id: string; phase: string; role: string; stakeholder_name: string | null; content: string };
 type Revision = { id: string; revision: number; snapshot: unknown; evidence_message_ids: string[]; created_at: string };
-export function ScopeBrief({ session, messages, revisions, onRefresh }: {
+export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyChange }: {
   session: { id: string; engagement_brief?: unknown; framing_notes?: string | null; chosen_intervention_slug?: string | null; intervention_rationale?: string | null; scope_revision?: number };
-  messages: Message[]; revisions: Revision[]; onRefresh: () => void;
+  messages: Message[]; revisions: Revision[]; onRefresh: () => void; onDirtyChange: (dirty: boolean) => void;
 }) {
   const [brief, setBrief] = useState(() => readEngagementBrief(session.engagement_brief));
   const [dirty, setDirty] = useState(false);
@@ -41,9 +41,18 @@ export function ScopeBrief({ session, messages, revisions, onRefresh }: {
     return () => clearTimeout(timer);
   }, [brief, dirty, saving.isPending, saving.isError]);
   useEffect(() => {
+    onDirtyChange(dirty || saving.isPending);
+  }, [dirty, saving.isPending, onDirtyChange]);
+  useEffect(() => {
     const preventLoss = (e: BeforeUnloadEvent) => { if (dirtyRef.current) { e.preventDefault(); e.returnValue = ""; } };
+    const preventLinkLoss = (e: MouseEvent) => {
+      if (dirtyRef.current && e.target instanceof Element && e.target.closest('a[href]')) {
+        e.preventDefault(); e.stopPropagation(); toast.error("Save your engagement brief before leaving Scope.");
+      }
+    };
     window.addEventListener("beforeunload", preventLoss);
-    return () => window.removeEventListener("beforeunload", preventLoss);
+    document.addEventListener("click", preventLinkLoss, true);
+    return () => { window.removeEventListener("beforeunload", preventLoss); document.removeEventListener("click", preventLinkLoss, true); };
   }, []);
   const framing = legacyFraming(session.framing_notes);
   const evidence = messages.filter(m => m.phase === "scoping" || m.phase === "intervention");

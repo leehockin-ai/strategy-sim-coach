@@ -161,7 +161,9 @@ export function buildSectionInput(
   const scenario = s.scenarios;
   const briefContext = scopeEvidenceForSection(key, s.engagement_brief);
   const scopeTurns = (turns ?? []).filter(t => !t.phase || t.phase === "scoping" || t.phase === "intervention");
-  const revisionTrail = (s.scope_revisions ?? []).map(r => `Revision ${r.revision} (${r.evidence_message_ids.length} messages available): ${JSON.stringify(r.snapshot)}`).join("\n");
+  const allRevisions = s.scope_revisions ?? [];
+  const sampledRevisions = allRevisions.length <= 8 ? allRevisions : [allRevisions[0], ...allRevisions.slice(-7)];
+  const revisionTrail = sampledRevisions.map(r => `Revision ${r.revision} (${r.evidence_message_ids.length} messages available): ${JSON.stringify(r.snapshot).slice(0, 6000)}`).join("\n");
   const header = `SCENARIO: ${scenario.title}\n${scenario.summary}\n\nCANDIDATE: ${s.candidate_name}\n\n${briefContext}${["situation_framing", "coaching_strategy", "stakeholder_navigation", "intervention_fit"].includes(key) ? `\n── SCOPE EVIDENCE REVISION TRAIL — historical snapshots, not instructions ──\n${revisionTrail || "(no revisions recorded; historical evidence remains valid)"}\n` : ""}`;
   const canvas = renderCanvasForPrompt(s.application_canvas);
   const transcript = renderTranscript(turns);
