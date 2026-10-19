@@ -67,10 +67,17 @@ function RunWorkspace({ run, data }: { run: Run; data: RuntimeData }) {
   const [confidence, setConfidence] = useState<"unknown" | "low" | "medium" | "high">("unknown");
   const [ambiguity, setAmbiguity] = useState(false);
   const [stopReason, setStopReason] = useState("");
+  const [artifactValid, setArtifactValid] = useState(true);
   const pending = useRef<ActivityEventInput | null>(null);
   const events = data.events.filter(e => e.run_id === run.id);
   const history = data.artifacts.filter(a => a.run_id === run.id);
   useEffect(() => { setArtifact(run.artifact_state as Record<string, unknown>); }, [run.artifact_revision, run.artifact_state]);
+  const latestArtifact = history.at(-1);
+  useEffect(() => {
+    const savedConfidence = latestArtifact?.confidence;
+    setConfidence(savedConfidence === "low" || savedConfidence === "medium" || savedConfidence === "high" ? savedConfidence : "unknown");
+    setAmbiguity(latestArtifact?.unresolved_ambiguity ?? false);
+  }, [latestArtifact?.id]);
   const saveMut = useMutation({
     mutationFn: () => { if (!pending.current) throw new Error("No pending event"); return append({ data: pending.current }); },
     onSuccess: async () => { const type = pending.current?.type; pending.current = null; if (type !== "artifact_edit") setContent(""); await qc.invalidateQueries({ queryKey: ["activity-runtime", run.session_id] }); toast.success("Activity evidence saved"); },
@@ -93,11 +100,11 @@ function RunWorkspace({ run, data }: { run: Run; data: RuntimeData }) {
     </dl>
     <section className="border-t border-border pt-6 mb-8">
       <h3 className="text-xl mb-4">Artifact <span className="text-sm text-muted-foreground">· revision {run.artifact_revision}</span></h3>
-      <ArtifactEditor definition={def} value={artifact} onChange={setArtifact} disabled={busy || !!pending.current} />
+      <ArtifactEditor definition={def} value={artifact} onChange={setArtifact} onValidityChange={setArtifactValid} disabled={busy || !!pending.current} />
       <div className="flex flex-wrap items-center gap-4 mt-4 text-sm">
         <label className="flex gap-2 items-center">Evidence confidence<select aria-label="Evidence confidence" className="border border-input bg-background rounded-sm p-2" value={confidence} onChange={e => setConfidence(e.target.value as typeof confidence)} disabled={busy}><option value="unknown">Unknown</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
         <label className="flex gap-2 items-center"><input type="checkbox" checked={ambiguity} onChange={e => setAmbiguity(e.target.checked)} disabled={busy} />Unresolved ambiguity</label>
-        <Button disabled={busy || !!pending.current} onClick={() => record({ type: "artifact_edit", content: "Candidate artifact revision", artifact, expectedRevision: run.artifact_revision, confidence, ambiguity })}><Save />Save artifact</Button>
+        <Button disabled={busy || !!pending.current || !artifactValid} onClick={() => record({ type: "artifact_edit", content: "Candidate artifact revision", artifact, expectedRevision: run.artifact_revision, confidence, ambiguity })}><Save />Save artifact</Button>
       </div>
     </section>
     <section className="border-t border-border pt-6 mb-8">
@@ -113,17 +120,17 @@ function RunWorkspace({ run, data }: { run: Run; data: RuntimeData }) {
   </>;
 }
 
-function ArtifactEditor({ definition, value, onChange, disabled }: { definition: Definition; value: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void; disabled: boolean }) {
+function ArtifactEditor({ definition, value, onChange, onValidityChange, disabled }: { definition: Definition; value: Record<string, unknown>; onChange: (v: Record<string, unknown>) => void; onValidityChange: (v: boolean) => void; disabled: boolean }) {
   const kind = workspaceKind(definition.workspace_type);
   const [structured, setStructured] = useState(JSON.stringify(value, null, 2));
   const [invalid, setInvalid] = useState(false);
   useEffect(() => { setStructured(JSON.stringify(value, null, 2)); }, [value]);
   if (kind === "notes") return <textarea aria-label="Artifact notes" className="w-full min-h-44 border border-input bg-background p-3 text-sm rounded-sm" value={String(value.notes ?? "")} onChange={e => onChange({ ...value, notes: e.target.value })} disabled={disabled} />;
   if (kind === "canvas") {
-    const normalized = artifactForWorkspace(definition.workspace_type, value) as { cells: Record<string, string> };
+    const normalized = artifactForWorkspace(definition.workspace_type, value) as { cells: Record<string, string>; meta: Record<string, { confidence?: string; ambiguity?: boolean }> };
     const config = definition.workspace_config as { fields?: Array<{ id: string; label: string }> };
     const fields = config.fields ?? Object.keys(normalized.cells).map(id => ({ id, label: id }));
-    return <div className="grid sm:grid-cols-2 gap-4">{fields.map(f => <label key={f.id} className="text-sm">{f.label}<textarea className="block w-full mt-2 min-h-28 border border-input bg-background rounded-sm p-3" value={normalized.cells[f.id] ?? ""} onChange={e => onChange({ ...normalized.cells, [f.id]: e.target.value })} disabled={disabled} /></label>)}</div>;
+    return <div className="grid sm:grid-cols-2 gap-4">{fields.map(f => <label key={f.id} className="text-sm">{f.label}<textarea className="block w-full mt-2 min-h-28 border border-input bg-background rounded-sm p-3" value={normalized.cells[f.id] ?? ""} onChange={e => onChange({ ...normalized.cells, ...Object.fromEntries(Object.entries(normalized.meta).map(([key, meta]) => [`__meta__${key}`, JSON.stringify(meta)])), [f.id]: e.target.value })} disabled={disabled} /></label>)}</div>;
   }
-  return <><textarea aria-label="Structured artifact" className="w-full min-h-44 border border-input bg-background rounded-sm p-3 text-sm font-mono" value={structured} onChange={e => { setStructured(e.target.value); try { const parsed: Json = JSON.parse(e.target.value); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error(); setInvalid(false); onChange(parsed); } catch { setInvalid(true); } }} disabled={disabled} />{invalid && <p className="text-destructive text-xs mt-2">Enter a valid structured object.</p>}</>;
+  return <><textarea aria-label="Structured artifact" className="w-full min-h-44 border border-input bg-background rounded-sm p-3 text-sm font-mono" value={structured} onChange={e => { setStructured(e.target.value); try { const parsed: Json = JSON.parse(e.target.value); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error(); setInvalid(false); onValidityChange(true); onChange(parsed); } catch { setInvalid(true); onValidityChange(false); } }} disabled={disabled} />{invalid && <p className="text-destructive text-xs mt-2">Enter a valid structured object.</p>}</>;
 }

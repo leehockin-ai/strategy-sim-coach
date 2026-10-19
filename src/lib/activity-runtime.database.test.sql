@@ -1,0 +1,43 @@
+-- Privileged runner; disposable fixture and claims are rolled back.
+BEGIN;
+DO $$
+DECLARE owner uuid; scenario uuid; intervention uuid; sid uuid:=gen_random_uuid(); ordinary uuid:=gen_random_uuid(); def uuid:=gen_random_uuid(); rid uuid; eid uuid; key uuid:=gen_random_uuid(); denied boolean; scope_id uuid;
+BEGIN
+ SELECT owner_id,scenario_id INTO owner,scenario FROM public.sessions WHERE owner_id IS NOT NULL LIMIT 1;
+ SELECT id INTO intervention FROM public.interventions WHERE slug='customer_profile_interviews';
+ INSERT INTO public.activity_definitions(id,activity_key,version,intervention_id,title,objective,instructions,workspace_type,intended_output,status,test_only) VALUES(def,'test_rollback_runtime',1,intervention,'TEST / NON-PRODUCTION','Technical test only','Not approved methodology','notes','Technical record','active',true);
+ INSERT INTO public.sessions(id,scenario_id,owner_id,candidate_name,candidate_email,status,chosen_intervention_slug) VALUES(sid,scenario,owner,'TEST/NON-PRODUCTION rolled-back activity','test@example.invalid','working_session','customer_profile_interviews');
+ INSERT INTO public.sessions(id,scenario_id,owner_id,candidate_name,candidate_email,status,chosen_intervention_slug) VALUES(ordinary,scenario,owner,'Ordinary certification session','test@example.invalid','working_session','customer_profile_interviews');
+ UPDATE public.sessions SET engagement_brief='{"decision_to_enable":"TEST specific decision"}' WHERE id=sid;
+ SELECT id INTO scope_id FROM public.scope_revisions WHERE session_id=sid AND revision=1;
+ INSERT INTO public.activity_runtime_test_access VALUES(sid,owner,now());
+ PERFORM set_config('request.jwt.claim.sub',owner::text,true);
+ PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',owner,'role','authenticated')::text,true);
+ rid:=public.start_activity_run(sid,def,key);
+ IF rid<>public.start_activity_run(sid,def,key) THEN RAISE EXCEPTION 'Start retries duplicated run'; END IF;
+ IF (SELECT scope_revision_id FROM public.activity_runs WHERE id=rid) IS DISTINCT FROM scope_id THEN RAISE EXCEPTION 'Wrong Scope reference'; END IF;
+ denied:=false; BEGIN PERFORM public.start_activity_run(ordinary,def,gen_random_uuid()); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'Test activity available to ordinary certification'; END IF;
+ key:=gen_random_uuid();
+ eid:=public.append_activity_event(rid,key,'artifact_edit','TEST artifact','{"notes":"Durable evidence"}',0,'low',true);
+ IF eid<>public.append_activity_event(rid,key,'artifact_edit','TEST artifact','{"notes":"Durable evidence"}',0,'low',true) THEN RAISE EXCEPTION 'Retry duplicated accepted event'; END IF;
+ denied:=false; BEGIN PERFORM public.append_activity_event(rid,key,'artifact_edit','Different payload','{"notes":"Durable evidence"}',0,'low',true); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'Reused key with different input accepted'; END IF;
+ denied:=false; BEGIN PERFORM public.append_activity_event(rid,gen_random_uuid(),'artifact_edit','Stale edit','{}',0); EXCEPTION WHEN raise_exception THEN denied:=true; END;
+ IF NOT denied OR (SELECT count(*) FROM public.activity_events WHERE run_id=rid)<>1 THEN RAISE EXCEPTION 'Stale edit wrote evidence'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.activity_artifact_history WHERE run_id=rid AND event_id=eid AND revision=1 AND actor_type='coach' AND confidence='low' AND unresolved_ambiguity) THEN RAISE EXCEPTION 'Artifact attribution missing'; END IF;
+ UPDATE public.sessions SET chosen_intervention_slug='evidence_gathering',status='framing' WHERE id=sid;
+ IF (SELECT intervention_slug FROM public.activity_runs WHERE id=rid)<>'customer_profile_interviews' OR (SELECT scope_revision_id FROM public.activity_runs WHERE id=rid) IS DISTINCT FROM scope_id THEN RAISE EXCEPTION 'Later intervention relabelled historical run'; END IF;
+ IF (SELECT status FROM public.sessions WHERE id=sid)<>'working_session' THEN RAISE EXCEPTION 'Progress regressed'; END IF;
+ denied:=false; BEGIN UPDATE public.activity_definitions SET title='Changed methodology' WHERE id=def; EXCEPTION WHEN raise_exception THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'Used definition version changed'; END IF;
+ PERFORM set_config('request.jwt.claim.sub',gen_random_uuid()::text,true);
+ denied:=false; BEGIN PERFORM public.append_activity_event(rid,gen_random_uuid(),'coach_message','Unauthorized'); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
+ IF NOT denied THEN RAISE EXCEPTION 'Other candidate altered event history'; END IF;
+ IF has_table_privilege('authenticated','public.activity_simulation_truth','SELECT') OR has_table_privilege('authenticated','public.activity_simulation_truth','INSERT') THEN RAISE EXCEPTION 'Private truth accessible'; END IF;
+ IF has_table_privilege('authenticated','public.activity_event_private','UPDATE') OR has_table_privilege('authenticated','public.activity_run_private','SELECT') THEN RAISE EXCEPTION 'Private metadata accessible'; END IF;
+ IF has_table_privilege('authenticated','public.activity_events','UPDATE') OR has_column_privilege('authenticated','public.activity_events','request_payload','SELECT') THEN RAISE EXCEPTION 'Event append-only boundary broken'; END IF;
+ IF has_column_privilege('authenticated','public.evaluations','internal_notes','SELECT') THEN RAISE EXCEPTION 'Stage 2 reviewer-note boundary broken'; END IF;
+ RAISE NOTICE 'Activity runtime start, retry, ordering, artifact linkage, conflict, Scope binding, versioning, progress and security checks passed';
+END $$;
+ROLLBACK;
