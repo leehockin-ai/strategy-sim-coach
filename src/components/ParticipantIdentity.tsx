@@ -9,11 +9,14 @@ export function ParticipantIdentity({
   participant,
   size = "md",
   showDescription = false,
+  dark = false,
   className,
 }: {
   participant: ParticipantIdentityInput;
   size?: "sm" | "md" | "lg";
   showDescription?: boolean;
+  /** Use on colored/dark surfaces (e.g. the Client Brief header). */
+  dark?: boolean;
   className?: string;
 }) {
   const id = resolveIdentity(participant);
@@ -24,7 +27,7 @@ export function ParticipantIdentity({
         <img
           src={id.portrait}
           alt=""
-          className={cn(avatarPx, "rounded-full object-cover border border-ink/20 shrink-0")}
+          className={cn(avatarPx, "rounded-full object-cover border shrink-0", dark ? "border-paper/40" : "border-ink/20")}
         />
       ) : (
         <span
@@ -38,10 +41,10 @@ export function ParticipantIdentity({
       <span className="min-w-0 leading-tight">
         <span className={cn("block truncate font-medium", size === "sm" ? "text-xs" : "text-sm")}>{id.name}</span>
         {id.role ? (
-          <span className="block truncate text-[11px] text-muted-foreground">{id.role}</span>
+          <span className={cn("block truncate text-[11px]", dark ? "opacity-70" : "text-muted-foreground")}>{id.role}</span>
         ) : null}
         {showDescription && id.description ? (
-          <span className="block text-[11px] text-muted-foreground mt-0.5">{id.description}</span>
+          <span className={cn("block text-[11px] mt-0.5", dark ? "opacity-80" : "text-muted-foreground")}>{id.description}</span>
         ) : null}
       </span>
     </span>
