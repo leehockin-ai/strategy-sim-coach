@@ -44,8 +44,8 @@ describe("scenario visibility (public client context vs private assessment truth
     expect(publicStakeholders([{ name: "A" }, 42, { name: " " }])).toEqual([{ name: "A" }]);
   });
 
-  it("passes through null/undefined scenarios", () => {
+  it("returns null for null/undefined scenarios", () => {
     expect(publicScenario(null)).toBeNull();
-    expect(publicScenario(undefined)).toBeUndefined();
+    expect(publicScenario(undefined)).toBeNull();
   });
 });
