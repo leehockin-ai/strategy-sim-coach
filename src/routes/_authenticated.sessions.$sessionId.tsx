@@ -250,13 +250,13 @@ function ChapterNav({
                 key={c.key}
                 onClick={() => !disabled && onChange(c.key)}
                 disabled={disabled}
-                className={`flex-1 py-4 text-left border-r border-ink last:border-r-0 px-5 transition-colors ${active ? "bg-ink text-paper" : disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-secondary"}`}
+                className={`min-w-0 flex-1 py-4 text-left border-r border-ink last:border-r-0 px-2 md:px-5 transition-colors ${active ? "bg-ink text-paper" : disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-secondary"}`}
               >
                 <div className="marker-num text-[10px] uppercase tracking-[0.14em] opacity-70">
                   {String(c.index).padStart(2, "0")} · Chapter {c.index}
                 </div>
                 <div className="text-base font-medium mt-1">{c.label}</div>
-                <div className={`text-[11px] mt-1 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{c.descriptor}</div>
+                <div className={`hidden md:block text-[11px] mt-1 leading-snug ${active ? "opacity-70" : "text-muted-foreground"}`}>{c.descriptor}</div>
               </button>
             );
           })}
