@@ -26,6 +26,4 @@ BEGIN
  denied:=false; BEGIN PERFORM public.connect_strategyzer_playbook(rid,gen_random_uuid(),'https://app.strategyzer.com/q','https://app.strategyzer.com/q','app.strategyzer.com',true,true,true,null,null); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END; IF NOT denied THEN RAISE EXCEPTION 'other candidate connected'; END IF;
  RAISE NOTICE 'strategyzer runtime checks passed';
 END $$;
-SET LOCAL ROLE authenticated;
-SELECT set_config('request.jwt.claims',json_build_object('sub',(SELECT id FROM auth.users ORDER BY created_at DESC LIMIT 1),'role','authenticated')::text,true);
 ROLLBACK;
