@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
+import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { Button } from "@/components/ui/button";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
@@ -30,9 +31,9 @@ const CANVAS_IMAGES: Record<string, { src: string; alt: string }> = {
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({ meta: [
     { title: "Coaching session · Coach Compass" },
-    { name: "description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { name: "description", content: "Scope the engagement, facilitate the work, and advance the customer outcome in your Strategyzer coaching engagement." },
     { property: "og:title", content: "Coaching session · Coach Compass" },
-    { property: "og:description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { property: "og:description", content: "Scope the engagement, facilitate the work, and advance the customer outcome in your Strategyzer coaching engagement." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
