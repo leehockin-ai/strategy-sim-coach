@@ -9,12 +9,14 @@ import { createSession } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 
 export const Route = createFileRoute("/_authenticated/scenarios")({
-  head: () => ({
-    meta: [
-      { title: "Scenarios · Strategyzer Coach Certification Simulator" },
-      { name: "description", content: "Browse certification scenarios and start a structured coaching session." },
-    ],
-  }),
+  head: () => ({ meta: [
+    { title: "Scenarios · Coach Compass" },
+    { name: "description", content: "Explore realistic Strategyzer coaching scenarios and resume your certification work." },
+    { property: "og:title", content: "Scenarios · Coach Compass" },
+    { property: "og:description", content: "Explore realistic Strategyzer coaching scenarios and resume your certification work." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: ScenariosPage,
 });
 

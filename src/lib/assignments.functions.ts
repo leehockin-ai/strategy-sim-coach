@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { seedInitialStakeholderStates } from "@/lib/simulator.functions";
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -11,6 +9,7 @@ import { seedInitialStakeholderStates } from "@/lib/simulator.functions";
 export const listMyAssignments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("assignments" as any)
       .select(
@@ -55,6 +54,7 @@ export const getAssignment = createServerFn({ method: "POST" })
     z.object({ assignmentId: z.string().uuid() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: a, error } = await supabaseAdmin
       .from("assignments" as any)
       .select(
@@ -85,6 +85,7 @@ export const startSessionFromAssignment = createServerFn({ method: "POST" })
         .parse(d),
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: a } = await supabaseAdmin
       .from("assignments" as any)
       .select(
@@ -134,12 +135,6 @@ export const startSessionFromAssignment = createServerFn({ method: "POST" })
       .select("id")
       .single();
     if (error) throw new Error(error.message);
-
-    try {
-      await seedInitialStakeholderStates((session as any).id, ax.scenario_id);
-    } catch (err) {
-      console.error("[beginAssignmentAttempt] seedInitialStakeholderStates failed", err);
-    }
 
     return { sessionId: (session as any).id, resumed: false };
   });

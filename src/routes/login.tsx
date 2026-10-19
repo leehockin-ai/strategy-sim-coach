@@ -9,9 +9,14 @@ export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>) => ({
     redirect: typeof s.redirect === "string" ? s.redirect : "/scenarios",
   }),
-  head: () => ({
-    meta: [{ title: "Sign in · Strategyzer Coach Certification" }],
-  }),
+  head: () => ({ meta: [
+    { title: "Sign in · Coach Compass" },
+    { name: "description", content: "Sign in to your Coach Compass coaching certification account." },
+    { property: "og:title", content: "Sign in · Coach Compass" },
+    { property: "og:description", content: "Sign in to your Coach Compass coaching certification account." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: LoginPage,
 });
 

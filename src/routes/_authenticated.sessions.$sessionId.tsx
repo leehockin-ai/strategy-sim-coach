@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
+import { canvasForEditing } from "@/lib/session-compatibility";
 import { voiceForStakeholder } from "@/lib/voices";
 import { generateEvaluation } from "@/lib/evaluation.functions";
 import { savePlaybookApplication } from "@/lib/playbook.functions";
@@ -24,9 +25,14 @@ const CANVAS_IMAGES: Record<string, { src: string; alt: string }> = {
 
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
-  head: () => ({
-    meta: [{ title: "Session · Strategyzer Coach Certification" }],
-  }),
+  head: () => ({ meta: [
+    { title: "Coaching session · Coach Compass" },
+    { name: "description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { property: "og:title", content: "Coaching session · Coach Compass" },
+    { property: "og:description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: SessionPage,
 });
 
@@ -3014,18 +3020,9 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
 
 
   const canvas = canvasForPlaybook(session.methodology_choice);
-  const initial = (session.application_canvas as Record<string, string> | null) ?? {};
-  const [cells, setCells] = useState<Record<string, string>>(initial);
-  const [meta, setMeta] = useState<Record<string, CellMeta>>(() => {
-    // Allow meta to be encoded in canvas as `__meta__${cellKey}` strings (JSON)
-    const m: Record<string, CellMeta> = {};
-    for (const [k, v] of Object.entries(initial)) {
-      if (k.startsWith("__meta__") && typeof v === "string") {
-        try { m[k.replace("__meta__", "")] = JSON.parse(v); } catch {}
-      }
-    }
-    return m;
-  });
+  const initial = canvasForEditing(session.application_canvas);
+  const [cells, setCells] = useState<Record<string, string>>(initial.cells);
+  const [meta, setMeta] = useState<Record<string, CellMeta>>(initial.meta as Record<string, CellMeta>);
   const [assist, setAssist] = useState<Record<string, FacilitationAssist>>({});
   const [turns, setTurns] = useState<Record<string, FacilitationTurn[]>>({});
   const [draft, setDraft] = useState<Record<string, string>>({});

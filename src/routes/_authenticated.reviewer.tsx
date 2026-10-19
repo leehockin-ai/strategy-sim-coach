@@ -10,7 +10,14 @@ import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { useMyRoles } from "@/hooks/use-my-roles";
 
 export const Route = createFileRoute("/_authenticated/reviewer")({
-  head: () => ({ meta: [{ title: "Reviewer · Strategyzer Coach Certification" }] }),
+  head: () => ({ meta: [
+    { title: "Reviewer workspace · Coach Compass" },
+    { name: "description", content: "Review coaching evidence and make authoritative Strategyzer certification decisions." },
+    { property: "og:title", content: "Reviewer workspace · Coach Compass" },
+    { property: "og:description", content: "Review coaching evidence and make authoritative Strategyzer certification decisions." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: ReviewerGate,
 });
 

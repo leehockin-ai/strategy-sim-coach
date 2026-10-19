@@ -8,7 +8,14 @@ import { toast } from "sonner";
 import React from "react";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/report")({
-  head: () => ({ meta: [{ title: "Your assessment · Strategyzer Coach Certification" }] }),
+  head: () => ({ meta: [
+    { title: "Your assessment · Coach Compass" },
+    { name: "description", content: "View your coaching rubric and authoritative Strategyzer reviewer assessment." },
+    { property: "og:title", content: "Your assessment · Coach Compass" },
+    { property: "og:description", content: "View your coaching rubric and authoritative Strategyzer reviewer assessment." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: AssessmentPage,
 });
 
