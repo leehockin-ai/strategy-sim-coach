@@ -31,11 +31,11 @@ function ScenariosPage() {
     <Shell>
       <section className="hairline-b">
         <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-16">
-          <span className="chip mb-4 inline-flex">Scenario library</span>
-          <h1 className="text-4xl md:text-5xl tracking-tight">Pick a coaching situation</h1>
+          <span className="chip mb-4 inline-flex">Client briefs</span>
+          <h1 className="text-4xl md:text-5xl tracking-tight">Pick a client to coach</h1>
           <p className="mt-4 max-w-2xl text-muted-foreground">
-            Each scenario is a realistic, ambiguous business context with a stakeholder cast.
-            There is no single correct path. Your decisions are scored against the rubric.
+            Each brief is a realistic, ambiguous client situation with a stakeholder cast.
+            There is no single correct path — your coaching judgment is what gets assessed.
           </p>
         </div>
       </section>
@@ -78,11 +78,7 @@ function ScenarioCard({ scenario, index }: { scenario: any; index: number }) {
         <h3 className="text-xl mb-1">{scenario.title}</h3>
         <p className="text-xs text-muted-foreground uppercase tracking-[0.12em] mb-3">{scenario.industry}</p>
         <p className="text-sm text-muted-foreground leading-relaxed mb-6 flex-1">{scenario.summary}</p>
-        <div className="flex flex-wrap gap-1.5 mb-6">
-          {(scenario.ambiguity_factors as string[]).slice(0, 3).map((a) => (
-            <span key={a} className="text-[11px] px-2 py-0.5 bg-secondary">{a}</span>
-          ))}
-        </div>
+        <div className="mb-6" />
         <button
           onClick={() => setOpen(true)}
           className="self-start inline-flex items-center gap-2 bg-ink text-paper px-4 py-2 text-sm font-medium rounded-sm hover:opacity-90"
@@ -160,7 +156,7 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
               className="w-full border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
             <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-              We'll send your post-session evaluation report here once a Strategyzer reviewer scores your performance. This is your email — not the reviewer's.
+              We'll send your assessment report here once your session has been reviewed. This is your email — not the reviewer's.
             </p>
           </div>
           <div className="flex gap-2 pt-2">

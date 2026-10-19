@@ -79,8 +79,8 @@ function Hero() {
           <div className="border border-ink">
             <div className="grid grid-cols-2 gap-px bg-ink">
               <HeroCell color="var(--brand-blue)" fg="var(--paper)" label="Scope" />
-              <HeroCell color="var(--brand-lime)" fg="var(--ink)" label="Apply" />
-              <HeroCell color="var(--brand-red)" fg="var(--paper)" label="Progress" />
+              <HeroCell color="var(--brand-lime)" fg="var(--ink)" label="Facilitate" />
+              <HeroCell color="var(--brand-red)" fg="var(--paper)" label="Advance" />
               <HeroCell color="var(--brand-cyan)" fg="var(--ink)" label="Assess" />
             </div>
             <div className="border-t border-ink px-5 py-4 text-[13px] text-muted-foreground leading-[1.5]">
@@ -115,12 +115,12 @@ const CHAPTERS = [
   },
   {
     n: "Chapter 2",
-    t: "Apply the intervention",
-    d: "Facilitate what you committed to. Produce meaningful output. Know when enough has been achieved.",
+    t: "Facilitate the work",
+    d: "Facilitate what you committed to with the client team. Produce meaningful output. Know when enough has been achieved.",
   },
   {
     n: "Chapter 3",
-    t: "Progress the engagement",
+    t: "Advance the outcome",
     d: "Interpret what emerged. Decide what the client can now know, decide, or not yet decide. Recommend the smallest responsible next move.",
   },
 ];

@@ -304,16 +304,12 @@ function SubTabNav({
 
 function ChapterBanner({ chapter }: { chapter: ChapterKey }) {
   const meta = chapterMeta(chapter);
-  const isApply = chapter === "apply";
-  const descriptor = isApply
-    ? "You've scoped the engagement. Now facilitate the Playbook activity with the team. Ask questions, redirect solution-jumping, and produce meaningful — not necessarily complete — output. Know when enough has been achieved."
-    : meta.descriptor;
   return (
     <div className="mb-8 border-l-2 border-ink pl-4">
       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground marker-num">
         Chapter {meta.index} · {meta.label}
       </div>
-      <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{descriptor}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{meta.descriptor}</p>
     </div>
   );
 }
@@ -1208,16 +1204,16 @@ function Chapter2Container({
   if (!slug) {
     return (
       <div className="border border-ink p-6 bg-paper max-w-2xl">
-        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No intervention committed yet</div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No approach committed yet</div>
         <p className="text-sm mb-4">
-          You haven't committed to an intervention yet — return to Chapter 1 → Approach to make a choice
+          You haven't committed to an approach yet — return to Scope the Engagement → Your Approach
           before starting the working session.
         </p>
         <button
           onClick={onChangeIntervention}
           className="bg-ink text-paper px-4 py-2 text-sm rounded-sm hover:opacity-90"
         >
-          Go to Chapter 1 · Approach →
+          Go to Your Approach →
         </button>
       </div>
     );
@@ -1253,7 +1249,7 @@ function Chapter2Container({
     <div className="border border-ink p-4 mb-6 flex flex-wrap items-center justify-between gap-3 bg-paper">
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          Chapter 2 · {PATHWAY_PLAIN[pathwayType] ?? pathwayType}
+          Your committed approach · {PATHWAY_PLAIN[pathwayType] ?? pathwayType}
         </div>
         <div className="text-sm font-medium mt-0.5">{label}</div>
       </div>
@@ -1261,7 +1257,7 @@ function Chapter2Container({
         onClick={onChangeIntervention}
         className="text-xs underline underline-offset-2 hover:opacity-70"
       >
-        Change intervention
+        Change approach
       </button>
     </div>
   );
@@ -1539,7 +1535,7 @@ function DeliberatePauseWorkspace({
         <h2 className="text-xl font-medium mt-1">No intervention is the right move right now</h2>
         <p className="text-sm text-muted-foreground mt-2">
           Restraint is a judgment, not a stall. Spell out why pausing serves the client better than facilitating,
-          and what would need to be true before you'd re-engage. This is what the evaluator will read.
+          and what would need to be true before you'd re-engage.
         </p>
       </div>
 
@@ -3092,16 +3088,16 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
     const mode = session.methodology_choice?.startsWith("none") ? "none" : "unmapped";
     return (
       <StepShell
-        title="Live Playbook Facilitation"
-        hint="You're in the room with the team now. Sometimes the right move is no canvas at all — restraint scores above forced facilitation."
+        title="Working session"
+        hint="You're in the room with the team now. Sometimes the right move is no canvas at all — facilitate only as much as the client needs."
       >
         {mode === "none" ? (
           <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-lime)" }}>
             <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
             <p className="text-sm leading-relaxed">
-              You chose to gather more evidence before activating a playbook. Stay here while you work the
-              Stakeholder Workspace, then return to Coaching Approach when you're ready to commit. Knowing when NOT
-              to run a playbook is itself rewarded.
+              You chose to gather more evidence before activating a playbook. Stay with your conversations,
+              then return to Your Approach when you're ready to commit. Knowing when not
+              to run a playbook is part of the craft.
             </p>
           </div>
         ) : (
@@ -3224,7 +3220,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
           <button
             onClick={() => setMeta((p) => ({ ...p, [cell.key]: { ...p[cell.key], ambiguity: !cellMeta.ambiguity } }))}
             className={`ml-auto text-[9px] uppercase tracking-[0.1em] border border-ink px-1.5 py-0.5 ${cellMeta.ambiguity ? "bg-ink text-paper" : "bg-paper"}`}
-            title="Mark this cell as unresolved ambiguity to flag for the evaluator"
+            title="Mark this cell as unresolved ambiguity — the honest answer for now"
           >
             {cellMeta.ambiguity ? "✓ Unresolved" : "Flag unresolved"}
           </button>
@@ -3273,13 +3269,12 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
   return (
     <div>
       <div className="border border-ink p-5 mb-6" style={{ backgroundColor: "var(--brand-blue)", color: "var(--paper)" }}>
-        <div className="text-[10px] uppercase tracking-[0.14em] mb-1 opacity-80">Step 04 · The intervention</div>
-        <h2 className="text-2xl tracking-tight">Live Playbook Facilitation</h2>
+        <div className="text-[10px] uppercase tracking-[0.14em] mb-1 opacity-80">Facilitate the Work</div>
+        <h2 className="text-2xl tracking-tight">Working session with the team</h2>
         <p className="text-sm leading-relaxed mt-2 max-w-3xl opacity-95">
-          You are now <strong>in</strong> the session. You're not designing a workshop anymore — you are actively
-          guiding the team through Strategyzer methodology. Run the playbook you committed to in Coaching Approach,
-          respond to what the team gives you, narrow segments, redirect solution-jumping, simplify assumptions, and
-          surface evidence gaps in real time. This is the core of the simulation.
+          You are now <strong>in</strong> the session. Guide the team through the work you committed to in
+          Your Approach — respond to what they give you, narrow segments, redirect solution-jumping, simplify
+          assumptions, and surface evidence gaps in real time. Meaningful output matters more than complete output.
         </p>
       </div>
       {canvasImage && (
@@ -3320,10 +3315,10 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
             </p>
           </div>
           <div className="border border-ink p-3 text-xs mb-3">
-            <div className="uppercase tracking-[0.12em] font-medium mb-1">Reward / penalize</div>
+            <div className="uppercase tracking-[0.12em] font-medium mb-1">Good facilitation here</div>
             <p className="leading-relaxed">
-              <span className="block mb-1"><strong>Rewarded:</strong> open-ended probes, specificity, evidence rigor, simplification, ownership transfer, workshop recovery, ambiguity navigation, facilitation restraint.</span>
-              <span className="block"><strong>Penalized:</strong> answering for the team, leading/yes-no questions, framework jargon, mechanically completed cells, premature solutioning, polished consulting narration.</span>
+              <span className="block mb-1"><strong>Works:</strong> open-ended probes, specificity, evidence rigor, simplification, ownership transfer, workshop recovery, ambiguity navigation, facilitation restraint.</span>
+              <span className="block"><strong>Backfires:</strong> answering for the team, leading/yes-no questions, framework jargon, mechanically completed cells, premature solutioning.</span>
             </p>
           </div>
           <div className="border border-ink p-3 text-xs mb-3 bg-paper">
@@ -3412,7 +3407,7 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
     mutationFn: () =>
       save({ data: { sessionId: session.id, interventionRecommendation: rec, decision, status: "intervention" } }),
     onSuccess: () => {
-      toast.success("Intervention saved — now apply a real playbook");
+      toast.success("Judgment saved");
       onSaved();
     },
     onError: (e: any) => toast.error(e.message ?? "Save failed"),
@@ -3652,15 +3647,15 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
 
       <div className="flex justify-between items-center gap-2 border-t border-ink pt-4 mt-6">
         <div className="text-xs text-muted-foreground max-w-xl">
-          The evaluator reads this pathway as your orchestration artifact. Restraint, sequencing
-          coherence, and operational realism score above polished consulting language.
+          This pathway is your recommendation for how the client keeps moving toward their outcome.
+          Restraint, sequencing coherence, and operational realism matter more than polished language.
         </div>
         <button
           onClick={() => submit.mutate()}
           disabled={submit.isPending || filledCount === 0}
           className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Generating evaluation…" : "Submit & generate evaluation →"}
+          {submit.isPending ? "Submitting…" : "Submit for assessment →"}
         </button>
       </div>
     </div>

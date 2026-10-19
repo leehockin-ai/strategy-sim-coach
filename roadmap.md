@@ -1,13 +1,13 @@
 # Stabilization roadmap
 
-## Stage 5.5 — Candidate Experience Alignment (in progress)
-- [ ] Three-chapter candidate orientation (Scope the Engagement / Facilitate the Work / Advance the Outcome) without locking or wizard rigidity.
-- [ ] Client Brief: separate public client context from private assessment truth; audit candidate payloads for spoilers.
-- [ ] Persistent participant identity (deterministic avatar fallback) across Brief, Scope, conversations, Live Client Team.
-- [ ] Scope as one engagement workspace (Client / Engagement Brief / Your Approach); reduce duplicated inputs; iterative scoping.
-- [ ] Customer outcome as through-line into Facilitate the Work; external Apply reframe; Live Client Team UX prioritizes people/conversation.
-- [ ] Terminology audit, instructional-overload reduction, landing cleanup, responsive checks.
-- [ ] Regression across multiple scenarios, internal runtime, historical sessions, refresh/resume, privacy/security, human walkthrough; final report. Stop before Stage 6.
+## Stage 5.5 — Candidate Experience Alignment
+- [x] Three-chapter candidate orientation (Scope the Engagement / Facilitate the Work / Advance the Outcome) without locking or wizard rigidity.
+- [x] Client Brief: candidate payloads now carry public client context only (safe scenario projection); system prompt, ambiguity factors, unrealistic aspects and stakeholder postures no longer reach candidates.
+- [x] Persistent participant identity (deterministic initials/color fallback, optional portrait) across Brief header, Scope conversations and Live Client Team.
+- [x] Scope as one engagement workspace (Client / Your Approach with Scoping call and 1:1 conversations); legacy framing summary is read-only and points to the Engagement Brief.
+- [x] Customer outcome as through-line into Facilitate the Work; working-session workspace reframed, setup collapses once connected, Engagement Brief outcome anchors the room; Live Client Team shows participant identities.
+- [x] Terminology audit (evaluator/reviewer/scoring copy removed from candidate view), landing cleanup. 63 tests pass, build OK, signed-in browser checks passed.
+- [ ] Human walkthrough by Lee across scenarios; responsive/mobile spot check. Stop before Stage 6.
 
 ## Stage 5 — Live Client Team (POC)
 - [x] Shared room, private participant state, evidence reveal, synthesis and conclusion on the Customer Profile POC; Tests A–F, security checks, transcripts and report done. Stopped before Stage 6 (pacing). Next: separate UI/UX cleanup pass per Lee.

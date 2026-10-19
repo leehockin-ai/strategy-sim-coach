@@ -24,7 +24,20 @@ export const getActivityRuntime = createServerFn({ method: "POST" })
     const events = ids.length ? await context.supabase.from("activity_events").select(PUBLIC_EVENT_COLUMNS).in("run_id", ids).order("sequence") : { data: [], error: null };
     const artifacts = ids.length ? await context.supabase.from("activity_artifact_history").select("*").in("run_id", ids).order("revision") : { data: [], error: null };
     if (events.error || artifacts.error) throw new Error("Activity evidence could not be loaded");
-    return { session, intervention, testAllowed: !!testAllowed, definitions: (definitions.data ?? []).filter(d => d.test_only ? !!testAllowed : d.methodology_approved), runs: runs ?? [], events: events.data ?? [], artifacts: artifacts.data ?? [] };
+    // Outcome continuity: the working session shows the candidate's own
+    // committed Engagement Brief outcome so the room stays anchored to the
+    // customer outcome. Candidate-authored, safe to return to the owner.
+    const { data: latestRevision } = await context.supabase.from("scope_revisions")
+      .select("revision, snapshot").eq("session_id", session.id).order("revision", { ascending: false }).limit(1).maybeSingle();
+    const { readEngagementBrief } = await import("./scope-brief");
+    const brief = readEngagementBrief(latestRevision?.snapshot);
+    const briefOutcome = {
+      revision: latestRevision?.revision ?? null,
+      success: brief.success,
+      decision_to_enable: brief.decision_to_enable,
+      decision_maker: brief.decision_maker,
+    };
+    return { session, intervention, testAllowed: !!testAllowed, definitions: (definitions.data ?? []).filter(d => d.test_only ? !!testAllowed : d.methodology_approved), runs: runs ?? [], events: events.data ?? [], artifacts: artifacts.data ?? [], briefOutcome };
   });
 
 export const startActivityRun = createServerFn({ method: "POST" })

@@ -40,21 +40,36 @@ export function publicStakeholders(raw: unknown): PublicStakeholder[] {
   return raw.map(publicStakeholder).filter((s): s is PublicStakeholder => s !== null);
 }
 
+// Concrete, serializable public scenario shape returned to candidates.
+export type PublicScenarioRow = {
+  id: string;
+  slug: string | null;
+  title: string | null;
+  industry: string | null;
+  difficulty: string | null;
+  summary: string | null;
+  context: string | null;
+  success_definition: string | null;
+  success_pressure: string | null;
+  stakeholders: PublicStakeholder[];
+};
+
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
 // Narrow a full scenario row (any shape) to its public client-context shape.
 // Unknown/private columns are dropped even if a caller selected them.
-export function publicScenario<T extends Record<string, unknown> | null | undefined>(scenario: T): T {
-  if (!scenario || typeof scenario !== "object") return scenario;
-  const s = scenario as Record<string, unknown>;
+export function publicScenario(scenario: Record<string, unknown> | null | undefined): PublicScenarioRow | null {
+  if (!scenario || typeof scenario !== "object") return null;
   return {
-    id: s.id,
-    slug: s.slug,
-    title: s.title,
-    industry: s.industry,
-    difficulty: s.difficulty,
-    summary: s.summary,
-    context: s.context,
-    success_definition: s.success_definition,
-    success_pressure: s.success_pressure,
-    stakeholders: publicStakeholders(s.stakeholders),
-  } as T;
+    id: String(scenario.id ?? ""),
+    slug: str(scenario.slug),
+    title: str(scenario.title),
+    industry: str(scenario.industry),
+    difficulty: str(scenario.difficulty),
+    summary: str(scenario.summary),
+    context: str(scenario.context),
+    success_definition: str(scenario.success_definition),
+    success_pressure: str(scenario.success_pressure),
+    stakeholders: publicStakeholders(scenario.stakeholders),
+  };
 }

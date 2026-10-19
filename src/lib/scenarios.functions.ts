@@ -11,7 +11,7 @@ export const listScenarios = createServerFn({ method: "GET" }).handler(async () 
   if (error) throw new Error(error.message);
   // Narrow each row to public client context — private assessment truth
   // (ambiguity factors, hidden dynamics) never reaches candidates.
-  return { scenarios: (data ?? []).map((s) => publicScenario(s as Record<string, unknown>)) };
+  return { scenarios: (data ?? []).map((s) => publicScenario(s as Record<string, unknown>)).filter((s) => s !== null) };
 });
 
 export const getScenario = createServerFn({ method: "GET" })

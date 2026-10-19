@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { beginWorkingSession, concludeWorkingSession, facilitateTeam, getLiveTeam, startSynthesis } from "@/lib/live-team.functions";
+import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 
 type Header = { assessmentReference: string | null; projectName: string; playbook: string; onOpen: () => void };
 
@@ -52,7 +53,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
     </div>
 
     <div>
-      <p className="text-xs uppercase text-muted-foreground mb-1">Your assessed activity</p>
+      <p className="text-xs uppercase text-muted-foreground mb-1">Your working session</p>
       <h3 className="text-xl">{config.title}</h3>
       <p className="text-sm text-muted-foreground">{config.exerciseLabel} · {config.expectedDurationMinutes} min</p>
       <p className="text-sm mt-3 max-w-2xl">{config.instructions}</p>
@@ -61,7 +62,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
 
     <div>
       <h3 className="text-lg flex items-center gap-2 mb-3"><Users className="size-4" />Live Client Team</h3>
-      <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm mb-4">{config.participants.map(p => <li key={p.name}><span className="font-medium">{p.name}</span> <span className="text-muted-foreground">· {p.role}</span></li>)}</ul>
+      <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm mb-4">{config.participants.map(p => <li key={p.name}><ParticipantIdentity participant={{ name: p.name, role: p.role }} size="sm" /></li>)}</ul>
       {phase === "not_started" && <Button disabled={!runActive || !data.connected || simple.isPending} onClick={() => simple.mutate(keyed(k => begin({ data: { runId, requestKey: k } })))}><Play />Begin working session</Button>}
       {phase !== "not_started" && <div className="border border-border">
         <div className="max-h-[480px] overflow-y-auto p-4 space-y-4">
@@ -71,7 +72,9 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
             if (kind === "concluded") return <p key={e.id} className="text-xs text-center text-muted-foreground">Working session concluded</p>;
             const coach = e.actor_type === "coach";
             return <div key={e.id} className={coach ? "pl-8" : "pr-8"}>
-              <p className="text-xs text-muted-foreground">{coach ? "You" : `${e.actor_id} · ${roles[e.actor_id ?? ""] ?? ""}`}</p>
+              {coach
+                ? <p className="text-xs text-muted-foreground">You</p>
+                : <ParticipantIdentity participant={{ name: e.actor_id ?? "", role: roles[e.actor_id ?? ""] }} size="sm" />}
               <p className={`text-sm mt-1 whitespace-pre-wrap break-words ${coach ? "border-l-2 border-primary pl-3" : ""}`}>{e.content}</p>
             </div>;
           })}

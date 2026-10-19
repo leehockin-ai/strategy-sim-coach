@@ -46,8 +46,8 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
   return <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-8">
     <Button variant="link" className="px-0 mb-6" asChild><Link to="/sessions/$sessionId" params={{ sessionId: data.session.id }}><ArrowLeft />Back to engagement</Link></Button>
     <div className="border-b border-border pb-6 mb-8">
-      <p className="text-xs uppercase text-muted-foreground mb-2">Apply · {data.intervention?.label ?? "Activity runs"}</p>
-      <h1 className="text-3xl md:text-4xl">Activity workspace</h1>
+      <p className="text-xs uppercase text-muted-foreground mb-2">Facilitate the Work · {data.intervention?.label ?? "Activity runs"}</p>
+      <h1 className="text-3xl md:text-4xl">Working session workspace</h1>
     </div>
     <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-8">
       <aside className="min-w-0">
@@ -66,7 +66,7 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
         </div>)}
         {!!data.runs.length && <><h2 className="text-lg mt-8 mb-3">Attempts</h2>{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} className="w-full justify-start mb-1" onClick={() => setSelected(r.id)}>{r.assessment_reference ?? `Attempt ${i + 1}`} · {r.status}</Button>)}</>}
       </aside>
-      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : <p className="text-muted-foreground text-sm py-4">No activity run started.</p>}</main>
+      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcome} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : <p className="text-muted-foreground text-sm py-4">No activity run started.</p>}</main>
     </div>
   </div>;
 }
