@@ -254,6 +254,7 @@ export const createSession = createServerFn({ method: "POST" })
 export const listMySessions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("sessions")
       .select(`
