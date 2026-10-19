@@ -8,7 +8,7 @@ BEGIN
  SELECT id INTO scenario FROM public.scenarios ORDER BY id LIMIT 1;
  SELECT user_id INTO coach FROM public.user_roles WHERE role = 'admin' LIMIT 1;
  SELECT count(*) INTO before_count FROM public.stakeholder_states;
- INSERT INTO public.programs(slug,name,kind) VALUES ('test-stabilization-' || gen_random_uuid(),'TEST/NON-PRODUCTION stabilization','internal') RETURNING id INTO program_uuid;
+ INSERT INTO public.programs(slug,name,kind) VALUES ('test-stabilization-' || gen_random_uuid(),'TEST/NON-PRODUCTION stabilization','internal_qa') RETURNING id INTO program_uuid;
  INSERT INTO public.program_members(program_id,user_id) VALUES (program_uuid,coach);
  INSERT INTO public.assignments(program_id,scenario_id,assigned_to_user_id,assigned_by_user_id)
  VALUES(program_uuid,scenario,coach,coach) RETURNING id INTO assignment_uuid;
