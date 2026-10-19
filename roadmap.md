@@ -2,9 +2,9 @@
 
 ## Stage 5.5.1 — Causal team work-product proof
 - [x] Plan the narrow Customer Profile POC using existing runtime, events, artifacts and private team state.
-- [ ] Implement semantic work assignments and team-owned simulated work with causal, append-only revisions.
-- [ ] Verify behavioural Tests A–E and privacy, provenance, idempotency and compatibility regressions.
-- [ ] Report results and limitations; stop after Stage 5.5.1.
+- [x] Implement semantic work assignments and team-owned simulated work with causal, append-only revisions.
+- [x] Verify observed behavioural Tests A–E; 74 unit tests, reversible privacy/lineage/identity/conflict database checks and signed-in refresh/history/conclusion checks passed. Live simultaneous concurrency and reviewer-positive UI remain unverified.
+- [x] Report results and limitations in the Stage 5.5.1 report; disposable sessions removed. Observed causal proof passed, not production certification validation. Stopped after Stage 5.5.1.
 
 ## Stage 5.5 — Candidate Experience Alignment
 - [x] Three-chapter candidate orientation (Scope the Engagement / Facilitate the Work / Advance the Outcome) without locking or wizard rigidity.
