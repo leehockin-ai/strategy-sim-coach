@@ -32,7 +32,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
     onError: e => toast.error(e.message),
   });
   const simple = useMutation({ mutationFn: (f: () => Promise<unknown>) => f(), onSuccess: refresh, onError: e => toast.error(e.message) });
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [data?.events.length, sayMut.isPending]);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [data?.available ? data.events.length : 0, sayMut.isPending]);
 
   if (!data?.available) return null;
   const { config, phase, events } = data;
