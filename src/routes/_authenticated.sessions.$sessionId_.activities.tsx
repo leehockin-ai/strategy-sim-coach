@@ -6,7 +6,7 @@ import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 
 const runtimeQuery = (sessionId: string) => queryOptions({ queryKey: ["activity-runtime", sessionId], queryFn: () => getActivityRuntime({ data: { sessionId } }) });
 
-export const Route = createFileRoute("/_authenticated/sessions/$sessionId/activities")({
+export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/activities")({
   head: () => ({ meta: [
     { title: "Playbook activity workspace · Coach Compass" },
     { name: "description", content: "Resume a coaching activity and its saved artifact and event evidence in Coach Compass." },

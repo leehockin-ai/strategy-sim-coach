@@ -16,6 +16,7 @@ import { Route as AuthenticatedReviewerRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedScenariosRouteImport } from './routes/_authenticated.scenarios'
 import { Route as AuthenticatedSessionsIndexRouteImport } from './routes/_authenticated.sessions.index'
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated.sessions.$sessionId'
+import { Route as AuthenticatedSessionsSessionIdActivitiesRouteImport } from './routes/_authenticated.sessions.$sessionId_.activities'
 import { Route as AuthenticatedSessionsSessionIdReportRouteImport } from './routes/_authenticated.sessions.$sessionId_.report'
 
 const IndexRoute = IndexRouteImport.update({
@@ -54,6 +55,12 @@ const AuthenticatedSessionsSessionIdRoute =
     path: '/sessions/$sessionId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSessionsSessionIdActivitiesRoute =
+  AuthenticatedSessionsSessionIdActivitiesRouteImport.update({
+    id: '/sessions/$sessionId_/activities',
+    path: '/sessions/$sessionId/activities',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSessionsSessionIdReportRoute =
   AuthenticatedSessionsSessionIdReportRouteImport.update({
     id: '/sessions/$sessionId_/report',
@@ -68,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/scenarios': typeof AuthenticatedScenariosRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/sessions/': typeof AuthenticatedSessionsIndexRoute
+  '/sessions/$sessionId/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +85,7 @@ export interface FileRoutesByTo {
   '/scenarios': typeof AuthenticatedScenariosRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/sessions': typeof AuthenticatedSessionsIndexRoute
+  '/sessions/$sessionId/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRoutesById {
@@ -88,6 +97,7 @@ export interface FileRoutesById {
   '/_authenticated/scenarios': typeof AuthenticatedScenariosRoute
   '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
   '/_authenticated/sessions/': typeof AuthenticatedSessionsIndexRoute
+  '/_authenticated/sessions/$sessionId_/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/_authenticated/sessions/$sessionId_/report': typeof AuthenticatedSessionsSessionIdReportRoute
 }
 export interface FileRouteTypes {
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/scenarios'
     | '/sessions/$sessionId'
     | '/sessions/'
+    | '/sessions/$sessionId/activities'
     | '/sessions/$sessionId/report'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/scenarios'
     | '/sessions/$sessionId'
     | '/sessions'
+    | '/sessions/$sessionId/activities'
     | '/sessions/$sessionId/report'
   id:
     | '__root__'
@@ -118,6 +130,7 @@ export interface FileRouteTypes {
     | '/_authenticated/scenarios'
     | '/_authenticated/sessions/$sessionId'
     | '/_authenticated/sessions/'
+    | '/_authenticated/sessions/$sessionId_/activities'
     | '/_authenticated/sessions/$sessionId_/report'
   fileRoutesById: FileRoutesById
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/sessions/$sessionId_/activities': {
+      id: '/_authenticated/sessions/$sessionId_/activities'
+      path: '/sessions/$sessionId/activities'
+      fullPath: '/sessions/$sessionId/activities'
+      preLoaderRoute: typeof AuthenticatedSessionsSessionIdActivitiesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/sessions/$sessionId_/report': {
       id: '/_authenticated/sessions/$sessionId_/report'
       path: '/sessions/$sessionId/report'
@@ -193,6 +213,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedScenariosRoute: typeof AuthenticatedScenariosRoute
   AuthenticatedSessionsSessionIdRoute: typeof AuthenticatedSessionsSessionIdRoute
   AuthenticatedSessionsIndexRoute: typeof AuthenticatedSessionsIndexRoute
+  AuthenticatedSessionsSessionIdActivitiesRoute: typeof AuthenticatedSessionsSessionIdActivitiesRoute
   AuthenticatedSessionsSessionIdReportRoute: typeof AuthenticatedSessionsSessionIdReportRoute
 }
 
@@ -201,6 +222,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedScenariosRoute: AuthenticatedScenariosRoute,
   AuthenticatedSessionsSessionIdRoute: AuthenticatedSessionsSessionIdRoute,
   AuthenticatedSessionsIndexRoute: AuthenticatedSessionsIndexRoute,
+  AuthenticatedSessionsSessionIdActivitiesRoute:
+    AuthenticatedSessionsSessionIdActivitiesRoute,
   AuthenticatedSessionsSessionIdReportRoute:
     AuthenticatedSessionsSessionIdReportRoute,
 }
