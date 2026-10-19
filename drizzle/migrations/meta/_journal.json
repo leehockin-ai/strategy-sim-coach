@@ -43,6 +43,13 @@
       "when": 1792433395307,
       "tag": "0005_playbook_activity_runtime_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792433416890,
+      "tag": "0006_activity_runtime_explicit_privileges",
+      "breakpoints": true
     }
   ]
 }
