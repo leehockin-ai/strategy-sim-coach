@@ -42,3 +42,13 @@ describe("workspace compatibility", () => {
     expect(JSON.stringify([flat, nested])).toBe(before);
   });
 });
+import { normalizeStrategyzerUrl } from "./activity-runtime";
+describe("Strategyzer URL handling", () => {
+  const hosts = ["strategyzer.com"];
+  it("accepts https Strategyzer subdomains", () => expect(normalizeStrategyzerUrl(" https://app.strategyzer.com/p/1 ", hosts)).toMatchObject({ ok: true, host: "app.strategyzer.com" }));
+  it("rejects http", () => expect(normalizeStrategyzerUrl("http://strategyzer.com/x", hosts).ok).toBe(false));
+  it("rejects lookalike domains", () => expect(normalizeStrategyzerUrl("https://strategyzer.com.evil.io/x", hosts).ok).toBe(false));
+  it("rejects suffix tricks", () => expect(normalizeStrategyzerUrl("https://evilstrategyzer.com/x", hosts).ok).toBe(false));
+  it("rejects script payloads", () => expect(normalizeStrategyzerUrl("javascript:alert(1)", hosts).ok).toBe(false));
+  it("rejects credentials in URL", () => expect(normalizeStrategyzerUrl("https://a:b@strategyzer.com/", hosts).ok).toBe(false));
+});
