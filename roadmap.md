@@ -1,5 +1,11 @@
 # Stabilization roadmap
 
+## Stage 5.5.1 — Causal team work-product proof
+- [ ] Plan the narrow Customer Profile POC using existing runtime, events, artifacts and private team state.
+- [ ] Implement semantic work assignments and team-owned simulated work with causal, append-only revisions.
+- [ ] Verify behavioural Tests A–E and privacy, provenance, idempotency and compatibility regressions.
+- [ ] Report results and limitations; stop after Stage 5.5.1.
+
 ## Stage 5.5 — Candidate Experience Alignment
 - [x] Three-chapter candidate orientation (Scope the Engagement / Facilitate the Work / Advance the Outcome) without locking or wizard rigidity.
 - [x] Client Brief: candidate payloads now carry public client context only (safe scenario projection); system prompt, ambiguity factors, unrealistic aspects and stakeholder postures no longer reach candidates.
