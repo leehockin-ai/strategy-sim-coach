@@ -19,6 +19,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
   const [msg, setMsg] = useState("");
   const [concluding, setConcluding] = useState(false);
   const [rationale, setRationale] = useState("");
+  const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const pending = useRef<{ text: string; key: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: key });
@@ -40,6 +41,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
   const lines = events.filter(e => (e.metadata as { team_kind?: string }).team_kind !== "private_marker");
   const roles = Object.fromEntries(config.participants.map(p => [p.name, p.role]));
   const open = runActive && (phase === "working" || phase === "synthesis");
+  const shownWork = selectedRevision === null ? data.work : data.workHistory.find(h => h.revision === selectedRevision)?.work;
 
   return <section className="border-t border-border pt-6 space-y-6">
     {config.poc && <p className="text-xs font-semibold text-destructive">POC simulation configuration · Not approved certification content</p>}
@@ -70,6 +72,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
             const kind = (e.metadata as { team_kind?: string }).team_kind;
             if (kind === "session_started" || kind === "synthesis_started") return <p key={e.id} className="text-xs text-center text-muted-foreground">{kind === "session_started" ? "Working session started" : "Team brought back together for synthesis"}</p>;
             if (kind === "concluded") return <p key={e.id} className="text-xs text-center text-muted-foreground">Working session concluded</p>;
+             if (kind === "work_product") return <p key={e.id} className="text-xs text-center text-muted-foreground">{e.content}</p>;
             const coach = e.actor_type === "coach";
             return <div key={e.id} className={coach ? "pl-8" : "pr-8"}>
               {coach
@@ -81,7 +84,16 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
           {sayMut.isPending && <p className="text-xs text-muted-foreground">The team is responding…</p>}
           <div ref={endRef} />
         </div>
+         {shownWork && <section className="border-t border-border p-4 bg-muted/30 space-y-4" aria-label="Simulated client team work">
+           <div className="flex flex-wrap justify-between gap-3 items-start">
+             <div><h4 className="text-sm font-semibold uppercase">Team work — {data.revision === 1 ? "first pass" : "working draft"}</h4><p className="text-xs text-muted-foreground">Simulated client team work · Not verified Strategyzer artifact state</p></div>
+             <label className="text-xs text-muted-foreground">Revision <select aria-label="Team work revision" className="ml-2 bg-background border border-border rounded px-2 py-1 text-foreground" value={selectedRevision ?? "latest"} onChange={e => setSelectedRevision(e.target.value === "latest" ? null : Number(e.target.value))}><option value="latest">Latest ({data.revision})</option>{data.workHistory.map(h => <option key={h.revision} value={h.revision}>{h.revision}</option>)}</select></label>
+           </div>
+           <p className="text-xs text-muted-foreground capitalize">{shownWork.status.replaceAll("_", " ")}</p>
+           <div className="grid sm:grid-cols-2 gap-5">{shownWork.sections.map(s => <div key={s.key}><h5 className="text-sm font-medium mb-2">{s.label}</h5>{s.items.length ? <ul className="space-y-2 text-sm">{s.items.map((item, i) => <li key={`${item.sourceId}:${i}`} className="break-words"><p>{item.text}</p><span className="text-xs text-muted-foreground">{item.speaker}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">—</p>}</div>)}</div>
+         </section>}
         {open && <div className="border-t border-border p-3 space-y-3">
+           {data.work && <p className="text-xs uppercase text-muted-foreground">Continue coaching</p>}
           {phase === "synthesis" && <p className="text-sm">Bring the team back together before moving on. Facilitate a short synthesis of what the team has established, what remains uncertain, and what matters next.</p>}
           <Textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="Facilitate the team…" rows={3} maxLength={4000}
             onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && msg.trim()) sayMut.mutate(msg.trim()); }} />
