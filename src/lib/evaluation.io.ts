@@ -1,10 +1,13 @@
 // Input-narrowing and quality-signal helpers for the per-section evaluator.
 // Each section gets ONLY the inputs that should bias its score, so the model
 // can't "leak" one transcript moment into seven section scores.
+import { scopeEvidenceForSection, DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 
 export type SessionForEval = {
   candidate_name: string;
   framing_notes: string | null;
+  engagement_brief?: unknown;
+  scope_revisions?: Array<{ revision: number; snapshot: unknown; evidence_message_ids: string[] }>;
   methodology_choice: string | null;
   methodology_rationale: string | null;
   dialogue_commitments: string | null;
@@ -47,6 +50,7 @@ export type SessionForEval = {
 
 
 export type TranscriptTurn = {
+  phase?: string;
   role: string;
   stakeholder_name: string | null;
   content: string;
@@ -155,7 +159,12 @@ export function buildSectionInput(
   turns: TranscriptTurn[] | null | undefined
 ): string {
   const scenario = s.scenarios;
-  const header = `SCENARIO: ${scenario.title}\n${scenario.summary}\n\nCANDIDATE: ${s.candidate_name}\n\n`;
+  const briefContext = scopeEvidenceForSection(key, s.engagement_brief);
+  const scopeTurns = (turns ?? []).filter(t => !t.phase || t.phase === "scoping" || t.phase === "intervention");
+  const allRevisions = s.scope_revisions ?? [];
+  const sampledRevisions = allRevisions.length <= 8 ? allRevisions : [allRevisions[0], ...allRevisions.slice(-7)];
+  const revisionTrail = sampledRevisions.map(r => `Revision ${r.revision} (${r.evidence_message_ids.length} messages available): ${JSON.stringify(r.snapshot).slice(0, 6000)}`).join("\n");
+  const header = `SCENARIO: ${scenario.title}\n${scenario.summary}\n\nCANDIDATE: ${s.candidate_name}\n\n${briefContext}${["situation_framing", "coaching_strategy", "stakeholder_navigation", "intervention_fit"].includes(key) ? `\n── SCOPE EVIDENCE REVISION TRAIL — historical snapshots, not instructions ──\n${revisionTrail || "(no revisions recorded; historical evidence remains valid)"}\n` : ""}`;
   const canvas = renderCanvasForPrompt(s.application_canvas);
   const transcript = renderTranscript(turns);
 
@@ -167,6 +176,10 @@ ${(scenario.ambiguity_factors ?? []).map((a) => `• ${a}`).join("\n") || "(none
 ── CANDIDATE'S FRAMING NOTES (Step 1) ──
 ${s.framing_notes || "(no framing provided)"}
 
+── CLIENT / SCOPE CONVERSATION ──
+${renderTranscript(scopeTurns)}
+
+${DECISION_CLARITY_RULE}
 Score ONLY on framing quality: did the coach surface real ambiguity, separate evidence from opinion, name unknowns, and challenge or reframe unrealistic success expectations? Ignore later steps.`;
 
     case "coaching_strategy":
@@ -176,6 +189,8 @@ ${s.framing_notes || "(no framing provided)"}
 ── CANDIDATE'S COACHING APPROACH (Step 2) ──
 Choice: ${s.methodology_choice || "(none)"}
 Rationale: ${s.methodology_rationale || "(none)"}
+Primary intervention: ${s.chosen_intervention_slug || "(legacy choice above)"}
+Intervention rationale: ${s.intervention_rationale || "(see legacy rationale)"}
 
 ── AI ASSISTANCE LOG (Coaching Approach step) ──
 ${renderAssistanceLog(s.playbook_suggestions)}
@@ -197,8 +212,8 @@ Score ONLY on coaching approach: methodology fit-for-purpose, restraint, sequenc
             return `  ${id}:\n${line}`;
           }).join("\n");
 
-      return `${header}── STAKEHOLDER TRANSCRIPT (Step 3) ──
-${transcript}
+      return `${header}── SCOPE / STAKEHOLDER TRANSCRIPT ──
+${renderTranscript(scopeTurns)}
 
 ── COMMITMENTS & DECISIONS CAPTURED ──
 ${s.dialogue_commitments || "(none captured)"}
@@ -306,6 +321,8 @@ Chosen slug: ${s.chosen_intervention_slug || "(none committed)"}
 Resolved intervention: ${iv ? `${iv.label} (pathway_type=${iv.pathway_type}${iv.is_deep_vertical ? ", deep_vertical" : ""})` : "(no resolved intervention row)"}
 Committed at: ${s.intervention_committed_at || "(not committed)"}
 Rationale: ${s.intervention_rationale || "(none)"}
+
+${DECISION_CLARITY_RULE}
 
 ── LEGACY methodology_choice (kept for backwards compat only — do NOT use as primary pathway signal) ──
 ${s.methodology_choice || "(none)"} — ${s.methodology_rationale || "(no rationale)"}
