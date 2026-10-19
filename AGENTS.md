@@ -4,4 +4,5 @@
 - Seed hidden stakeholder state transactionally only for new sessions; never synthesize trajectories for historical sessions.
 - Hidden state is reviewer-readable under role-scoped RLS and server-managed for simulation/evaluation; candidate payloads exclude it and privileged reviewer endpoints verify roles first.
 - Canvas compatibility readers normalize saved formats in memory without rewriting historical evidence.
-- Stabilization regression tests live beside domain helpers and database behavior tests run against rolled-back transactions.
+- Stabilization regression tests live beside domain helpers and database behavior tests use the privileged database runner in rolled-back transactions because sandbox SQL access cannot update existing rows.
+- The root auth watcher invalidates only identity transitions, not initial hydration or token refresh, to avoid interrupting signed-in data reads.

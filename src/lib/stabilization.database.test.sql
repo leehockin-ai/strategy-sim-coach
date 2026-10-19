@@ -1,4 +1,5 @@
--- Run with psql -v ON_ERROR_STOP=1 -f this-file. All test rows roll back.
+-- Run through the privileged database runner. Sandbox SQL access is read-only.
+-- All test rows roll back; no production methodology content is introduced.
 BEGIN;
 DO $$
 DECLARE
