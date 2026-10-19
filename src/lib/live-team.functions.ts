@@ -154,18 +154,22 @@ export const facilitateTeam = createServerFn({ method: "POST" })
       .slice(-40).map((e: any) => `${e.actor_type === "coach" ? "Coach" : e.actor_id}: ${e.content}`).join("\n");
     const scope = await priorScopeContext(admin, run.session_id, config.participants.map(p => p.name));
     const t0 = Date.now();
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    let turn = sanitizeTurn({}, config, state);
+    // One bounded retry when the model returns no usable in-character response.
+    for (let attempt = 0; attempt < 2 && !turn.responses.length; attempt++) {
+      let raw: RawTurn = {};
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST", headers: { Authorization: `Bearer ${process.env.LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: MODEL, response_format: { type: "json_object" }, messages: [
         { role: "system", content: buildPrompt(config, state, scope, transcript, phase) },
         { role: "user", content: `Coach says to the room: ${data.message}` },
       ] }),
     });
-    if (!res.ok) throw new Error(res.status === 429 ? "The team needs a moment — try again shortly." : res.status === 402 ? "AI credits exhausted." : "The team could not respond. Try again.");
-    const json = await res.json();
-    let raw: RawTurn = {};
-    try { raw = JSON.parse(String(json.choices?.[0]?.message?.content ?? "{}").replace(/^```(json)?|```$/g, "")); } catch { raw = {}; }
-    const turn = sanitizeTurn(raw, config, state);
+      if (!res.ok) throw new Error(res.status === 429 ? "The team needs a moment — try again shortly." : res.status === 402 ? "AI credits exhausted." : "The team could not respond. Try again.");
+      const json = await res.json();
+      try { raw = JSON.parse(String(json.choices?.[0]?.message?.content ?? "{}").replace(/^```(json)?|```$/g, "")); } catch { raw = {}; }
+      turn = sanitizeTurn(raw, config, state);
+    }
     if (!turn.responses.length) throw new Error("The team could not respond. Try again.");
     const coachType = phase === "synthesis" ? "synthesis" : "coach_message";
     const events = [
