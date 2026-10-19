@@ -304,16 +304,12 @@ function SubTabNav({
 
 function ChapterBanner({ chapter }: { chapter: ChapterKey }) {
   const meta = chapterMeta(chapter);
-  const isApply = chapter === "apply";
-  const descriptor = isApply
-    ? "You've scoped the engagement. Now facilitate the Playbook activity with the team. Ask questions, redirect solution-jumping, and produce meaningful — not necessarily complete — output. Know when enough has been achieved."
-    : meta.descriptor;
   return (
     <div className="mb-8 border-l-2 border-ink pl-4">
       <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground marker-num">
         Chapter {meta.index} · {meta.label}
       </div>
-      <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{descriptor}</p>
+      <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{meta.descriptor}</p>
     </div>
   );
 }
@@ -1208,16 +1204,16 @@ function Chapter2Container({
   if (!slug) {
     return (
       <div className="border border-ink p-6 bg-paper max-w-2xl">
-        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No intervention committed yet</div>
+        <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No approach committed yet</div>
         <p className="text-sm mb-4">
-          You haven't committed to an intervention yet — return to Chapter 1 → Approach to make a choice
+          You haven't committed to an approach yet — return to Scope the Engagement → Your Approach
           before starting the working session.
         </p>
         <button
           onClick={onChangeIntervention}
           className="bg-ink text-paper px-4 py-2 text-sm rounded-sm hover:opacity-90"
         >
-          Go to Chapter 1 · Approach →
+          Go to Your Approach →
         </button>
       </div>
     );
@@ -1253,7 +1249,7 @@ function Chapter2Container({
     <div className="border border-ink p-4 mb-6 flex flex-wrap items-center justify-between gap-3 bg-paper">
       <div>
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          Chapter 2 · {PATHWAY_PLAIN[pathwayType] ?? pathwayType}
+          Your committed approach · {PATHWAY_PLAIN[pathwayType] ?? pathwayType}
         </div>
         <div className="text-sm font-medium mt-0.5">{label}</div>
       </div>
@@ -1261,7 +1257,7 @@ function Chapter2Container({
         onClick={onChangeIntervention}
         className="text-xs underline underline-offset-2 hover:opacity-70"
       >
-        Change intervention
+        Change approach
       </button>
     </div>
   );
