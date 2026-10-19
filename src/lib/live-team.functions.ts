@@ -169,10 +169,9 @@ export const facilitateTeam = createServerFn({ method: "POST" })
     if (!turn.responses.length) throw new Error("The team could not respond. Try again.");
     const coachType = phase === "synthesis" ? "synthesis" : "coach_message";
     const events = [
-      { type: coachType, actor: "coach", actor_id: context.userId, content: data.message, metadata: { team_kind: "utterance" }, private: { evaluator: { coach_act: turn.coachAct, reinforced: turn.reinforced, challenged: turn.challenged, reasoning: turn.reasoning, latency_ms: Date.now() - t0 } } },
+      { type: coachType, actor: "coach", actor_id: context.userId, content: data.message, metadata: { team_kind: "utterance" }, private: { state: Object.fromEntries(turn.changes.map(n => [n, turn.next.participants[n]])), evaluator: { coach_act: turn.coachAct, state_changed: turn.changes, reinforced: turn.reinforced, challenged: turn.challenged, reasoning: turn.reasoning, latency_ms: Date.now() - t0 } } },
       ...turn.responses.map(r => ({ type: "team_response", actor: "team", actor_id: r.participant, content: r.text, metadata: { team_kind: "response" },
         private: { evaluator: { surfaced: turn.surfaced.filter(s => s.by === r.participant) }, state: turn.next.participants[r.participant] } })),
-      ...(turn.changes.length ? [{ type: "participant_state_change", actor: "system", content: "", metadata: { team_kind: "private_marker" }, private: { state: Object.fromEntries(turn.changes.map(n => [n, turn.next.participants[n]])) } }] : []),
     ];
     const { error } = await admin.rpc("append_team_events", { _run: run.id, _request: data.requestKey, _events: events as unknown as Json, _participant_state: { team: turn.next } as unknown as Json });
     if (error) throw new Error(error.message);
