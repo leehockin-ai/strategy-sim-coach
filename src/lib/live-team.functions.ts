@@ -235,6 +235,7 @@ export const facilitateTeam = createServerFn({ method: "POST" })
       try { rawWork = JSON.parse(extracted.choices?.[0]?.message?.content ?? "{}"); } catch { throw new Error("The team's work could not be recorded. Try again."); }
     }
     let work = intent === "conversation" || (intent === "coach_work" && !currentWork) ? null : customerProfileWork(rawWork, allSources);
+    console.info("POC work extraction", JSON.stringify({ intent, rawWork, accepted: !!work }));
     if ((intent === "assign_work" || intent === "revise_work") && !work) throw new Error("The team's work could not be recorded. Try again.");
     if (work && !work.sections.some(s => s.items.some(i => i.sourceId.startsWith("response:")))) work = null;
     if (intent === "intentional_stop" && currentWork) work = { ...currentWork, status: "stopped_intentionally" };
