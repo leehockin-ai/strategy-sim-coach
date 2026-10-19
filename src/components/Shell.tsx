@@ -62,7 +62,7 @@ function Header() {
                 </button>
               </>
             ) : (
-              <Link to="/login" className="text-xs px-2.5 py-1 bg-ink text-paper rounded-sm">
+              <Link to="/login" search={{ redirect: "/scenarios" }} className="text-xs px-2.5 py-1 bg-ink text-paper rounded-sm">
                 Sign in
               </Link>
             )}
