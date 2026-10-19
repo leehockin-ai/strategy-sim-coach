@@ -1,5 +1,12 @@
 # Stabilization roadmap
 
+## Stage 3 — Playbook Activity Runtime Foundation
+- [ ] Add configurable/versioned activity definitions, protected simulation truth, durable runs and Scope revision linkage.
+- [ ] Add atomic ordered/idempotent event append and event-linked artifact history; reserve time fields without timing rules.
+- [ ] Prove one TEST/NON-PRODUCTION runtime workspace without replacing current Apply or changing Scope.
+- [ ] Verify candidate privacy/ownership, retries, refresh, historical compatibility and unchanged progress; remove temporary data.
+- [ ] Report architecture, results and concerns; stop before Stage 4.
+
 ## Stage 2 — Integrated Scope
 - [x] Close internal_notes privacy across candidate payloads and direct reads; denial verified before Scope work.
 - [x] Add editable Engagement Brief, revision trail and optional intervention sequence without rewriting historical evidence.
