@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { connectStrategyzerPlaybook, getStrategyzerConnections, recordStrategyzerLaunch, type getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { normalizeStrategyzerUrl } from "@/lib/activity-runtime";
+import { LiveClientTeam } from "@/components/LiveClientTeam";
 
 type RuntimeData = Awaited<ReturnType<typeof getActivityRuntime>>;
 type Run = RuntimeData["runs"][number];
@@ -50,7 +51,7 @@ export function StrategyzerWorkspace({ run, events }: { run: Run; events: Event[
       <p className="text-xs uppercase text-muted-foreground mb-2">Assessment {run.assessment_reference} · Capability level {run.integration_capability_level} — {CAPABILITY[run.integration_capability_level ?? 0]}</p>
       <h2 className="text-2xl">Strategyzer assessment workspace</h2>
       <p className="text-sm text-muted-foreground mt-3 max-w-2xl">You will use the real Strategyzer Playbook environment to complete the application portion of this assessment. Keep Coach Compass available alongside your Playbook. Your simulated client team will eventually operate through Coach Compass while you facilitate the work in Strategyzer.</p>
-      <p className="text-sm mt-3 border-l-2 border-border pl-3">This is a setup step. The simulated client team is not available yet, and Coach Compass cannot see what you do inside Strategyzer.</p>
+      <p className="text-sm mt-3 border-l-2 border-border pl-3">Coach Compass cannot see what you do inside Strategyzer.</p>
     </div>
 
     <section className="border-t border-border pt-6">
@@ -87,8 +88,10 @@ export function StrategyzerWorkspace({ run, events }: { run: Run; events: Event[
       {data.connections.map(c => <div key={c.id} className="py-3 border-b border-border"><p>Connection {c.version} · {c.status === "connected" ? "current" : "replaced"} · {new Date(c.connected_at).toLocaleString()}</p><p className="text-xs text-muted-foreground break-all">{c.supplied_url}</p></div>)}
     </details>}
 
+    {current && <LiveClientTeam runId={run.id} runActive={run.status === "active"} header={{ assessmentReference: run.assessment_reference, projectName: current.confirmed_project_name ?? projectName, playbook: current.confirmed_playbook_title || snap.intervention_label || run.intervention_slug, onOpen: open }} />}
+
     <section className="border-t border-border pt-6"><h3 className="text-lg mb-3">Activity record</h3>
-      <ol className="divide-y divide-border">{events.map(e => <li key={e.id} className="py-3 text-sm"><div className="text-xs text-muted-foreground">Event {e.sequence} · {e.actor_type === "coach" ? "candidate" : e.actor_type} · {new Date(e.occurred_at).toLocaleString()}</div><p className="break-words">{e.content}</p></li>)}</ol>
+      <ol className="divide-y divide-border">{events.filter(e => !(e.metadata && typeof e.metadata === "object" && "team_kind" in e.metadata)).map(e => <li key={e.id} className="py-3 text-sm"><div className="text-xs text-muted-foreground">Event {e.sequence} · {e.actor_type === "coach" ? "candidate" : e.actor_type} · {new Date(e.occurred_at).toLocaleString()}</div><p className="break-words">{e.content}</p></li>)}</ol>
     </section>
   </div>;
 }

@@ -1198,6 +1198,71 @@ export type Database = {
           },
         ]
       }
+      team_activity_configs: {
+        Row: {
+          activity_key: string
+          activity_steps: Json
+          created_at: string
+          exercise_label: string
+          expected_duration_minutes: number
+          id: string
+          instructions: string
+          intervention_slug: string
+          methodology_approved: boolean
+          participants: Json
+          poc: boolean
+          scenario_id: string
+          status: string
+          title: string
+          truth: Json
+          version: number
+        }
+        Insert: {
+          activity_key: string
+          activity_steps?: Json
+          created_at?: string
+          exercise_label: string
+          expected_duration_minutes: number
+          id?: string
+          instructions: string
+          intervention_slug: string
+          methodology_approved?: boolean
+          participants?: Json
+          poc?: boolean
+          scenario_id: string
+          status?: string
+          title: string
+          truth?: Json
+          version: number
+        }
+        Update: {
+          activity_key?: string
+          activity_steps?: Json
+          created_at?: string
+          exercise_label?: string
+          expected_duration_minutes?: number
+          id?: string
+          instructions?: string
+          intervention_slug?: string
+          methodology_approved?: boolean
+          participants?: Json
+          poc?: boolean
+          scenario_id?: string
+          status?: string
+          title?: string
+          truth?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_activity_configs_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1240,6 +1305,16 @@ export type Database = {
           _type: string
         }
         Returns: string
+      }
+      append_team_events: {
+        Args: {
+          _events: Json
+          _internal?: Json
+          _participant_state?: Json
+          _request: string
+          _run: string
+        }
+        Returns: Json
       }
       connect_strategyzer_playbook: {
         Args: {
