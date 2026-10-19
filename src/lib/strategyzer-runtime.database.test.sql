@@ -5,7 +5,7 @@ DECLARE owner uuid; other uuid; scenario uuid; sid uuid:=gen_random_uuid(); rid 
 BEGIN
  SELECT owner_id,scenario_id INTO owner,scenario FROM public.sessions WHERE owner_id IS NOT NULL LIMIT 1;
  SELECT id INTO other FROM auth.users WHERE id<>owner LIMIT 1;
- INSERT INTO public.sessions(id,owner_id,scenario_id,candidate_name,chosen_intervention_slug) VALUES(sid,owner,scenario,'TEST/NON-PRODUCTION Jane Doe','customer_profile_interviews');
+ INSERT INTO public.sessions(id,owner_id,scenario_id,candidate_name,candidate_email,chosen_intervention_slug) VALUES(sid,owner,scenario,'TEST/NON-PRODUCTION Jane Doe','test@example.invalid','customer_profile_interviews');
  PERFORM set_config('request.jwt.claims',json_build_object('sub',owner,'role','authenticated')::text,true);
  rid:=public.start_strategyzer_run(sid,'b4000000-0000-4000-8000-0000000000aa');
  IF public.start_strategyzer_run(sid,'b4000000-0000-4000-8000-0000000000aa')<>rid THEN RAISE EXCEPTION 'start not idempotent'; END IF;
