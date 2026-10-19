@@ -788,7 +788,7 @@ function MethodStep({
   const commitMut = useMutation({
     mutationFn: () => save({ data: buildSaveData(true) as any }),
     onSuccess: async () => {
-      toast.success("Intervention committed");
+      toast.success("Approach committed");
       if (onCommitAndAdvance) await onCommitAndAdvance();
     },
     onError: (e: any) => toast.error(e.message ?? "Commit failed"),
@@ -805,8 +805,8 @@ function MethodStep({
 
   return (
     <StepShell
-      title="Choose your intervention"
-      hint="Problem → decision → intervention"
+      title="Your approach"
+      hint="Given the customer outcome, the current situation and what you've learned — how should you help this client make progress?"
     >
       {/* Pathway cards */}
       <div className="grid md:grid-cols-2 gap-3 mb-6">
@@ -832,17 +832,16 @@ function MethodStep({
         })}
       </div>
 
-      {/* AI second opinion — logged for reviewer */}
+      {/* AI second opinion */}
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
-          <div className="font-medium mb-1 flex items-center gap-2">
-            {hasDraft ? "Compare with AI" : "AI second opinion"}
-            <span className="text-[10px] uppercase tracking-[0.14em] opacity-70 px-1.5 py-0.5 border border-ink">Logged for reviewer</span>
+          <div className="font-medium mb-1">
+            {hasDraft ? "Pressure-test your thinking" : "AI second opinion"}
           </div>
           <div className="text-xs opacity-80">
             {hasDraft
-              ? "You've drafted your own reasoning. Pressure-test it against the AI — your reviewer will see both."
-              : "Draft your own intervention and rationale first, then pressure-test with AI. Every suggestion shown is recorded."}
+              ? "You've drafted your own reasoning. Compare it with an AI second opinion before you commit."
+              : "Draft your own approach and rationale first, then pressure-test it with an AI second opinion."}
           </div>
         </div>
         <button
@@ -857,7 +856,7 @@ function MethodStep({
 
       {suggestion && (
         <div className="mb-6 border border-ink p-4 bg-secondary">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI suggestion · confidence {suggestion.confidence ?? "—"}</div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI second opinion</div>
           {suggestion.playbookId && (
             <div className="font-medium mb-1">
               → {interventions.find((r) => r.slug === suggestion.playbookId)?.label ?? PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
@@ -936,7 +935,7 @@ function MethodStep({
                         <div className="flex items-center justify-between mb-1 gap-2">
                           <span className="text-sm font-medium">{r.label}</span>
                           {r.is_deep_vertical && (
-                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Deep vertical</span>
+                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Multi-session</span>
                           )}
                         </div>
                         <p className="text-xs opacity-80 leading-relaxed">{r.short_description}</p>
@@ -964,10 +963,10 @@ function MethodStep({
 
       {/* Rationale */}
       <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
-        Why does this intervention fit? <span className="text-red-600">*</span>
+        Why is this the right way to help? <span className="text-red-600">*</span>
       </label>
       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
-        Ground your reasoning in what you diagnosed in Framing and Stakeholders. Required before you continue to Chapter 2.
+        Ground your reasoning in your conversations and your Engagement Brief — the outcome, the evidence, the sequencing, and what would change your mind.
       </p>
       <div className="relative">
         <textarea
@@ -997,9 +996,9 @@ function MethodStep({
             onClick={() => commitMut.mutate()}
             disabled={commitMut.isPending || !canCommit}
             className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
-            title={!canCommit ? "Pick an intervention and write a rationale first." : undefined}
+            title={!canCommit ? "Choose an approach and write your reasoning first." : undefined}
           >
-            {commitMut.isPending ? "Committing…" : `Continue to ${nextChapterLabel ?? "Chapter 2"} →`}
+            {commitMut.isPending ? "Committing…" : "Commit approach →"}
           </button>
         )}
       </div>
