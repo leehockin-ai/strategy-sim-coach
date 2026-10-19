@@ -57,6 +57,13 @@
       "when": 1792435574290,
       "tag": "0007_strategyzer_external_runtime",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792439048844,
+      "tag": "0008_live_client_team_poc",
+      "breakpoints": true
     }
   ]
 }
