@@ -66,10 +66,10 @@ export function chapterMeta(key: ChapterKey) {
 }
 
 export const STEP_LABELS: Record<StepKey, string> = {
-  framing: "Framing",
-  stakeholder_workspace: "Stakeholders",
-  coaching_approach: "Approach",
-  live_playbook: "Live Playbook",
+  framing: "Scoping Call",
+  stakeholder_workspace: "Conversations",
+  coaching_approach: "Your Approach",
+  live_playbook: "Working Session",
   next_step_judgment: "Judgment",
   engagement_orchestration: "Orchestration",
 };
