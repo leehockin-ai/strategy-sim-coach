@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { canvasSchema, sessionStatusSchema } from "@/lib/session-compatibility";
+import { assertReviewerAccess } from "@/lib/reviewer-access";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
@@ -18,6 +19,7 @@ export const suggestPlaybook = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -107,6 +109,7 @@ Return strict JSON:
 
 
 async function assertSessionOwner(sessionId: string, userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("sessions")
     .select("owner_id")
@@ -122,26 +125,6 @@ async function assertSessionOwner(sessionId: string, userId: string) {
 // guardedness state that accumulates across dialogue turns. Seeded at
 // session creation, updated on every coach turn to a stakeholder.
 // ────────────────────────────────────────────────────────────────────
-export async function seedInitialStakeholderStates(sessionId: string, scenarioId: string) {
-  const { data: scen } = await supabaseAdmin
-    .from("scenarios")
-    .select("stakeholders")
-    .eq("id", scenarioId)
-    .maybeSingle();
-  const stakeholders = ((scen as any)?.stakeholders ?? []) as Array<{ name: string }>;
-  if (stakeholders.length === 0) return;
-  const rows = stakeholders.map((s) => ({
-    session_id: sessionId,
-    stakeholder_id: s.name,
-    engagement: "medium" as const,
-    trust: "medium" as const,
-    guardedness: "measured" as const,
-    turn_index: 0,
-    reasoning: "initial state",
-  }));
-  await supabaseAdmin.from("stakeholder_states" as any).insert(rows as any);
-}
-
 type StakeholderState = {
   engagement: "low" | "medium" | "high";
   trust: "low" | "medium" | "high";
@@ -250,6 +233,7 @@ export const createSession = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
       .insert({
@@ -263,11 +247,6 @@ export const createSession = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
-    try {
-      await seedInitialStakeholderStates((session as any).id, data.scenarioId);
-    } catch (err) {
-      console.error("[createSession] seedInitialStakeholderStates failed", err);
-    }
     return { session };
   });
 
@@ -275,6 +254,7 @@ export const createSession = createServerFn({ method: "POST" })
 export const listMySessions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("sessions")
       .select(`
@@ -300,6 +280,7 @@ export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
     z.object({ sessionId: z.string().uuid() }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("sessions")
       .select("owner_id, submission_requested_at, status")
@@ -347,7 +328,9 @@ export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
 export const getSessionForReviewer = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertReviewerAccess(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
       .select("*, scenarios(*)")
@@ -359,12 +342,13 @@ export const getSessionForReviewer = createServerFn({ method: "POST" })
       .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
     const { data: evaluation } = await supabaseAdmin
       .from("evaluations").select("*").eq("session_id", data.sessionId).maybeSingle();
-    const { data: stakeholderStates } = await supabaseAdmin
+    const { data: stakeholderStates, error: stateError } = await supabaseAdmin
       .from("stakeholder_states" as any)
       .select("*")
       .eq("session_id", data.sessionId)
       .order("stakeholder_id", { ascending: true })
       .order("turn_index", { ascending: true });
+    if (stateError) throw new Error(stateError.message);
     return { session, messages: messages ?? [], evaluation, stakeholderStates: stakeholderStates ?? [] };
   });
 
@@ -373,6 +357,7 @@ export const getSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
       .select("*, scenarios(*)")
@@ -425,7 +410,7 @@ export const updateSession = createServerFn({ method: "POST" })
       methodologyRationale: z.string().max(4000).optional(),
       interventionRecommendation: z.string().max(8000).optional(),
       decision: z.string().max(60).optional(),
-      status: z.string().max(40).optional(),
+      status: sessionStatusSchema.refine((status) => !["evaluated", "approved", "conditional", "not_approved", "retry", "escalated"].includes(status), "Assessment progress is server managed").optional(),
       dialogueCommitments: z.string().max(8000).optional(),
       chosenInterventionSlug: z.string().max(120).optional(),
       interventionRationale: z.string().max(8000).optional(),
@@ -439,6 +424,7 @@ export const updateSession = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const patch: Record<string, unknown> = {};
     if (data.framingNotes !== undefined) patch.framing_notes = data.framingNotes;
@@ -488,6 +474,7 @@ export const updateSession = createServerFn({ method: "POST" })
 export const listInterventions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("interventions")
       .select("slug, label, short_description, long_description, pathway_type, phase, is_deep_vertical, sort_order, default_activity_list")
@@ -508,18 +495,13 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const stateAssessmentStart = Date.now();
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
-    await supabaseAdmin.from("messages").insert({
-      session_id: data.sessionId,
-      role: "candidate",
-      stakeholder_name: data.stakeholderName,
-      content: data.candidateMessage,
-      ...(data.phase ? { phase: data.phase } : {}),
-    });
+
 
 
     const { data: session, error: sErr } = await supabaseAdmin
@@ -537,18 +519,22 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
 
     const scenario = (session as any).scenarios;
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
-    const persona = stakeholders.find((s) => s.name === data.stakeholderName) ?? stakeholders[0];
+    const persona = stakeholders.find((s) => s.name === data.stakeholderName);
+    if (!persona) throw new Error("Unknown stakeholder");
+    const { error: coachError } = await supabaseAdmin.from("messages").insert({ session_id: data.sessionId, role: "candidate", stakeholder_name: persona.name, content: data.candidateMessage, ...(data.phase ? { phase: data.phase } : {}) });
+    if (coachError) throw new Error(coachError.message);
 
     // ── Patch 3: fetch prior hidden state for THIS stakeholder, then run
     // a state-assessment call before we generate the reply. Serial pipeline;
     // the reply prompt depends on the assessed state.
-    const { data: priorRows } = await supabaseAdmin
+    const { data: priorRows, error: priorError } = await supabaseAdmin
       .from("stakeholder_states" as any)
       .select("engagement, trust, guardedness, reasoning, turn_index")
       .eq("session_id", data.sessionId)
       .eq("stakeholder_id", persona.name)
       .order("turn_index", { ascending: false })
       .limit(1);
+    if (priorError) throw new Error(priorError.message);
     const priorRow = (priorRows ?? [])[0] as any;
     const priorState: StakeholderState = priorRow
       ? {
@@ -569,23 +555,17 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
     });
     const stateAssessmentMs = Date.now() - stateAssessmentT0;
 
-    let currentState: StakeholderState;
-    if (assessed) {
-      currentState = assessed;
-      const { error: insErr } = await supabaseAdmin.from("stakeholder_states" as any).insert({
-        session_id: data.sessionId,
-        stakeholder_id: persona.name,
-        engagement: assessed.engagement,
-        trust: assessed.trust,
-        guardedness: assessed.guardedness,
-        turn_index: nextTurnIndex,
-        reasoning: assessed.reasoning,
-      });
-      if (insErr) console.error("[sendStakeholderMessage] state insert failed", insErr);
-    } else {
-      currentState = priorState;
-      console.warn(`[sendStakeholderMessage] state assessment failed for ${persona.name}; carrying prior state forward`);
-    }
+    const currentState: StakeholderState = assessed ?? {
+      ...priorState,
+      reasoning: "State assessment unavailable; carried forward last observed state (not a new assessment).",
+    };
+    const { error: stateWriteError } = await supabaseAdmin.from("stakeholder_states").insert({
+      session_id: data.sessionId,
+      stakeholder_id: persona.name,
+      ...currentState,
+      turn_index: nextTurnIndex,
+    });
+    if (stateWriteError) throw new Error(`Could not persist stakeholder state: ${stateWriteError.message}`);
 
     const toneModulator = toneModulatorForState(currentState);
 
@@ -640,6 +620,7 @@ Hard rules:
           ? `[Coach to ${m.stakeholder_name}]: ${m.content}`
           : `[${m.stakeholder_name}]: ${m.content}`,
       })),
+      { role: "user", content: `[Coach to ${persona.name}]: ${data.candidateMessage}` },
     ];
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -663,7 +644,7 @@ Hard rules:
     const json = await res.json();
     const reply: string = json.choices?.[0]?.message?.content ?? "...";
 
-    const { data: saved } = await supabaseAdmin
+    const { data: saved, error: replyWriteError } = await supabaseAdmin
       .from("messages")
       .insert({
         session_id: data.sessionId,
@@ -676,6 +657,7 @@ Hard rules:
       .single();
 
 
+    if (replyWriteError) throw new Error(replyWriteError.message);
     const totalMs = Date.now() - stateAssessmentStart;
     console.log(`[sendStakeholderMessage] stakeholder=${persona.name} stateAssessmentMs=${stateAssessmentMs} totalMs=${totalMs}`);
     return { message: saved, _timing: { stateAssessmentMs, totalMs } };
@@ -693,6 +675,7 @@ export const sendScopingTurn = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -798,6 +781,7 @@ export const extractFraming = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -877,6 +861,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -995,6 +980,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
@@ -1084,15 +1070,16 @@ export const saveCanvas = createServerFn({ method: "POST" })
   .inputValidator((d: { sessionId: string; canvas: Record<string, unknown> }) =>
     z.object({
       sessionId: z.string().uuid(),
-      canvas: z.record(z.string(), z.union([z.string().max(8000), z.array(z.string().max(2000)).max(50)])),
+      canvas: canvasSchema,
 
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const { error } = await supabaseAdmin
       .from("sessions")
-      .update({ application_canvas: data.canvas, status: "application" })
+      .update({ application_canvas: data.canvas as any })
       .eq("id", data.sessionId);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1112,6 +1099,7 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");

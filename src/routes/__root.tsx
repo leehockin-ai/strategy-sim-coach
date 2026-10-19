@@ -68,8 +68,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "Strategyzer Coach Certification Simulator" },
       { property: "og:description", content: "An AI-assisted simulator that assesses Strategyzer coaching judgment in realistic business scenarios." },
       { name: "twitter:description", content: "An AI-assisted simulator that assesses Strategyzer coaching judgment in realistic business scenarios." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7e51449e-1d69-4b8d-a0f2-7378f2179d4b" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/7e51449e-1d69-4b8d-a0f2-7378f2179d4b" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -113,9 +111,10 @@ function RootComponent() {
 function AuthWatcher({ router }: { router: ReturnType<typeof useRouter> }) {
   const qc = useQueryClient();
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
-      qc.invalidateQueries();
+      if (event !== "SIGNED_OUT") qc.invalidateQueries();
     });
     return () => subscription.unsubscribe();
   }, [router, qc]);

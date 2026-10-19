@@ -6,7 +6,14 @@ import { listMySessions } from "@/lib/simulator.functions";
 import { stepFromStatus, chapterForStep } from "@/lib/chapters";
 
 export const Route = createFileRoute("/_authenticated/sessions/")({
-  head: () => ({ meta: [{ title: "My sessions · Strategyzer Coach Certification" }] }),
+  head: () => ({ meta: [
+    { title: "My sessions · Coach Compass" },
+    { name: "description", content: "Resume coaching sessions and view AI rubrics and human certification assessments." },
+    { property: "og:title", content: "My sessions · Coach Compass" },
+    { property: "og:description", content: "Resume coaching sessions and view AI rubrics and human certification assessments." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary_large_image" },
+  ] }),
   component: MySessionsPage,
 });
 

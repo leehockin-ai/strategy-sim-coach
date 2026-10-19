@@ -585,6 +585,7 @@ export type Database = {
         Args: { _assignment_id: string }
         Returns: undefined
       }
+      session_progress_rank: { Args: { _status: string }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "reviewer" | "user"

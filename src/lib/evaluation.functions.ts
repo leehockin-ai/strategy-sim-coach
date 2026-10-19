@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { assertReviewerAccess } from "@/lib/reviewer-access";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import {
@@ -382,6 +382,7 @@ export const generateEvaluation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
@@ -399,13 +400,14 @@ export const generateEvaluation = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
-    const { data: stakeholderStates } = await supabaseAdmin
+    const { data: stakeholderStates, error: stateError } = await supabaseAdmin
       .from("stakeholder_states" as any)
       .select("stakeholder_id, engagement, trust, guardedness, turn_index, reasoning")
       .eq("session_id", data.sessionId)
       .order("stakeholder_id", { ascending: true })
       .order("turn_index", { ascending: true });
 
+    if (stateError) throw new Error(stateError.message);
     const s = session as unknown as SessionForEval & { id: string };
     const turns = transcript as TranscriptTurn[] | null;
     s.stakeholder_state_trajectory = (stakeholderStates ?? []) as any;
@@ -577,7 +579,9 @@ export const setReviewerDecision = createServerFn({ method: "POST" })
       ]),
     }).parse(d)
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    await assertReviewerAccess(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: evaluation, error } = await supabaseAdmin
       .from("evaluations")
       .update({
@@ -606,7 +610,9 @@ export const setReviewerDecision = createServerFn({ method: "POST" })
 
 export const listReviewSessions = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
+    await assertReviewerAccess(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
       .from("sessions")
       .select(
