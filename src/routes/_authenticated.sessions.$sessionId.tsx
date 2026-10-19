@@ -454,7 +454,6 @@ function FramingStep({
   const sendTurn = useServerFn(sendScopingTurn);
   const tts = useServerFn(synthesizeVoice);
   const extract = useServerFn(extractFraming);
-  const save = useServerFn(updateSession);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -557,6 +556,7 @@ function FramingStep({
     <div className="grid lg:grid-cols-12 gap-6">
       <div className="lg:col-span-4 min-w-0">
         <h2 className="text-2xl tracking-tight mb-2">Scoping call</h2>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">Meet the team. Listen for what they say they want — and what sits underneath it.</p>
         <button
           onClick={() => extractMut.mutate()}
           disabled={extractMut.isPending || scopingMessages.length < 2}
@@ -564,7 +564,9 @@ function FramingStep({
         >
           {extractMut.isPending ? "Summarizing conversation…" : "Review conversation summary"}
         </button>
-        <Button variant="outline" className="w-full mb-2" onClick={() => { setDraft(parseFraming(session.framing_notes)); setReviewing(true); }}>Edit framing</Button>
+        {session.framing_notes && (
+          <Button variant="outline" className="w-full mb-2" onClick={() => { setDraft(parseFraming(session.framing_notes)); setReviewing(true); }}>View saved summary</Button>
+        )}
         <p className="text-[11px] text-muted-foreground">{scopingMessages.length} messages exchanged</p>
       </div>
 
