@@ -666,7 +666,6 @@ function MethodStep({
   session,
   onSaved,
   onCommitAndAdvance,
-  nextChapterLabel,
 }: {
   session: any;
   onSaved: () => void;
