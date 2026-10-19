@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertReviewerAccess } from "@/lib/reviewer-access";
-import { activityEventSchema, PUBLIC_EVENT_COLUMNS, type ActivityEventInput } from "./activity-runtime";
+import { activityEventSchema, PUBLIC_EVENT_COLUMNS, normalizeStrategyzerUrl, type ActivityEventInput } from "./activity-runtime";
 
 const sessionInput = z.object({ sessionId: z.string().uuid() });
 
@@ -13,7 +13,7 @@ export const getActivityRuntime = createServerFn({ method: "POST" })
     const { data: session, error } = await context.supabase.from("sessions")
       .select("id,owner_id,scenario_id,chosen_intervention_slug,scope_revision,status").eq("id", data.sessionId).single();
     if (error || !session || session.owner_id !== context.userId) throw new Error("Forbidden");
-    const { data: intervention } = await context.supabase.from("interventions").select("id,label").eq("slug", session.chosen_intervention_slug ?? "").maybeSingle();
+    const { data: intervention } = await context.supabase.from("interventions").select("id,label,pathway_type").eq("slug", session.chosen_intervention_slug ?? "").maybeSingle();
     const { data: testAllowed, error: testError } = await context.supabase.rpc("activity_runtime_test_allowed", { _session: session.id, _candidate: context.userId });
     if (testError) throw new Error("Activity access could not be checked");
     const definitions = intervention ? await context.supabase.from("activity_definitions").select("*").eq("intervention_id", intervention.id).eq("status", "active").order("sort_order") : { data: [], error: null };
@@ -68,4 +68,51 @@ export const getActivityEvidenceForReviewer = createServerFn({ method: "POST" })
     const artifacts = await context.supabase.from("activity_artifact_history").select("*").eq("run_id", run.id).order("revision");
     if (truth.error || annotations.error || artifacts.error) throw new Error("Reviewer evidence could not be loaded");
     return { run, events, artifacts: artifacts.data ?? [], privateRun, truth: truth.data, annotations: annotations.data ?? [] };
+  });
+const allowedHosts = async (supabase: { from: (t: "external_runtime_allowed_hosts") => any }) => {
+  const { data, error } = await supabase.from("external_runtime_allowed_hosts").select("host_suffix").eq("enabled", true);
+  if (error) throw new Error("Allowed Strategyzer addresses could not be loaded");
+  return (data ?? []).map((h: { host_suffix: string }) => h.host_suffix) as string[];
+};
+
+export const getStrategyzerConnections = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { runId: string }) => z.object({ runId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase.from("activity_external_connections").select("*").eq("run_id", data.runId).order("version");
+    if (error) throw new Error("Connection history could not be loaded");
+    return { connections: rows ?? [], allowedHosts: await allowedHosts(context.supabase) };
+  });
+
+export const startStrategyzerRun = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; requestKey: string }) => z.object({ sessionId: z.string().uuid(), requestKey: z.string().uuid() }).strict().parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: runId, error } = await context.supabase.rpc("start_strategyzer_run", { _session: data.sessionId, _request: data.requestKey });
+    if (error || !runId) throw new Error(error?.message ?? "Assessment workspace could not be created");
+    return { runId };
+  });
+
+export const connectStrategyzerPlaybook = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { runId: string; requestKey: string; url: string; confirmProject: boolean; confirmName: boolean; confirmPlaybook: boolean; projectName?: string; playbookTitle?: string }) =>
+    z.object({ runId: z.string().uuid(), requestKey: z.string().uuid(), url: z.string().max(2048), confirmProject: z.literal(true), confirmName: z.literal(true), confirmPlaybook: z.literal(true), projectName: z.string().max(300).optional(), playbookTitle: z.string().max(300).optional() }).strict().parse(d))
+  .handler(async ({ data, context }) => {
+    const parsed = normalizeStrategyzerUrl(data.url, await allowedHosts(context.supabase));
+    if (!parsed.ok) throw new Error(parsed.error);
+    const { data: id, error } = await context.supabase.rpc("connect_strategyzer_playbook", {
+      _run: data.runId, _request: data.requestKey, _supplied_url: parsed.supplied, _launch_url: parsed.launch, _host: parsed.host,
+      _confirm_project: true, _confirm_name: true, _confirm_playbook: true, _project_name: data.projectName ?? "", _playbook_title: data.playbookTitle ?? "",
+    });
+    if (error || !id) throw new Error(error?.message ?? "Playbook could not be connected");
+    return { connectionId: id };
+  });
+
+export const recordStrategyzerLaunch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { runId: string; requestKey: string }) => z.object({ runId: z.string().uuid(), requestKey: z.string().uuid() }).strict().parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("record_strategyzer_launch", { _run: data.runId, _request: data.requestKey });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
