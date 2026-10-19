@@ -5,6 +5,8 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
+import { ScopeBrief } from "@/components/ScopeBrief";
+import { Button } from "@/components/ui/button";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
@@ -126,7 +128,7 @@ function SessionPage() {
         furthestChapterIndex={furthestChapter.index}
         onChange={(k) => setActiveStep(chapterMeta(k).steps[0])}
       />
-      {chapter.steps.length > 1 && (
+      {activeChapter !== "scope" && chapter.steps.length > 1 && (
         <SubTabNav
           steps={chapter.steps}
           active={activeStep}
@@ -134,17 +136,27 @@ function SessionPage() {
         />
       )}
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
-        <ChapterBanner chapter={activeChapter} />
-        {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={onStepSaved} onRefresh={refetch} />}
+        {activeChapter !== "scope" && <ChapterBanner chapter={activeChapter} />}
+        {activeChapter === "scope" && <div>
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the engagement</div><h2 className="text-2xl mt-2">Engagement hypothesis</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Understand</span><span>→ Frame</span><span>→ Decide</span><span>→ Scope</span></div></div>
+          <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-7 items-start">
+            <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
+              {([{ key: "framing", label: "Client conversation" }, { key: "stakeholder_workspace", label: "Stakeholders" }, { key: "coaching_approach", label: "Intervention thinking" }] as const).map(tab => <Button key={tab.key} role="tab" aria-selected={activeStep === tab.key} variant={activeStep === tab.key ? "default" : "ghost"} onClick={() => setActiveStep(tab.key)}>{tab.label}</Button>)}
+            </div>
+        {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
         {renderKey === "method" && (
           <MethodStep
             session={session}
-            onSaved={onStepSaved}
+            onSaved={refreshOnly}
             onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined}
             nextChapterLabel={nextChapter ? `Chapter ${nextChapter.index} — ${nextChapter.label}` : undefined}
           />
         )}
-        {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={onStepSaved} />}
+        {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
+            </div>
+            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} />
+          </div>
+        </div>}
         {renderKey === "application" && (
           <Chapter2Container
             session={session}
@@ -156,7 +168,7 @@ function SessionPage() {
         {renderKey === "intervention" && <InterventionStep session={session} onSaved={onStepSaved} />}
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
-        {showChapterTransition && nextChapter && !suppressSharedContinue && (
+        {activeChapter !== "scope" && showChapterTransition && nextChapter && !suppressSharedContinue && (
           <div className="mt-12 border-t border-ink pt-8 flex justify-end">
             <button
               onClick={() => goToChapter(nextChapter.key)}
@@ -302,7 +314,7 @@ function StepShell({ title, hint, children }: { title: string; hint: string; chi
         <h2 className="text-2xl tracking-tight mb-3">{title}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">{hint}</p>
       </div>
-      <div className="md:col-span-8">{children}</div>
+      <div className="md:col-span-8 min-w-0">{children}</div>
     </div>
   );
 }
@@ -490,7 +502,7 @@ function FramingStep({
 
   const saveMut = useMutation({
     mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(draft ?? {}), status: "framing" } }),
-    onSuccess: () => { toast.success("Framing locked"); onSaved(); },
+    onSuccess: () => { toast.success("Framing saved"); onSaved(); setReviewing(false); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -505,10 +517,10 @@ function FramingStep({
   if (reviewing && draft) {
     return (
       <StepShell
-        title="Review the framing"
-        hint="The AI drafted these scoping fields from your call. Edit anything that's off, then lock it in. Empty fields mean you didn't surface that in the call — go back and ask if needed."
+        title="Framing draft"
+        hint="From your saved conversation"
       >
-        {gaps.length > 0 && (
+        {false && gaps.length > 0 && (
           <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
             <div className="uppercase tracking-[0.12em] mb-1 font-medium">Coaching note</div>
             <ul className="list-disc pl-4 space-y-0.5">{gaps.map((g, i) => <li key={i}>{g}</li>)}</ul>
@@ -521,7 +533,6 @@ function FramingStep({
                 <span className="marker-num opacity-60">{String(i + 1).padStart(2, "0")}</span>
                 {f.label}
               </label>
-              <p className="text-[11px] text-muted-foreground mb-1.5">{f.hint}</p>
               <textarea
                 value={draft[f.key] ?? ""}
                 onChange={(e) => setDraft((p) => ({ ...(p ?? {}), [f.key]: e.target.value }))}
@@ -534,7 +545,7 @@ function FramingStep({
         <div className="mt-6 flex items-center justify-between">
           <button onClick={() => setReviewing(false)} className="text-xs underline">← Back to call</button>
           <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !draft.decision?.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-            {saveMut.isPending ? "Saving…" : "Lock framing & diagnose playbook →"}
+            {saveMut.isPending ? "Saving…" : "Save framing"}
           </button>
         </div>
       </StepShell>
@@ -544,29 +555,20 @@ function FramingStep({
   // ----- Live call screen -----
   return (
     <div className="grid lg:grid-cols-12 gap-6">
-      <div className="lg:col-span-4">
+      <div className="lg:col-span-4 min-w-0">
         <h2 className="text-2xl tracking-tight mb-2">Scoping call</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-          You're on a kick-off video call with the team. <strong>Lead the conversation</strong> — they won't volunteer the framing.
-          Surface the decision, the ambiguity, what they've tried, the cost of inaction, and what success looks like.
-        </p>
-        <div className="border border-ink p-3 text-xs mb-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
-          <div className="uppercase tracking-[0.12em] font-medium mb-1">Five things to surface</div>
-          <ol className="space-y-0.5 list-decimal pl-4">
-            {SCOPING_FIELDS.map((f) => <li key={f.key}>{f.label}</li>)}
-          </ol>
-        </div>
         <button
           onClick={() => extractMut.mutate()}
           disabled={extractMut.isPending || scopingMessages.length < 2}
           className="w-full bg-ink text-paper py-2 text-sm rounded-sm disabled:opacity-40 mb-2"
         >
-          {extractMut.isPending ? "Synthesizing call…" : callEnded ? "Re-extract framing draft" : "End call & extract framing →"}
+          {extractMut.isPending ? "Summarizing conversation…" : "Review conversation summary"}
         </button>
+        <Button variant="outline" className="w-full mb-2" onClick={() => { setDraft(parseFraming(session.framing_notes)); setReviewing(true); }}>Edit framing</Button>
         <p className="text-[11px] text-muted-foreground">{scopingMessages.length} messages exchanged</p>
       </div>
 
-      <div className="lg:col-span-8 space-y-4">
+      <div className="lg:col-span-8 min-w-0 space-y-4">
         {/* Video grid */}
         <div className="grid grid-cols-2 gap-2">
           {stakeholders.map((s, i) => (
@@ -590,7 +592,7 @@ function FramingStep({
           </div>
           <div ref={scrollRef} className="px-4 py-3 space-y-2 max-h-[28vh] overflow-y-auto text-sm">
             {scopingMessages.length === 0 && (
-              <div className="text-muted-foreground italic">Open the call. Start by introducing yourself and asking what brought them to this engagement.</div>
+              <div className="text-muted-foreground italic">The team is ready.</div>
             )}
             {scopingMessages.map((m) => (
               <div key={m.id} className={m.role === "candidate" ? "text-ink" : ""}>
@@ -607,7 +609,7 @@ function FramingStep({
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Speak or type your next question to the team…"
-              className="flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
+              className="min-w-0 w-full flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
               disabled={turnMut.isPending}
             />
             <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
@@ -802,7 +804,7 @@ function MethodStep({
   return (
     <StepShell
       title="Choose your intervention"
-      hint="Pick the pathway that fits what you diagnosed in Framing and Stakeholders — then pick a specific intervention (or write your own alignment approach). Your rationale is what reviewers assess; the commit happens when you continue to Chapter 2."
+      hint="Problem → decision → intervention"
     >
       {/* Pathway cards */}
       <div className="grid md:grid-cols-2 gap-3 mb-6">
@@ -844,7 +846,7 @@ function MethodStep({
         <button
           type="button"
           onClick={() => suggestMut.mutate()}
-          disabled={suggestMut.isPending || !pathway}
+          disabled={suggestMut.isPending || !hasDraft}
           className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
         >
           {suggestMut.isPending ? "Thinking…" : hasDraft ? "Compare" : "Suggest"}
@@ -1024,7 +1026,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   }, [filtered.length]);
 
   const mut = useMutation({
-    mutationFn: () => send({ data: { sessionId: session.id, stakeholderName: target, candidateMessage: text } }),
+    mutationFn: () => send({ data: { sessionId: session.id, stakeholderName: target, candidateMessage: text, phase: "intervention" } }),
     onSuccess: () => { setText(""); onRefresh(); },
     onError: (e: any) => toast.error(e.message),
   });
@@ -1033,6 +1035,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
     setSavingCommit(true);
     try {
       await save({ data: { sessionId: session.id, dialogueCommitments: next } });
+      onRefresh();
     } catch (e: any) {
       toast.error(e?.message ?? "Save failed");
     } finally {
@@ -1043,20 +1046,6 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   return (
     <div className="space-y-6">
       {/* Purpose framing */}
-      <div className="border border-ink p-5" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-xs uppercase tracking-[0.14em] font-medium mb-2">Stakeholder workspace — diagnostic & preparatory</div>
-        <p className="text-sm leading-relaxed">
-          This is where you gather the missing context <em>before</em> you facilitate. Use these 1:1s to validate
-          assumptions, uncover constraints, clarify stakeholder readiness, read emotional dynamics, identify hidden
-          blockers, test alignment, and surface political reality. Stakeholders remember the full transcript — they will
-          resist, evolve, and sometimes contradict themselves under pressure, just like real ones.
-        </p>
-        <p className="text-sm leading-relaxed mt-2">
-          <strong>What gets carried forward:</strong> commitments and decisions captured on the right. These sharpen
-          your Live Playbook Facilitation, your Next-Step Judgment, and your Engagement Orchestration. This isn't a
-          standalone coaching phase — return here any time a later step surfaces a new question for a stakeholder.
-        </p>
-      </div>
 
       <div className="grid md:grid-cols-12 gap-6">
         <aside className="md:col-span-3">
@@ -1073,13 +1062,9 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
               </button>
             ))}
           </div>
-          <p className="mt-6 text-[11px] text-muted-foreground leading-relaxed">
-            This workspace stays open across the whole session. Switch sections from the top nav at any time —
-            nothing here is locked or "completed".
-          </p>
         </aside>
 
-        <div className="md:col-span-6 border border-ink flex flex-col min-h-[60vh]">
+        <div className="md:col-span-6 min-w-0 border border-ink flex flex-col min-h-[60vh]">
           <div className="hairline-b px-5 py-3 flex items-center justify-between">
             <div>
               <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Talking to</div>
@@ -1091,7 +1076,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4 max-h-[55vh]">
             {filtered.length === 0 && (
               <div className="text-sm text-muted-foreground italic">
-                Open the conversation. What do you want to learn — or get committed — from {target}?
+                {target} is available.
               </div>
             )}
             {filtered.map((m) => (
@@ -1119,7 +1104,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={`Say something to ${target}…`}
-              className="flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
+              className="min-w-0 w-full flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
             <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
             <button type="submit" disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">

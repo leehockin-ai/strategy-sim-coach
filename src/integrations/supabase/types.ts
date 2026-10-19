@@ -382,6 +382,86 @@ export type Database = {
         }
         Relationships: []
       }
+      scope_revisions: {
+        Row: {
+          created_at: string
+          evidence_message_ids: string[]
+          id: string
+          revision: number
+          session_id: string
+          snapshot: Json
+        }
+        Insert: {
+          created_at?: string
+          evidence_message_ids?: string[]
+          id?: string
+          revision: number
+          session_id: string
+          snapshot: Json
+        }
+        Update: {
+          created_at?: string
+          evidence_message_ids?: string[]
+          id?: string
+          revision?: number
+          session_id?: string
+          snapshot?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_revisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scope_submissions: {
+        Row: {
+          assessment: Json | null
+          feedback: Json | null
+          id: string
+          locked_at: string | null
+          revision: number
+          session_id: string
+          submitted_at: string
+        }
+        Insert: {
+          assessment?: Json | null
+          feedback?: Json | null
+          id?: string
+          locked_at?: string | null
+          revision: number
+          session_id: string
+          submitted_at?: string
+        }
+        Update: {
+          assessment?: Json | null
+          feedback?: Json | null
+          id?: string
+          locked_at?: string | null
+          revision?: number
+          session_id?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scope_submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scope_submissions_session_id_revision_fkey"
+            columns: ["session_id", "revision"]
+            isOneToOne: false
+            referencedRelation: "scope_revisions"
+            referencedColumns: ["session_id", "revision"]
+          },
+        ]
+      }
       sessions: {
         Row: {
           alignment_workspace: Json | null
@@ -394,6 +474,7 @@ export type Database = {
           created_at: string
           decision: string | null
           dialogue_commitments: string | null
+          engagement_brief: Json
           evidence_gathering_plan: Json | null
           framing_notes: string | null
           id: string
@@ -412,6 +493,7 @@ export type Database = {
           playbook_pdf_path: string | null
           playbook_suggestions: Json
           scenario_id: string
+          scope_revision: number
           status: string
           submission_requested_at: string | null
         }
@@ -426,6 +508,7 @@ export type Database = {
           created_at?: string
           decision?: string | null
           dialogue_commitments?: string | null
+          engagement_brief?: Json
           evidence_gathering_plan?: Json | null
           framing_notes?: string | null
           id?: string
@@ -444,6 +527,7 @@ export type Database = {
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
           scenario_id: string
+          scope_revision?: number
           status?: string
           submission_requested_at?: string | null
         }
@@ -458,6 +542,7 @@ export type Database = {
           created_at?: string
           decision?: string | null
           dialogue_commitments?: string | null
+          engagement_brief?: Json
           evidence_gathering_plan?: Json | null
           framing_notes?: string | null
           id?: string
@@ -476,6 +561,7 @@ export type Database = {
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
           scenario_id?: string
+          scope_revision?: number
           status?: string
           submission_requested_at?: string | null
         }

@@ -43,12 +43,12 @@ function Header() {
 
   return (
     <header className="hairline-b">
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 h-16 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-[1400px] px-6 md:px-10 min-h-16 py-3 md:py-0 flex flex-wrap items-center justify-between gap-3">
         <Link to="/" className="flex items-center gap-3 group">
           <Logo />
           <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground hidden sm:inline">Simulator</span>
         </Link>
-        <nav className="flex items-center gap-1 text-sm">
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
           <NavLink to="/">Overview</NavLink>
           <NavLink to="/scenarios">Scenarios</NavLink>
           {email && <NavLink to="/sessions">My sessions</NavLink>}

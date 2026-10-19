@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { assertReviewerAccess } from "@/lib/reviewer-access";
+import { CANDIDATE_EVALUATION_COLUMNS } from "@/lib/evaluation-public";
+import { DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import {
@@ -22,7 +24,7 @@ export const SECTION_RUBRIC = [
     label: "Situation Framing",
     step: "Step 1",
     focus:
-      "Did the coach surface real ambiguity, separate evidence from opinion, and explicitly challenge or reframe the team's success definition where it was unrealistic? Reward naming the unknowns over pretending to know.",
+      "Assess client understanding, problem framing, decision clarity, evidence mindset and business thinking. Did the coach surface real ambiguity, separate evidence from opinion, and challenge unrealistic success expectations? " + DECISION_CLARITY_RULE,
   },
   {
     key: "coaching_strategy",
@@ -396,7 +398,7 @@ export const generateEvaluation = createServerFn({ method: "POST" })
 
     const { data: transcript } = await supabaseAdmin
       .from("messages")
-      .select("role, stakeholder_name, content, created_at")
+      .select("role, stakeholder_name, content, created_at, phase")
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
@@ -411,6 +413,9 @@ export const generateEvaluation = createServerFn({ method: "POST" })
     const s = session as unknown as SessionForEval & { id: string };
     const turns = transcript as TranscriptTurn[] | null;
     s.stakeholder_state_trajectory = (stakeholderStates ?? []) as any;
+    const { data: scopeRevisions, error: revisionError } = await supabaseAdmin.from("scope_revisions").select("revision, snapshot, evidence_message_ids").eq("session_id", data.sessionId).order("revision", { ascending: true });
+    if (revisionError) throw new Error(revisionError.message);
+    s.scope_revisions = scopeRevisions ?? [];
 
     // Resolve the committed intervention row so the intervention_fit and
     // intervention_execution dimensions can read pathway_type directly
@@ -542,7 +547,7 @@ export const generateEvaluation = createServerFn({ method: "POST" })
         },
         { onConflict: "session_id" }
       )
-      .select()
+      .select(CANDIDATE_EVALUATION_COLUMNS)
       .single();
     if (eErr) throw new Error(eErr.message);
 
