@@ -19,7 +19,7 @@ describe("scenario visibility (public client context vs private assessment truth
       ambiguity_factors: ["Solution committed before problem validated"],
       unrealistic_aspects: ["Timeline is unsupported"],
     };
-    const out = publicScenario(row) as Record<string, unknown>;
+    const out = publicScenario(row) as unknown as Record<string, unknown>;
     expect(out.system_prompt).toBeUndefined();
     expect(out.ambiguity_factors).toBeUndefined();
     expect(out.unrealistic_aspects).toBeUndefined();
