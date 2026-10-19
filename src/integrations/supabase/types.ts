@@ -14,6 +14,471 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_artifact_history: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          confidence: string | null
+          contribution: Json
+          created_at: string
+          event_id: string
+          id: string
+          revision: number
+          run_id: string
+          state: Json
+          unresolved_ambiguity: boolean
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type: string
+          confidence?: string | null
+          contribution?: Json
+          created_at?: string
+          event_id: string
+          id?: string
+          revision: number
+          run_id: string
+          state: Json
+          unresolved_ambiguity?: boolean
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          confidence?: string | null
+          contribution?: Json
+          created_at?: string
+          event_id?: string
+          id?: string
+          revision?: number
+          run_id?: string
+          state?: Json
+          unresolved_ambiguity?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_artifact_history_event_id_run_id_fkey"
+            columns: ["event_id", "run_id"]
+            isOneToOne: false
+            referencedRelation: "activity_events"
+            referencedColumns: ["id", "run_id"]
+          },
+          {
+            foreignKeyName: "activity_artifact_history_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "activity_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_definitions: {
+        Row: {
+          activity_key: string
+          created_at: string
+          expected_inputs: Json
+          id: string
+          instructions: string
+          intended_output: string
+          intervention_id: string
+          methodology_approved: boolean
+          methodology_reference: Json
+          objective: string
+          prerequisites: Json
+          sort_order: number
+          status: string
+          stop_conditions: Json
+          suggested_duration_minutes: number | null
+          test_only: boolean
+          title: string
+          version: number
+          workspace_config: Json
+          workspace_type: string
+        }
+        Insert: {
+          activity_key: string
+          created_at?: string
+          expected_inputs?: Json
+          id?: string
+          instructions: string
+          intended_output: string
+          intervention_id: string
+          methodology_approved?: boolean
+          methodology_reference?: Json
+          objective: string
+          prerequisites?: Json
+          sort_order?: number
+          status?: string
+          stop_conditions?: Json
+          suggested_duration_minutes?: number | null
+          test_only?: boolean
+          title: string
+          version: number
+          workspace_config?: Json
+          workspace_type: string
+        }
+        Update: {
+          activity_key?: string
+          created_at?: string
+          expected_inputs?: Json
+          id?: string
+          instructions?: string
+          intended_output?: string
+          intervention_id?: string
+          methodology_approved?: boolean
+          methodology_reference?: Json
+          objective?: string
+          prerequisites?: Json
+          sort_order?: number
+          status?: string
+          stop_conditions?: Json
+          suggested_duration_minutes?: number | null
+          test_only?: boolean
+          title?: string
+          version?: number
+          workspace_config?: Json
+          workspace_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_definitions_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "interventions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_event_private: {
+        Row: {
+          evaluator_metadata: Json
+          event_id: string
+          participant_state: Json
+          reviewer_metadata: Json
+        }
+        Insert: {
+          evaluator_metadata?: Json
+          event_id: string
+          participant_state?: Json
+          reviewer_metadata?: Json
+        }
+        Update: {
+          evaluator_metadata?: Json
+          event_id?: string
+          participant_state?: Json
+          reviewer_metadata?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_event_private_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "activity_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_events: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          content: string
+          event_type: string
+          evidence_reference: string
+          id: string
+          message_id: string | null
+          metadata: Json
+          occurred_at: string
+          request_key: string
+          request_payload: Json
+          run_id: string
+          sequence: number
+          simulated_time_seconds: number | null
+          time_category: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type: string
+          content?: string
+          event_type: string
+          evidence_reference: string
+          id?: string
+          message_id?: string | null
+          metadata?: Json
+          occurred_at?: string
+          request_key: string
+          request_payload: Json
+          run_id: string
+          sequence: number
+          simulated_time_seconds?: number | null
+          time_category?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          content?: string
+          event_type?: string
+          evidence_reference?: string
+          id?: string
+          message_id?: string | null
+          metadata?: Json
+          occurred_at?: string
+          request_key?: string
+          request_payload?: Json
+          run_id?: string
+          sequence?: number
+          simulated_time_seconds?: number | null
+          time_category?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_events_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "activity_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_run_private: {
+        Row: {
+          internal_configuration: Json
+          participant_state: Json
+          run_id: string
+          simulation_truth_id: string | null
+        }
+        Insert: {
+          internal_configuration?: Json
+          participant_state?: Json
+          run_id: string
+          simulation_truth_id?: string | null
+        }
+        Update: {
+          internal_configuration?: Json
+          participant_state?: Json
+          run_id?: string
+          simulation_truth_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_run_private_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: true
+            referencedRelation: "activity_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_run_private_simulation_truth_id_fkey"
+            columns: ["simulation_truth_id"]
+            isOneToOne: false
+            referencedRelation: "activity_simulation_truth"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_runs: {
+        Row: {
+          activity_definition_id: string
+          activity_version: number
+          artifact_revision: number
+          artifact_state: Json
+          candidate_id: string
+          candidate_stop_rationale: string | null
+          definition_snapshot: Json
+          elapsed_simulated_seconds: number | null
+          ended_at: string | null
+          id: string
+          intervention_id: string
+          intervention_slug: string
+          last_sequence: number
+          scenario_id: string
+          scope_context: Json
+          scope_revision_id: string | null
+          session_id: string
+          simulation_config: Json
+          simulation_version: number
+          start_request_key: string
+          started_at: string
+          status: string
+          stop_state: Json
+          time_budget_seconds: number | null
+        }
+        Insert: {
+          activity_definition_id: string
+          activity_version: number
+          artifact_revision?: number
+          artifact_state?: Json
+          candidate_id: string
+          candidate_stop_rationale?: string | null
+          definition_snapshot: Json
+          elapsed_simulated_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          intervention_id: string
+          intervention_slug: string
+          last_sequence?: number
+          scenario_id: string
+          scope_context?: Json
+          scope_revision_id?: string | null
+          session_id: string
+          simulation_config?: Json
+          simulation_version?: number
+          start_request_key: string
+          started_at?: string
+          status?: string
+          stop_state?: Json
+          time_budget_seconds?: number | null
+        }
+        Update: {
+          activity_definition_id?: string
+          activity_version?: number
+          artifact_revision?: number
+          artifact_state?: Json
+          candidate_id?: string
+          candidate_stop_rationale?: string | null
+          definition_snapshot?: Json
+          elapsed_simulated_seconds?: number | null
+          ended_at?: string | null
+          id?: string
+          intervention_id?: string
+          intervention_slug?: string
+          last_sequence?: number
+          scenario_id?: string
+          scope_context?: Json
+          scope_revision_id?: string | null
+          session_id?: string
+          simulation_config?: Json
+          simulation_version?: number
+          start_request_key?: string
+          started_at?: string
+          status?: string
+          stop_state?: Json
+          time_budget_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_runs_activity_definition_id_fkey"
+            columns: ["activity_definition_id"]
+            isOneToOne: false
+            referencedRelation: "activity_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_runs_intervention_id_fkey"
+            columns: ["intervention_id"]
+            isOneToOne: false
+            referencedRelation: "interventions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_runs_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_runs_scope_revision_id_fkey"
+            columns: ["scope_revision_id"]
+            isOneToOne: false
+            referencedRelation: "scope_revisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_runs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_runtime_test_access: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          session_id: string
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          session_id: string
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_runtime_test_access_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      activity_simulation_truth: {
+        Row: {
+          activity_definition_id: string
+          challenge_moments: Json
+          created_at: string
+          id: string
+          participant_knowledge: Json
+          participant_motivations: Json
+          reveal_conditions: Json
+          scenario_id: string
+          truth: Json
+          version: number
+        }
+        Insert: {
+          activity_definition_id: string
+          challenge_moments?: Json
+          created_at?: string
+          id?: string
+          participant_knowledge?: Json
+          participant_motivations?: Json
+          reveal_conditions?: Json
+          scenario_id: string
+          truth?: Json
+          version: number
+        }
+        Update: {
+          activity_definition_id?: string
+          challenge_moments?: Json
+          created_at?: string
+          id?: string
+          participant_knowledge?: Json
+          participant_motivations?: Json
+          reveal_conditions?: Json
+          scenario_id?: string
+          truth?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_simulation_truth_activity_definition_id_fkey"
+            columns: ["activity_definition_id"]
+            isOneToOne: false
+            referencedRelation: "activity_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_simulation_truth_scenario_id_fkey"
+            columns: ["scenario_id"]
+            isOneToOne: false
+            referencedRelation: "scenarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assignments: {
         Row: {
           admin_note: string | null
@@ -652,6 +1117,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activity_runtime_test_allowed: {
+        Args: { _candidate: string; _session: string }
+        Returns: boolean
+      }
+      append_activity_event: {
+        Args: {
+          _ambiguity?: boolean
+          _artifact?: Json
+          _confidence?: string
+          _content: string
+          _expected_revision?: number
+          _request: string
+          _run: string
+          _type: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -672,6 +1154,10 @@ export type Database = {
         Returns: undefined
       }
       session_progress_rank: { Args: { _status: string }; Returns: number }
+      start_activity_run: {
+        Args: { _definition: string; _request: string; _session: string }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "reviewer" | "user"

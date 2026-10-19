@@ -36,6 +36,13 @@
       "when": 1792432601482,
       "tag": "0004_scope_history_explicit_read_only_privileges",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792433395307,
+      "tag": "0005_playbook_activity_runtime_foundation",
+      "breakpoints": true
     }
   ]
 }
