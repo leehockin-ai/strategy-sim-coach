@@ -29,3 +29,22 @@ export function artifactForWorkspace(type: string, state: unknown) {
   if (kind === "notes") return { notes: state && typeof state === "object" && "notes" in state && typeof state.notes === "string" ? state.notes : "" };
   return state && typeof state === "object" ? state : {};
 }
+// Level 0 external runtime: parse/normalize a candidate-supplied URL. Never fetched server-side.
+export type NormalizedExternalUrl = { ok: true; supplied: string; launch: string; host: string } | { ok: false; error: string };
+export function hostAllowed(host: string, suffixes: readonly string[]) {
+  return suffixes.some(s => host === s || host.endsWith(`.${s}`));
+}
+export function normalizeStrategyzerUrl(input: string, suffixes: readonly string[]): NormalizedExternalUrl {
+  const supplied = input.trim();
+  if (!supplied || supplied.length > 2048) return { ok: false, error: "Paste the full address of your Strategyzer project or Playbook." };
+  if (/[\s<>"'`\\]/.test(supplied)) return { ok: false, error: "That address contains characters that are not allowed." };
+  let url: URL;
+  try { url = new URL(supplied); } catch { return { ok: false, error: "That is not a valid web address." }; }
+  if (url.protocol !== "https:") return { ok: false, error: "The address must start with https://" };
+  if (url.username || url.password || url.port) return { ok: false, error: "That address is not accepted." };
+  const host = url.hostname.toLowerCase();
+  if (!hostAllowed(host, suffixes)) return { ok: false, error: "That address is not a recognised Strategyzer address." };
+  const launch = url.toString();
+  if (launch.length > 2048) return { ok: false, error: "That address is too long." };
+  return { ok: true, supplied, launch, host };
+}
