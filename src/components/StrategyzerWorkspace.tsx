@@ -51,7 +51,7 @@ export function StrategyzerWorkspace({ run, events }: { run: Run; events: Event[
       <p className="text-xs uppercase text-muted-foreground mb-2">Assessment {run.assessment_reference} · Capability level {run.integration_capability_level} — {CAPABILITY[run.integration_capability_level ?? 0]}</p>
       <h2 className="text-2xl">Strategyzer assessment workspace</h2>
       <p className="text-sm text-muted-foreground mt-3 max-w-2xl">You will use the real Strategyzer Playbook environment to complete the application portion of this assessment. Keep Coach Compass available alongside your Playbook. Your simulated client team will eventually operate through Coach Compass while you facilitate the work in Strategyzer.</p>
-      <p className="text-sm mt-3 border-l-2 border-border pl-3">This is a setup step. The simulated client team is not available yet, and Coach Compass cannot see what you do inside Strategyzer.</p>
+      <p className="text-sm mt-3 border-l-2 border-border pl-3">Coach Compass cannot see what you do inside Strategyzer.</p>
     </div>
 
     <section className="border-t border-border pt-6">
