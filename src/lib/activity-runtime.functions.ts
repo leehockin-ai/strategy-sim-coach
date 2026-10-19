@@ -13,7 +13,7 @@ export const getActivityRuntime = createServerFn({ method: "POST" })
     const { data: session, error } = await context.supabase.from("sessions")
       .select("id,owner_id,scenario_id,chosen_intervention_slug,scope_revision,status").eq("id", data.sessionId).single();
     if (error || !session || session.owner_id !== context.userId) throw new Error("Forbidden");
-    const { data: intervention } = await context.supabase.from("interventions").select("id,label").eq("slug", session.chosen_intervention_slug ?? "").maybeSingle();
+    const { data: intervention } = await context.supabase.from("interventions").select("id,label,pathway_type").eq("slug", session.chosen_intervention_slug ?? "").maybeSingle();
     const { data: testAllowed, error: testError } = await context.supabase.rpc("activity_runtime_test_allowed", { _session: session.id, _candidate: context.userId });
     if (testError) throw new Error("Activity access could not be checked");
     const definitions = intervention ? await context.supabase.from("activity_definitions").select("*").eq("intervention_id", intervention.id).eq("status", "active").order("sort_order") : { data: [], error: null };

@@ -5,7 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Play, Save, Square } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getActivityRuntime, startActivityRun, appendActivityEvent } from "@/lib/activity-runtime.functions";
+import { getActivityRuntime, startActivityRun, appendActivityEvent, startStrategyzerRun } from "@/lib/activity-runtime.functions";
+import { StrategyzerWorkspace } from "@/components/StrategyzerWorkspace";
 import { workspaceKind, artifactForWorkspace, type ActivityEventInput } from "@/lib/activity-runtime";
 import type { Json } from "@/integrations/supabase/types";
 
@@ -16,8 +17,8 @@ type Definition = RuntimeData["definitions"][number];
 export function ActivityRuntimeEntry({ sessionId }: { sessionId: string }) {
   const fetchRuntime = useServerFn(getActivityRuntime);
   const { data } = useQuery({ queryKey: ["activity-runtime", sessionId], queryFn: () => fetchRuntime({ data: { sessionId } }) });
-  if (!data || (!data.definitions.length && !data.runs.length)) return null;
-  return <div className="flex justify-end mb-4"><Button variant="outline" asChild><Link to="/sessions/$sessionId/activities" params={{ sessionId }}><Play />{data.testAllowed ? "TEST activity workspace" : "Activity workspace"}</Link></Button></div>;
+  if (!data || (!data.definitions.length && !data.runs.length && data.intervention?.pathway_type !== "playbook")) return null;
+  return <div className="flex justify-end mb-4"><Button variant="outline" asChild><Link to="/sessions/$sessionId/activities" params={{ sessionId }}><Play />{data.testAllowed ? "TEST activity workspace" : "Strategyzer Playbook workspace"}</Link></Button></div>;
 }
 
 export function ActivityRuntime({ data }: { data: RuntimeData }) {
@@ -33,6 +34,14 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
     onSuccess: async result => { pendingStart.current = null; setSelected(result.runId); await qc.invalidateQueries({ queryKey: ["activity-runtime", data.session.id] }); },
     onError: e => toast.error(e.message),
   });
+  const startExt = useServerFn(startStrategyzerRun);
+  const pendingExt = useRef<string | null>(null);
+  const extMut = useMutation({
+    mutationFn: () => { pendingExt.current ??= crypto.randomUUID(); return startExt({ data: { sessionId: data.session.id, requestKey: pendingExt.current } }); },
+    onSuccess: async result => { pendingExt.current = null; setSelected(result.runId); await qc.invalidateQueries({ queryKey: ["activity-runtime", data.session.id] }); },
+    onError: e => toast.error(e.message),
+  });
+  const hasActiveExternal = data.runs.some(r => r.runtime_type === "strategyzer_external" && r.status === "active");
   const run = data.runs.find(r => r.id === selected) ?? data.runs.at(-1);
   return <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-8">
     <Button variant="link" className="px-0 mb-6" asChild><Link to="/sessions/$sessionId" params={{ sessionId: data.session.id }}><ArrowLeft />Back to engagement</Link></Button>
@@ -42,17 +51,22 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
     </div>
     <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-8">
       <aside className="min-w-0">
+        {data.intervention?.pathway_type === "playbook" && !hasActiveExternal && <div className="border-b border-border pb-5 mb-5">
+          <p className="font-medium">Strategyzer Playbook</p>
+          <p className="text-xs text-muted-foreground mt-1">{data.intervention.label} · in your own Strategyzer account</p>
+          <Button className="mt-3" disabled={extMut.isPending} onClick={() => extMut.mutate()}><Play />Set up assessment workspace</Button>
+        </div>}
         <h2 className="text-lg mb-4">Activities</h2>
-        {!data.definitions.length && <p className="text-sm text-muted-foreground">No approved activities configured.</p>}
+        {!data.definitions.length && data.intervention?.pathway_type !== "playbook" && <p className="text-sm text-muted-foreground">No approved activities configured.</p>}
         {data.definitions.map(def => <div key={def.id} className="border-b border-border pb-5 mb-5">
           {def.test_only && <p className="text-xs font-semibold text-destructive mb-2">TEST / NON-PRODUCTION · Not approved methodology</p>}
           <p className="font-medium break-words">{def.title}</p>
           <p className="text-xs text-muted-foreground mt-1">Version {def.version}</p>
           <Button variant="outline" className="mt-3" disabled={startMut.isPending} onClick={() => startMut.mutate(def.id)}><Play />Start activity</Button>
         </div>)}
-        {!!data.runs.length && <><h2 className="text-lg mt-8 mb-3">Attempts</h2>{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} className="w-full justify-start mb-1" onClick={() => setSelected(r.id)}>Attempt {i + 1} · {r.status}</Button>)}</>}
+        {!!data.runs.length && <><h2 className="text-lg mt-8 mb-3">Attempts</h2>{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} className="w-full justify-start mb-1" onClick={() => setSelected(r.id)}>{r.assessment_reference ?? `Attempt ${i + 1}`} · {r.status}</Button>)}</>}
       </aside>
-      <main className="min-w-0">{run ? <RunWorkspace key={run.id} run={run} data={data} /> : <p className="text-muted-foreground text-sm py-4">No activity run started.</p>}</main>
+      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : <p className="text-muted-foreground text-sm py-4">No activity run started.</p>}</main>
     </div>
   </div>;
 }
