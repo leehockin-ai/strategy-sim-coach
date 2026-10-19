@@ -1049,7 +1049,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
 
       <div className="grid md:grid-cols-12 gap-6">
         <aside className="md:col-span-3">
-          <h3 className="text-xs uppercase tracking-[0.12em] mb-3">Stakeholders</h3>
+          <h3 className="text-xs uppercase tracking-[0.12em] mb-3">Who to talk to</h3>
           <div className="space-y-1">
             {stakeholders.map((s) => (
               <button
@@ -1057,8 +1057,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
                 onClick={() => setTarget(s.name)}
                 className={`w-full text-left p-3 border border-ink ${target === s.name ? "bg-ink text-paper" : "hover:bg-secondary"}`}
               >
-                <div className="text-sm font-medium">{s.name}</div>
-                <div className="text-xs opacity-70">{s.role}</div>
+                <ParticipantIdentity participant={s} dark={target === s.name} />
               </button>
             ))}
           </div>
@@ -1067,8 +1066,11 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
         <div className="md:col-span-6 min-w-0 border border-ink flex flex-col min-h-[60vh]">
           <div className="hairline-b px-5 py-3 flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Talking to</div>
-              <div className="font-medium">{target}</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-1">Talking to</div>
+              <ParticipantIdentity
+                participant={stakeholders.find((s) => s.name === target) ?? { name: target }}
+                size="sm"
+              />
             </div>
             <span className="chip">1:1 — keep it short</span>
           </div>
@@ -1117,8 +1119,8 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
         <aside className="md:col-span-3">
           <h3 className="text-xs uppercase tracking-[0.12em] mb-2">Commitments &amp; decisions</h3>
           <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed">
-            Capture what each stakeholder agreed to, refused, or hinted at. This carries into your intervention
-            recommendation and the canvas you'll run with the team.
+            Capture what each person agreed to, refused, or hinted at. This carries into your Engagement Brief
+            and the approach you commit to.
           </p>
           <textarea
             value={commitments}
