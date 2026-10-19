@@ -511,12 +511,6 @@ function FramingStep({
     onError: (e: any) => toast.error(e?.message ?? "Extraction failed"),
   });
 
-  const saveMut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(draft ?? {}), status: "framing" } }),
-    onSuccess: () => { toast.success("Framing saved"); onSaved(); setReviewing(false); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const t = text.trim();
@@ -524,12 +518,12 @@ function FramingStep({
     turnMut.mutate(t);
   }
 
-  // ----- Review screen after extracting framing -----
+  // ----- Read-only conversation summary (evidence, not a duplicate form) -----
   if (reviewing && draft) {
     return (
       <StepShell
-        title="Framing draft"
-        hint="From your saved conversation"
+        title="Conversation summary"
+        hint="What the scoping call surfaced. Capture what matters — the decision, the outcome, the unknowns — in your Engagement Brief."
       >
         {false && gaps.length > 0 && (
           <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
@@ -540,24 +534,19 @@ function FramingStep({
         <div className="space-y-4">
           {SCOPING_FIELDS.map((f, i) => (
             <div key={f.key}>
-              <label className="text-xs uppercase tracking-[0.12em] flex items-baseline gap-2">
+              <div className="text-xs uppercase tracking-[0.12em] flex items-baseline gap-2">
                 <span className="marker-num opacity-60">{String(i + 1).padStart(2, "0")}</span>
                 {f.label}
-              </label>
-              <textarea
-                value={draft[f.key] ?? ""}
-                onChange={(e) => setDraft((p) => ({ ...(p ?? {}), [f.key]: e.target.value }))}
-                rows={f.key === "decision" ? 2 : 3}
-                className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
-              />
+              </div>
+              <p className="mt-1 border border-ink/30 bg-secondary/40 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                {draft[f.key]?.trim() || "—"}
+              </p>
             </div>
           ))}
         </div>
         <div className="mt-6 flex items-center justify-between">
           <button onClick={() => setReviewing(false)} className="text-xs underline">← Back to call</button>
-          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !draft.decision?.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-            {saveMut.isPending ? "Saving…" : "Save framing"}
-          </button>
+          <span className="text-xs text-muted-foreground">Update your view in the Engagement Brief →</span>
         </div>
       </StepShell>
     );
