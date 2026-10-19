@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
+import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { Button } from "@/components/ui/button";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
@@ -30,9 +31,9 @@ const CANVAS_IMAGES: Record<string, { src: string; alt: string }> = {
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId")({
   head: () => ({ meta: [
     { title: "Coaching session · Coach Compass" },
-    { name: "description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { name: "description", content: "Scope the engagement, facilitate the work, and advance the customer outcome in your Strategyzer coaching engagement." },
     { property: "og:title", content: "Coaching session · Coach Compass" },
-    { property: "og:description", content: "Work through Scope, Apply and Progress in your Strategyzer coaching engagement." },
+    { property: "og:description", content: "Scope the engagement, facilitate the work, and advance the customer outcome in your Strategyzer coaching engagement." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }),
@@ -141,11 +142,18 @@ function SessionPage() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
         {activeChapter !== "scope" && <ChapterBanner chapter={activeChapter} />}
         {activeChapter === "scope" && <div>
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the engagement</div><h2 className="text-2xl mt-2">Engagement hypothesis</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Understand</span><span>→ Frame</span><span>→ Decide</span><span>→ Scope</span></div></div>
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Meet the client</span><span>→ Refine your view</span><span>→ Clarify the outcome</span><span>→ Choose how to help</span></div></div>
           <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-7 items-start">
             <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
-              {([{ key: "framing", label: "Client conversation" }, { key: "stakeholder_workspace", label: "Stakeholders" }, { key: "coaching_approach", label: "Intervention thinking" }] as const).map(tab => <Button key={tab.key} role="tab" aria-selected={activeStep === tab.key} variant={activeStep === tab.key ? "default" : "ghost"} onClick={() => setActiveStep(tab.key)}>{tab.label}</Button>)}
+              <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>Client</Button>
+              <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>Your Approach</Button>
             </div>
+        {(renderKey === "framing" || renderKey === "dialogue") && (
+          <div className="flex flex-wrap gap-4 mb-5 text-xs uppercase tracking-[0.12em]">
+            <button onClick={() => setActiveStep("framing")} className={`pb-1 border-b-2 transition-colors ${renderKey === "framing" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>Scoping call</button>
+            <button onClick={() => setActiveStep("stakeholder_workspace")} className={`pb-1 border-b-2 transition-colors ${renderKey === "dialogue" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>1:1 conversations</button>
+          </div>
+        )}
         {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
         {renderKey === "method" && (
           <MethodStep
@@ -187,12 +195,17 @@ function SessionPage() {
 }
 
 function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) {
+  // Client Brief: public client context only. Private assessment truth
+  // (hidden dynamics, diagnostic signals, flaws in the success picture) is
+  // never rendered here — context is provided, diagnosis is earned.
+  const stakeholders: { name: string; role?: string; description?: string; portrait?: string }[] =
+    Array.isArray(scenario.stakeholders) ? scenario.stakeholders : [];
   return (
     <section className="hairline-b" style={{ backgroundColor: "var(--brand-blue)" }}>
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10 text-paper">
         <div className="flex items-center justify-between mb-4">
-          <span className="text-xs uppercase tracking-[0.14em] opacity-70 marker-num">
-            Session · {session.id.slice(0, 8)}
+          <span className="text-xs uppercase tracking-[0.14em] opacity-70">
+            Client Brief
           </span>
           <span className="text-xs uppercase tracking-[0.14em] opacity-70">{scenario.industry}</span>
         </div>
@@ -203,7 +216,7 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
           <div className="mt-6 grid md:grid-cols-2 gap-4 max-w-4xl">
             {scenario.success_definition && (
               <div className="border border-paper/40 p-4">
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">What the team believes success looks like</div>
+                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">What the team says success looks like</div>
                 <p className="text-sm opacity-90 leading-relaxed">{scenario.success_definition}</p>
               </div>
             )}
@@ -213,25 +226,20 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
                 <p className="text-sm opacity-90 leading-relaxed">{scenario.success_pressure}</p>
               </div>
             )}
-            {Array.isArray(scenario.unrealistic_aspects) && scenario.unrealistic_aspects.length > 0 && (
-              <div className="md:col-span-2 border border-paper/40 p-4" style={{ backgroundColor: "rgba(0,0,0,0.18)" }}>
-                <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-1.5">Where their success picture may be off — for you to surface, not assume</div>
-                <ul className="text-sm opacity-90 leading-relaxed list-disc pl-4 space-y-0.5">
-                  {scenario.unrealistic_aspects.map((u: string, i: number) => <li key={i}>{u}</li>)}
-                </ul>
-              </div>
-            )}
           </div>
         )}
-        <div className="mt-6 grid md:grid-cols-3 gap-4">
-          {(scenario.stakeholders as any[]).map((s) => (
-            <div key={s.name} className="border border-paper/40 p-4">
-              <div className="text-xs uppercase opacity-70 mb-1">{s.role}</div>
-              <div className="font-medium mb-2">{s.name}</div>
-              <p className="text-sm opacity-80 leading-relaxed">{s.posture}</p>
+        {stakeholders.length > 0 && (
+          <div className="mt-6">
+            <div className="text-[10px] uppercase tracking-[0.14em] opacity-70 mb-2">Who's involved</div>
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {stakeholders.map((s) => (
+                <div key={s.name} className="border border-paper/40 p-4">
+                  <ParticipantIdentity participant={s} dark showDescription />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -446,7 +454,6 @@ function FramingStep({
   const sendTurn = useServerFn(sendScopingTurn);
   const tts = useServerFn(synthesizeVoice);
   const extract = useServerFn(extractFraming);
-  const save = useServerFn(updateSession);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -503,12 +510,6 @@ function FramingStep({
     onError: (e: any) => toast.error(e?.message ?? "Extraction failed"),
   });
 
-  const saveMut = useMutation({
-    mutationFn: () => save({ data: { sessionId: session.id, framingNotes: JSON.stringify(draft ?? {}), status: "framing" } }),
-    onSuccess: () => { toast.success("Framing saved"); onSaved(); setReviewing(false); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
   function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const t = text.trim();
@@ -516,12 +517,12 @@ function FramingStep({
     turnMut.mutate(t);
   }
 
-  // ----- Review screen after extracting framing -----
+  // ----- Read-only conversation summary (evidence, not a duplicate form) -----
   if (reviewing && draft) {
     return (
       <StepShell
-        title="Framing draft"
-        hint="From your saved conversation"
+        title="Conversation summary"
+        hint="What the scoping call surfaced. Capture what matters — the decision, the outcome, the unknowns — in your Engagement Brief."
       >
         {false && gaps.length > 0 && (
           <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-yellow)" }}>
@@ -532,24 +533,19 @@ function FramingStep({
         <div className="space-y-4">
           {SCOPING_FIELDS.map((f, i) => (
             <div key={f.key}>
-              <label className="text-xs uppercase tracking-[0.12em] flex items-baseline gap-2">
+              <div className="text-xs uppercase tracking-[0.12em] flex items-baseline gap-2">
                 <span className="marker-num opacity-60">{String(i + 1).padStart(2, "0")}</span>
                 {f.label}
-              </label>
-              <textarea
-                value={draft[f.key] ?? ""}
-                onChange={(e) => setDraft((p) => ({ ...(p ?? {}), [f.key]: e.target.value }))}
-                rows={f.key === "decision" ? 2 : 3}
-                className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
-              />
+              </div>
+              <p className="mt-1 border border-ink/30 bg-secondary/40 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                {draft[f.key]?.trim() || "—"}
+              </p>
             </div>
           ))}
         </div>
         <div className="mt-6 flex items-center justify-between">
           <button onClick={() => setReviewing(false)} className="text-xs underline">← Back to call</button>
-          <button onClick={() => saveMut.mutate()} disabled={saveMut.isPending || !draft.decision?.trim()} className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50">
-            {saveMut.isPending ? "Saving…" : "Save framing"}
-          </button>
+          <span className="text-xs text-muted-foreground">Update your view in the Engagement Brief →</span>
         </div>
       </StepShell>
     );
@@ -560,6 +556,7 @@ function FramingStep({
     <div className="grid lg:grid-cols-12 gap-6">
       <div className="lg:col-span-4 min-w-0">
         <h2 className="text-2xl tracking-tight mb-2">Scoping call</h2>
+        <p className="text-xs text-muted-foreground leading-relaxed mb-3">Meet the team. Listen for what they say they want — and what sits underneath it.</p>
         <button
           onClick={() => extractMut.mutate()}
           disabled={extractMut.isPending || scopingMessages.length < 2}
@@ -567,7 +564,9 @@ function FramingStep({
         >
           {extractMut.isPending ? "Summarizing conversation…" : "Review conversation summary"}
         </button>
-        <Button variant="outline" className="w-full mb-2" onClick={() => { setDraft(parseFraming(session.framing_notes)); setReviewing(true); }}>Edit framing</Button>
+        {session.framing_notes && (
+          <Button variant="outline" className="w-full mb-2" onClick={() => { setDraft(parseFraming(session.framing_notes)); setReviewing(true); }}>View saved summary</Button>
+        )}
         <p className="text-[11px] text-muted-foreground">{scopingMessages.length} messages exchanged</p>
       </div>
 
@@ -667,7 +666,6 @@ function MethodStep({
   session,
   onSaved,
   onCommitAndAdvance,
-  nextChapterLabel,
 }: {
   session: any;
   onSaved: () => void;
@@ -789,7 +787,7 @@ function MethodStep({
   const commitMut = useMutation({
     mutationFn: () => save({ data: buildSaveData(true) as any }),
     onSuccess: async () => {
-      toast.success("Intervention committed");
+      toast.success("Approach committed");
       if (onCommitAndAdvance) await onCommitAndAdvance();
     },
     onError: (e: any) => toast.error(e.message ?? "Commit failed"),
@@ -806,8 +804,8 @@ function MethodStep({
 
   return (
     <StepShell
-      title="Choose your intervention"
-      hint="Problem → decision → intervention"
+      title="Your approach"
+      hint="Given the customer outcome, the current situation and what you've learned — how should you help this client make progress?"
     >
       {/* Pathway cards */}
       <div className="grid md:grid-cols-2 gap-3 mb-6">
@@ -833,17 +831,16 @@ function MethodStep({
         })}
       </div>
 
-      {/* AI second opinion — logged for reviewer */}
+      {/* AI second opinion */}
       <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
         <div className="text-sm">
-          <div className="font-medium mb-1 flex items-center gap-2">
-            {hasDraft ? "Compare with AI" : "AI second opinion"}
-            <span className="text-[10px] uppercase tracking-[0.14em] opacity-70 px-1.5 py-0.5 border border-ink">Logged for reviewer</span>
+          <div className="font-medium mb-1">
+            {hasDraft ? "Pressure-test your thinking" : "AI second opinion"}
           </div>
           <div className="text-xs opacity-80">
             {hasDraft
-              ? "You've drafted your own reasoning. Pressure-test it against the AI — your reviewer will see both."
-              : "Draft your own intervention and rationale first, then pressure-test with AI. Every suggestion shown is recorded."}
+              ? "You've drafted your own reasoning. Compare it with an AI second opinion before you commit."
+              : "Draft your own approach and rationale first, then pressure-test it with an AI second opinion."}
           </div>
         </div>
         <button
@@ -858,7 +855,7 @@ function MethodStep({
 
       {suggestion && (
         <div className="mb-6 border border-ink p-4 bg-secondary">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI suggestion · confidence {suggestion.confidence ?? "—"}</div>
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI second opinion</div>
           {suggestion.playbookId && (
             <div className="font-medium mb-1">
               → {interventions.find((r) => r.slug === suggestion.playbookId)?.label ?? PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
@@ -937,7 +934,7 @@ function MethodStep({
                         <div className="flex items-center justify-between mb-1 gap-2">
                           <span className="text-sm font-medium">{r.label}</span>
                           {r.is_deep_vertical && (
-                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Deep vertical</span>
+                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Multi-session</span>
                           )}
                         </div>
                         <p className="text-xs opacity-80 leading-relaxed">{r.short_description}</p>
@@ -965,10 +962,10 @@ function MethodStep({
 
       {/* Rationale */}
       <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
-        Why does this intervention fit? <span className="text-red-600">*</span>
+        Why is this the right way to help? <span className="text-red-600">*</span>
       </label>
       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
-        Ground your reasoning in what you diagnosed in Framing and Stakeholders. Required before you continue to Chapter 2.
+        Ground your reasoning in your conversations and your Engagement Brief — the outcome, the evidence, the sequencing, and what would change your mind.
       </p>
       <div className="relative">
         <textarea
@@ -998,9 +995,9 @@ function MethodStep({
             onClick={() => commitMut.mutate()}
             disabled={commitMut.isPending || !canCommit}
             className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
-            title={!canCommit ? "Pick an intervention and write a rationale first." : undefined}
+            title={!canCommit ? "Choose an approach and write your reasoning first." : undefined}
           >
-            {commitMut.isPending ? "Committing…" : `Continue to ${nextChapterLabel ?? "Chapter 2"} →`}
+            {commitMut.isPending ? "Committing…" : "Commit approach →"}
           </button>
         )}
       </div>
@@ -1052,7 +1049,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
 
       <div className="grid md:grid-cols-12 gap-6">
         <aside className="md:col-span-3">
-          <h3 className="text-xs uppercase tracking-[0.12em] mb-3">Stakeholders</h3>
+          <h3 className="text-xs uppercase tracking-[0.12em] mb-3">Who to talk to</h3>
           <div className="space-y-1">
             {stakeholders.map((s) => (
               <button
@@ -1060,8 +1057,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
                 onClick={() => setTarget(s.name)}
                 className={`w-full text-left p-3 border border-ink ${target === s.name ? "bg-ink text-paper" : "hover:bg-secondary"}`}
               >
-                <div className="text-sm font-medium">{s.name}</div>
-                <div className="text-xs opacity-70">{s.role}</div>
+                <ParticipantIdentity participant={s} dark={target === s.name} />
               </button>
             ))}
           </div>
@@ -1070,8 +1066,11 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
         <div className="md:col-span-6 min-w-0 border border-ink flex flex-col min-h-[60vh]">
           <div className="hairline-b px-5 py-3 flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Talking to</div>
-              <div className="font-medium">{target}</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-1">Talking to</div>
+              <ParticipantIdentity
+                participant={stakeholders.find((s) => s.name === target) ?? { name: target }}
+                size="sm"
+              />
             </div>
             <span className="chip">1:1 — keep it short</span>
           </div>
@@ -1120,8 +1119,8 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
         <aside className="md:col-span-3">
           <h3 className="text-xs uppercase tracking-[0.12em] mb-2">Commitments &amp; decisions</h3>
           <p className="text-[11px] text-muted-foreground mb-2 leading-relaxed">
-            Capture what each stakeholder agreed to, refused, or hinted at. This carries into your intervention
-            recommendation and the canvas you'll run with the team.
+            Capture what each person agreed to, refused, or hinted at. This carries into your Engagement Brief
+            and the approach you commit to.
           </p>
           <textarea
             value={commitments}

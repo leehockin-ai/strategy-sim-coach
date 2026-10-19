@@ -22,22 +22,22 @@ export const CHAPTERS: Array<{
   {
     key: "scope",
     index: 1,
-    label: "Scope the engagement",
-    descriptor: "Understand the client, frame the real challenge, identify the decision to enable, and recommend a Strategyzer intervention.",
+    label: "Scope the Engagement",
+    descriptor: "Understand the client, frame the real challenge, and clarify the customer outcome and decision the work must enable.",
     steps: ["framing", "stakeholder_workspace", "coaching_approach"],
   },
   {
     key: "apply",
     index: 2,
-    label: "Apply the Playbook",
-    descriptor: "Facilitate a Strategyzer Playbook activity with the team. Ask questions, redirect solution-jumping, and produce meaningful — not necessarily complete — output.",
+    label: "Facilitate the Work",
+    descriptor: "Facilitate the client through the work you committed to — surfacing evidence, learning and decisions in service of the customer outcome.",
     steps: ["live_playbook"],
   },
   {
     key: "progress",
     index: 3,
-    label: "Progress the engagement",
-    descriptor: "Interpret what emerged, decide what the client can now know or decide, and recommend the smallest responsible next move.",
+    label: "Advance the Outcome",
+    descriptor: "Interpret what the work established, what remains uncertain, and the smallest responsible next move toward the customer outcome.",
     steps: ["next_step_judgment", "engagement_orchestration"],
   },
 ];
@@ -66,10 +66,10 @@ export function chapterMeta(key: ChapterKey) {
 }
 
 export const STEP_LABELS: Record<StepKey, string> = {
-  framing: "Framing",
-  stakeholder_workspace: "Stakeholders",
-  coaching_approach: "Approach",
-  live_playbook: "Live Playbook",
+  framing: "Scoping Call",
+  stakeholder_workspace: "Conversations",
+  coaching_approach: "Your Approach",
+  live_playbook: "Working Session",
   next_step_judgment: "Judgment",
   engagement_orchestration: "Orchestration",
 };

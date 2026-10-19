@@ -366,14 +366,18 @@ export const getSession = createServerFn({ method: "POST" })
   .inputValidator((d: { sessionId: string }) => z.object({ sessionId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { PUBLIC_SCENARIO_COLUMNS, publicScenario } = await import("@/lib/scenario-visibility");
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
-      .select("*, scenarios(*)")
+      .select(`*, scenarios(${PUBLIC_SCENARIO_COLUMNS})`)
       .eq("id", data.sessionId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!session) throw new Error("Session not found");
     if ((session as any).owner_id !== context.userId) throw new Error("Forbidden");
+    // Candidate payloads carry public client context only — never private
+    // assessment truth (system_prompt, ambiguity factors, hidden postures).
+    (session as any).scenarios = publicScenario((session as any).scenarios);
 
     const { data: messages } = await supabaseAdmin
       .from("messages")
