@@ -42,13 +42,13 @@ export function sanitizeTurn(raw: RawTurn, c: TeamConfig, room: RoomState) {
   const responses = (raw.responses ?? [])
     .filter(r => r.participant && names.has(r.participant) && typeof r.text === "string" && r.text.trim())
     .slice(0, 3)
-    .map(r => ({ participant: r.participant!, text: r.text!.trim().slice(0, 900) }));
+    .flatMap(r => typeof r.participant === "string" && typeof r.text === "string" ? [{ participant: r.participant, text: r.text.trim().slice(0, 900) }] : []);
   const spoke = new Set(responses.map(r => r.participant));
   const surfaced = (raw.surfaced ?? []).filter(s => {
     const item = c.truth.evidence.find(e => e.id === s.evidence_id);
     // Evidence can only surface through its holder actually speaking this turn, and only once.
     return item && item.holder === s.by && spoke.has(item.holder) && !room.surfaced.includes(item.id);
-  }).map(s => ({ evidence_id: s.evidence_id!, by: s.by!, reason: (s.reason ?? "").slice(0, 500) }));
+  }).flatMap(s => typeof s.evidence_id === "string" && typeof s.by === "string" ? [{ evidence_id: s.evidence_id, by: s.by, reason: (s.reason ?? "").slice(0, 500) }] : []);
   const participants: Record<string, ParticipantState> = {};
   for (const [name, prev] of Object.entries(room.participants)) {
     const u = raw.state?.[name] ?? {};

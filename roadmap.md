@@ -1,7 +1,7 @@
 # Stabilization roadmap
 
 ## Stage 5.5.1 — Causal team work-product proof
-- [ ] Plan the narrow Customer Profile POC using existing runtime, events, artifacts and private team state.
+- [x] Plan the narrow Customer Profile POC using existing runtime, events, artifacts and private team state.
 - [ ] Implement semantic work assignments and team-owned simulated work with causal, append-only revisions.
 - [ ] Verify behavioural Tests A–E and privacy, provenance, idempotency and compatibility regressions.
 - [ ] Report results and limitations; stop after Stage 5.5.1.

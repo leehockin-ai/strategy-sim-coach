@@ -64,6 +64,20 @@
       "when": 1792439048844,
       "tag": "0008_live_client_team_poc",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792448650277,
+      "tag": "0009_causal_team_work_turn",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792448982589,
+      "tag": "0010_team_work_public_source_lineage",
+      "breakpoints": true
     }
   ]
 }

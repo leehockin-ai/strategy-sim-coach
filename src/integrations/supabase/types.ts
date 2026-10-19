@@ -1316,6 +1316,21 @@ export type Database = {
         }
         Returns: Json
       }
+      append_team_work_turn: {
+        Args: {
+          _artifact?: Json
+          _candidate: string
+          _events: Json
+          _expected_revision: number
+          _expected_sequence: number
+          _identity: Json
+          _internal?: Json
+          _participant_state?: Json
+          _request: string
+          _run: string
+        }
+        Returns: Json
+      }
       connect_strategyzer_playbook: {
         Args: {
           _confirm_name: boolean
@@ -1364,6 +1379,10 @@ export type Database = {
       refresh_assignment_status: {
         Args: { _assignment_id: string }
         Returns: undefined
+      }
+      resolve_team_work_sources: {
+        Args: { _run: string; _state: Json }
+        Returns: Json
       }
       session_progress_rank: { Args: { _status: string }; Returns: number }
       start_activity_run: {
