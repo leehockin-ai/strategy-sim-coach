@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792431093295,
+      "tag": "0000_stabilize_progress_and_private_stakeholder_state",
+      "breakpoints": true
+    }
+  ]
+}
