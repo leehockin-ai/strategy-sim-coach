@@ -6,6 +6,7 @@ import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
+import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
 import { Button } from "@/components/ui/button";
 import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
@@ -1330,6 +1331,7 @@ function Chapter2Container({
   return (
     <div>
       {!suppressBanner && banner}
+      <ActivityRuntimeEntry sessionId={session.id} />
       {body}
     </div>
   );
