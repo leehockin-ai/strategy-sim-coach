@@ -246,6 +246,74 @@ export type Database = {
           },
         ]
       }
+      activity_external_connections: {
+        Row: {
+          candidate_confirmed_name: boolean
+          candidate_confirmed_playbook: boolean
+          candidate_confirmed_project: boolean
+          confirmed_playbook_title: string | null
+          confirmed_project_name: string | null
+          connected_at: string
+          event_id: string
+          host: string
+          id: string
+          launch_url: string
+          request_key: string
+          run_id: string
+          status: string
+          superseded_at: string | null
+          supplied_url: string
+          verification_status: string
+          version: number
+        }
+        Insert: {
+          candidate_confirmed_name: boolean
+          candidate_confirmed_playbook: boolean
+          candidate_confirmed_project: boolean
+          confirmed_playbook_title?: string | null
+          confirmed_project_name?: string | null
+          connected_at?: string
+          event_id: string
+          host: string
+          id?: string
+          launch_url: string
+          request_key: string
+          run_id: string
+          status?: string
+          superseded_at?: string | null
+          supplied_url: string
+          verification_status?: string
+          version: number
+        }
+        Update: {
+          candidate_confirmed_name?: boolean
+          candidate_confirmed_playbook?: boolean
+          candidate_confirmed_project?: boolean
+          confirmed_playbook_title?: string | null
+          confirmed_project_name?: string | null
+          connected_at?: string
+          event_id?: string
+          host?: string
+          id?: string
+          launch_url?: string
+          request_key?: string
+          run_id?: string
+          status?: string
+          superseded_at?: string | null
+          supplied_url?: string
+          verification_status?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_external_connections_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "activity_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       activity_run_private: {
         Row: {
           internal_configuration: Json
@@ -284,19 +352,24 @@ export type Database = {
       }
       activity_runs: {
         Row: {
-          activity_definition_id: string
-          activity_version: number
+          activity_definition_id: string | null
+          activity_version: number | null
           artifact_revision: number
           artifact_state: Json
+          assessment_reference: string | null
           candidate_id: string
           candidate_stop_rationale: string | null
           definition_snapshot: Json
           elapsed_simulated_seconds: number | null
           ended_at: string | null
+          external_platform: string | null
           id: string
+          integration_capability_level: number | null
           intervention_id: string
           intervention_slug: string
           last_sequence: number
+          required_project_name: string | null
+          runtime_type: string
           scenario_id: string
           scope_context: Json
           scope_revision_id: string | null
@@ -310,19 +383,24 @@ export type Database = {
           time_budget_seconds: number | null
         }
         Insert: {
-          activity_definition_id: string
-          activity_version: number
+          activity_definition_id?: string | null
+          activity_version?: number | null
           artifact_revision?: number
           artifact_state?: Json
+          assessment_reference?: string | null
           candidate_id: string
           candidate_stop_rationale?: string | null
           definition_snapshot: Json
           elapsed_simulated_seconds?: number | null
           ended_at?: string | null
+          external_platform?: string | null
           id?: string
+          integration_capability_level?: number | null
           intervention_id: string
           intervention_slug: string
           last_sequence?: number
+          required_project_name?: string | null
+          runtime_type?: string
           scenario_id: string
           scope_context?: Json
           scope_revision_id?: string | null
@@ -336,19 +414,24 @@ export type Database = {
           time_budget_seconds?: number | null
         }
         Update: {
-          activity_definition_id?: string
-          activity_version?: number
+          activity_definition_id?: string | null
+          activity_version?: number | null
           artifact_revision?: number
           artifact_state?: Json
+          assessment_reference?: string | null
           candidate_id?: string
           candidate_stop_rationale?: string | null
           definition_snapshot?: Json
           elapsed_simulated_seconds?: number | null
           ended_at?: string | null
+          external_platform?: string | null
           id?: string
+          integration_capability_level?: number | null
           intervention_id?: string
           intervention_slug?: string
           last_sequence?: number
+          required_project_name?: string | null
+          runtime_type?: string
           scenario_id?: string
           scope_context?: Json
           scope_revision_id?: string | null
@@ -615,6 +698,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      external_runtime_allowed_hosts: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          host_suffix: string
+          note: string | null
+          platform: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          host_suffix: string
+          note?: string | null
+          platform?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          host_suffix?: string
+          note?: string | null
+          platform?: string
+        }
+        Relationships: []
       }
       interventions: {
         Row: {
@@ -1134,12 +1241,38 @@ export type Database = {
         }
         Returns: string
       }
+      connect_strategyzer_playbook: {
+        Args: {
+          _confirm_name: boolean
+          _confirm_playbook: boolean
+          _confirm_project: boolean
+          _host: string
+          _launch_url: string
+          _playbook_title?: string
+          _project_name?: string
+          _request: string
+          _run: string
+          _supplied_url: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      insert_activity_run_event: {
+        Args: {
+          _actor: string
+          _content: string
+          _metadata: Json
+          _payload: Json
+          _request: string
+          _run: string
+        }
+        Returns: string
       }
       is_program_admin: {
         Args: { _program_id: string; _user_id: string }
@@ -1149,6 +1282,10 @@ export type Database = {
         Args: { _program_id: string; _user_id: string }
         Returns: boolean
       }
+      record_strategyzer_launch: {
+        Args: { _request: string; _run: string }
+        Returns: string
+      }
       refresh_assignment_status: {
         Args: { _assignment_id: string }
         Returns: undefined
@@ -1156,6 +1293,10 @@ export type Database = {
       session_progress_rank: { Args: { _status: string }; Returns: number }
       start_activity_run: {
         Args: { _definition: string; _request: string; _session: string }
+        Returns: string
+      }
+      start_strategyzer_run: {
+        Args: { _request: string; _session: string }
         Returns: string
       }
     }
