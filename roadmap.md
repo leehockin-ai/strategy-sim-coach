@@ -1,5 +1,8 @@
 # Stabilization roadmap
 
+## Stage 5 — Live Client Team (POC)
+- [x] Shared room, private participant state, evidence reveal, synthesis and conclusion on the Customer Profile POC; Tests A–F, security checks, transcripts and report done. Stopped before Stage 6 (pacing). Next: separate UI/UX cleanup pass per Lee.
+
 ## Stage 3 — Playbook Activity Runtime Foundation
 - [x] Add configurable/versioned activity definitions, protected simulation truth, durable runs and Scope revision linkage.
 - [x] Add atomic ordered/idempotent event append and event-linked artifact history; reserve time fields without timing rules.
