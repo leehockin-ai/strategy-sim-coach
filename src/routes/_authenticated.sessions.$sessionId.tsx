@@ -142,11 +142,18 @@ function SessionPage() {
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
         {activeChapter !== "scope" && <ChapterBanner chapter={activeChapter} />}
         {activeChapter === "scope" && <div>
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the engagement</div><h2 className="text-2xl mt-2">Engagement hypothesis</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Understand</span><span>→ Frame</span><span>→ Decide</span><span>→ Scope</span></div></div>
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Meet the client</span><span>→ Refine your view</span><span>→ Clarify the outcome</span><span>→ Choose how to help</span></div></div>
           <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-7 items-start">
             <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
-              {([{ key: "framing", label: "Client conversation" }, { key: "stakeholder_workspace", label: "Stakeholders" }, { key: "coaching_approach", label: "Intervention thinking" }] as const).map(tab => <Button key={tab.key} role="tab" aria-selected={activeStep === tab.key} variant={activeStep === tab.key ? "default" : "ghost"} onClick={() => setActiveStep(tab.key)}>{tab.label}</Button>)}
+              <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>Client</Button>
+              <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>Your Approach</Button>
             </div>
+        {(renderKey === "framing" || renderKey === "dialogue") && (
+          <div className="flex flex-wrap gap-4 mb-5 text-xs uppercase tracking-[0.12em]">
+            <button onClick={() => setActiveStep("framing")} className={`pb-1 border-b-2 transition-colors ${renderKey === "framing" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>Scoping call</button>
+            <button onClick={() => setActiveStep("stakeholder_workspace")} className={`pb-1 border-b-2 transition-colors ${renderKey === "dialogue" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>1:1 conversations</button>
+          </div>
+        )}
         {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
         {renderKey === "method" && (
           <MethodStep
