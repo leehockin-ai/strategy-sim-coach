@@ -1,5 +1,14 @@
 # Stabilization roadmap
 
+## Stage 5.5 — Candidate Experience Alignment (in progress)
+- [ ] Three-chapter candidate orientation (Scope the Engagement / Facilitate the Work / Advance the Outcome) without locking or wizard rigidity.
+- [ ] Client Brief: separate public client context from private assessment truth; audit candidate payloads for spoilers.
+- [ ] Persistent participant identity (deterministic avatar fallback) across Brief, Scope, conversations, Live Client Team.
+- [ ] Scope as one engagement workspace (Client / Engagement Brief / Your Approach); reduce duplicated inputs; iterative scoping.
+- [ ] Customer outcome as through-line into Facilitate the Work; external Apply reframe; Live Client Team UX prioritizes people/conversation.
+- [ ] Terminology audit, instructional-overload reduction, landing cleanup, responsive checks.
+- [ ] Regression across multiple scenarios, internal runtime, historical sessions, refresh/resume, privacy/security, human walkthrough; final report. Stop before Stage 6.
+
 ## Stage 5 — Live Client Team (POC)
 - [x] Shared room, private participant state, evidence reveal, synthesis and conclusion on the Customer Profile POC; Tests A–F, security checks, transcripts and report done. Stopped before Stage 6 (pacing). Next: separate UI/UX cleanup pass per Lee.
 
