@@ -1,106 +1,75 @@
+# Stage 5.5 — Candidate Experience Alignment Around Customer Outcomes
 
-## Goal
+Presentation-layer alignment pass. No scoring changes, no simulation-engine changes, no new tables, no historical backfills, no chapter locking. All rendering stays configuration-driven; nothing is special-cased to the POC scenario.
 
-Shift the simulator from "complete the modules in order" to "demonstrate coaching judgment under ambiguity." Preserve all existing visuals, components, and interaction mechanics. This is a structural + evaluative refactor, not a redesign.
+## 0. Privacy first: public client context vs private assessment truth
 
-## 1. Rename & rearchitect the step model
+Confirmed leak: `getSession` returns `scenarios(*)` — including `system_prompt`, `ambiguity_factors`, `unrealistic_aspects`, and stakeholder `posture` — to candidates.
 
-In `src/routes/_authenticated.sessions.$sessionId.tsx`, replace the linear `STEPS` array and forced auto-advance with a 6-section workspace:
+- `src/lib/simulator.functions.ts` — `getSession`: replace `scenarios(*)` with an explicit safe projection: `id, slug, title, industry, difficulty, summary, context, success_definition, success_pressure, stakeholders` (stakeholders narrowed to `name`, `role` only — strip `posture`).
+- `src/lib/scenarios.functions.ts` — `listScenarios`: drop `ambiguity_factors` from the payload; narrow stakeholders to name/role. `getScenario`: replace `select("*")` with the same safe projection.
+- `SessionRoute` `ScenarioHeader`: remove the `unrealistic_aspects` block and stakeholder `posture` display. Keep title, industry, context, success_definition, success_pressure, stakeholder names/roles — that is the Client Brief.
+- Add a regression test asserting the candidate projection excludes `system_prompt`, `ambiguity_factors`, `unrealistic_aspects`, `posture`.
 
-```
-01 Situation Framing      (was: Framing)
-02 Coaching Strategy      (was: Method) — playbook optional / multi / none
-03 Stakeholder Workspace  (was: Dialogue) — persistent, always accessible
-04 Working Session Design (was: Canvas / Application) — artifacts optional
-05 Intervention Decision  (kept) — Continue / Pivot / Escalate / Stop
-06 Engagement Pathway     (was: Playbook Application) — sequencing recommendation
-```
+## 1. Three-chapter orientation
 
-Changes to the nav shell:
-- All sections become freely navigable at any time (no locking, no required completion order).
-- Remove the `onSaved → setStep(next)` auto-advance behavior. Save stays, advance becomes a user choice via a "Continue" affordance the user can ignore.
-- Step labels and the small chip subtext get updated copy that emphasizes judgment, not completion (e.g. Working Session Design subtitle: "Facilitate Strategyzer thinking — fidelity is a choice, not a goal").
-- Stakeholder Workspace surfaces a persistent side affordance ("Revisit a stakeholder") from sections 02, 04, 05, 06 so the coach can return to dialogue without leaving their current section context.
+- `src/lib/chapters.ts`: rename chapter 2 → "Facilitate the Work", chapter 3 → "Advance the Outcome"; update descriptors to outcome-through-line language. Step keys, statuses, and reachability logic unchanged (existing progress-based reachability is preserved — no new locking, no wizard).
+- `SessionRoute` `ChapterNav`/`ChapterBanner`: lighter orientation copy — where you are, what you're establishing, what comes next. Update Scope tab labels to the three concepts: **Client** (scoping call + 1:1 conversations), **Engagement Brief** (persistent panel, already exists), **Your Approach** (was "Intervention thinking").
+- `src/routes/index.tsx`: conservative copy cleanup — chapter names, hero graphic labels (Scope / Facilitate / Advance), remove obsolete terms. No redesign.
 
-## 2. Coaching Strategy section (was Method)
+## 2. Client Brief at scenario entry
 
-In the same route file's `MethodStep`:
-- Allow three coach choices: **One playbook · Multiple playbooks · No playbook yet (gather more evidence)**.
-- The rationale prompt reframes from "why this playbook" to "what is your engagement approach, sequencing, and evidence focus — and why is restraint or escalation appropriate here?"
-- AI suggestion endpoint (`suggestPlaybook`) gets a second mode: when the coach selects "no playbook yet", the suggestion returns evidence-gathering moves instead of a playbook id.
+- `src/routes/_authenticated.scenarios.tsx`: library cards drop `ambiguity_factors`; start dialog reframed as receiving a Client Brief (who the client is, context, what they say they want, pressures, who's involved) — rendered dynamically from available fields, graceful when fields are absent.
+- Session header becomes the persistent Client Brief summary (public fields only, per §0).
 
-DB: `sessions.methodology_choice` already free-text; no schema change. Store multi-select as comma-joined ids, or `"none"`.
+## 3. Persistent participant identity
 
-## 3. Stakeholder Workspace (was Dialogue)
+- New `src/components/ParticipantIdentity.tsx`: avatar (initials + deterministic color hashed from name), name, role, optional public description. Supports an optional `portrait` URL in participant/stakeholder config if present; deterministic fallback otherwise. No imagery dependency.
+- Apply everywhere a participant appears: Client Brief stakeholder list, scoping-call tiles, stakeholder 1:1 picker and transcript, Live Client Team roster and transcript speakers.
+- Unit tests: deterministic fallback, stable across renders, no fixed-count assumptions.
 
-In `DialogueStep`:
-- Remove the "continue to next step" terminal CTA; replace with a persistent "Return to whatever section you came from" link.
-- Already supports per-stakeholder threads + transcript — preserve mechanics.
-- Stakeholder system prompts (server side in `sendStakeholderMessage`) get an addendum: "Carry political realism. You may resist, contradict earlier statements when pressed, or escalate emotionally. Remember the full transcript."
-- Each scenario gains `success_definition` and `success_pressure` fields (see §6) that stakeholders reference so the coach can challenge success expectations.
+## 4. Scope as one engagement workspace
 
-## 4. Working Session Design (was Canvas / Application)
+- Merge the "Client conversation" and "Stakeholders" tabs into one **Client** tab with an internal toggle (scoping call / 1:1 conversations), so converse → learn → update brief → converse again is one workspace. Engagement Brief stays persistent alongside. Mechanics, revision history, evidence linkage, unsaved-change protection all preserved.
+- **Duplication treatment:** legacy framing fields `decision` and `success` duplicate the brief's `Decision to enable` and `Success / intended outcome`. The editable legacy framing form becomes read-only "Saved framing evidence" (already shown in the brief); the scoping call and its summary stay. Historical `framing_notes` still render. `unclear`/`tried`/`nothing` remain visible as saved evidence but are no longer re-asked. Report any residual overlap that needs deeper change.
 
-In `ApplicationStep` and `PlaybookStep`:
-- Reframe copy: artifacts are tools, not deliverables. Add a visible "Stop early — gather evidence first" option that records a justified decision instead of an artifact.
-- Keep VPC / ecosystem / BMC canvas mechanics intact.
-- Add a per-activity "fidelity level" selector (sketch / working / decision-ready) — recorded into `playbook_application` JSON.
-- Saving an empty or partial artifact is valid IF a written rationale ("why we stopped here") is provided.
+## 5. Your Approach (intervention reasoning)
 
-## 5. Intervention Decision
+- Retitle "Choose your intervention" → "Your approach"; copy reframed to "given the outcome, situation and evidence, how should I help this client make progress?" Preserve all four pathways (alignment, Playbook, evidence-first, deliberate pause), the rationale requirement, AI second opinion, and committed-intervention behavior. Primary action renamed **"Commit approach"**.
+- Remove candidate-facing assessment mechanics: "Logged for reviewer", AI confidence display, "This is what the evaluator will read", Reward/Avoid/Penalize hints, "restraint scores above forced facilitation", "core of the simulation", "Deep vertical" badge (replace with neutral copy or remove).
 
-Keep the four options. Update prompt copy to emphasize restraint / scope discipline / sequencing / stakeholder readiness. No structural change.
+## 6. Facilitate the Work — external runtime
 
-## 6. Engagement Pathway (was Playbook Application)
+- `getActivityRuntime`: add a safe Engagement Brief projection (`success`, `decision_to_enable`, `decision_maker`) to the session payload so the outcome through-line can render. No private fields.
+- `StrategyzerWorkspace`: once connected, setup sections collapse behind a "Workspace setup details" disclosure (progressive disclosure; available on request). Fix obsolete copy ("will eventually operate"). Add a concise **Customer outcome** reference card rendered from the session's brief — never invented, hidden gracefully if the brief is empty.
+- Terminology: "Set up assessment workspace" → natural language ("Connect your Strategyzer workspace"). Level 0 semantics and candidate-confirmed/not-verified labels preserved exactly. TEST/NON-PRODUCTION labels preserved.
+- Internal `coach_compass` runtime and historical sessions render unchanged (runtime-aware dispatch stays).
 
-Reframe `PlaybookStep`:
-- Output is a **sequenced engagement plan**, not a single applied playbook.
-- Fields: next playbook(s) in order, evidence goals per step, workshop cadence, stakeholder alignment needs, follow-on interventions.
-- Save into existing `sessions.playbook_application` jsonb under key `engagement_pathway`.
-- Tone guardrails in the AI prompt: "consultative, customer-centered. Reject upsell phrasing. Reward minimal sufficient intervention."
+## 7. Live Client Team as the working experience
 
-## 7. Evaluation rubric realignment
+- `LiveClientTeam.tsx`: reorder hierarchy — participants (with ParticipantIdentity), transcript, facilitation input first; activity/instructions and connection summary become compact secondary cards (collapsible once the session is active). Persistent unobtrusive "Open Strategyzer workspace" action while connected. Concluded sessions render the stored conclusion rationale, not just "Working session concluded."
+- No simulation-engine changes.
 
-In `src/lib/evaluation.functions.ts`, update `SECTION_RUBRIC` keys and focus copy so they grade the new philosophy. Keys become:
+## 8. Progress chapter — terminology only
 
-- `situation_framing` — ambiguity surfaced, success definition challenged, evidence vs opinion separated
-- `coaching_strategy` — methodology restraint, sequencing logic, fit-for-purpose orchestration (single / multi / none)
-- `stakeholder_navigation` — uses persistent dialogue, surfaces resistance, captures commitments, manages politics
-- `working_session_facilitation` — fidelity judgment, asks better questions, stops at the right depth, doesn't over-canvas
-- `methodological_soundness` — Strategyzer rigor, customer-first sequencing, discovery vs delivery
-- `intervention_discipline` — restraint, scope, stakeholder readiness, aligned to dialogue commitments
-- `engagement_pathway` — sequencing quality, evidence goals, alignment moves, NOT upsell
+- Rename labels to Advance the Outcome language; fix the stale toast ("Intervention saved — now apply a real playbook"); "Submit & generate evaluation" → "Submit for assessment". No functional redesign of Judgment/Orchestration.
 
-Each section's prompt explicitly rewards: simplification, evidence rigor, sequencing, alignment, restraint. Explicitly penalizes: forced playbook application, over-engineering, canvas-completion thinking.
+## 9. Verification
 
-Final assessment prompt gets an added directive: "A coach who deliberately did less but did it well should be rated above a coach who applied every framework."
+- Unit tests: participant identity, safe projections, brief-projection helper; rerun existing 55+ suite.
+- Privacy: signed-in browser check that candidate payloads exclude private truth; cross-candidate denial unchanged; Stage 4/5 boundaries intact.
+- Regression: external-runtime journey end-to-end on the POC scenario; a second scenario for leak-check; internal runtime render; historical session render; refresh/resume across Scope, connection, Live Client Team; desktop + mobile viewports.
+- Human-style walkthrough per spec §24; final report to `/mnt/documents/coach-compass-stage5.5-report.md` covering all 22 required items.
 
-## 8. Scenario shape (DB migration)
+## Out of scope (per brief)
 
-Add to `scenarios` table:
-- `success_definition text` — what the team currently believes good looks like
-- `success_pressure text` — organizational/timeline pressure shaping that belief
-- `unrealistic_aspects text[]` — where the success definition is likely off
+No Stage 6, no evaluator/scoring changes, no chapter locking, no scenario-library redesign, no new production scenarios, no Strategyzer API work, no broad rebrand. Stop after Stage 5.5.
 
-Migration also backfills existing scenarios with reasonable defaults so the UI never renders blank. Stakeholder dialogue prompts read these so they can voice the pressure naturally.
+## Files touched
 
-## 9. Report page
-
-In `src/routes/_authenticated.sessions.$sessionId.report.tsx`, update the `SECTION_RUBRIC` consumer to render the new keys/labels. No visual redesign — same hero, same per-section cards, same final assessment block. The verdict colors and scorebars stay.
-
-## Out of scope
-
-- No visual redesign, no component library swaps, no new color tokens.
-- No changes to auth, routing shell, voice input, or playbook PDF ingestion.
-- No new tables beyond the scenarios columns above; reuse existing jsonb columns.
-
-## Technical summary
-
-Files touched:
-- `src/routes/_authenticated.sessions.$sessionId.tsx` — step model, copy, persistent dialogue affordance, fidelity selector, "stop early" option, free navigation
-- `src/routes/_authenticated.sessions.$sessionId.report.tsx` — consume new rubric keys
-- `src/lib/evaluation.functions.ts` — new `SECTION_RUBRIC`, updated prompt copy
-- `src/lib/simulator.functions.ts` — `suggestPlaybook` gains "no playbook yet" mode; `sendStakeholderMessage` system prompt addendum reading new scenario fields; new `saveEngagementPathway` server fn
-- `supabase/migration` — add `success_definition`, `success_pressure`, `unrealistic_aspects` to `scenarios`; backfill defaults
-
-No new dependencies. No changes to `src/integrations/supabase/*`, `src/components/Shell.tsx`, or routing shell.
+- `src/lib/simulator.functions.ts`, `src/lib/scenarios.functions.ts`, `src/lib/activity-runtime.functions.ts` (safe projections)
+- `src/lib/chapters.ts` (labels/descriptors)
+- `src/routes/_authenticated.sessions.$sessionId.tsx` (header, tabs, Client merge, Your Approach, copy cleanup)
+- `src/routes/_authenticated.scenarios.tsx`, `src/routes/index.tsx` (Client Brief, landing cleanup)
+- `src/components/ParticipantIdentity.tsx` (new), `ScopeBrief.tsx` (read-only legacy framing), `StrategyzerWorkspace.tsx`, `LiveClientTeam.tsx`, `ActivityRuntime.tsx`
+- New tests beside existing ones; report in /mnt/documents
