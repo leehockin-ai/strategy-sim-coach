@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { PUBLIC_SCENARIO_COLUMNS } from "./scenario-visibility";
+import { publicAssignment } from "./assignment-visibility";
 
 
 // ──────────────────────────────────────────────────────────────────
@@ -61,13 +63,13 @@ export const getAssignment = createServerFn({ method: "POST" })
         `id, status, admin_note, due_at, created_at,
          program_id, scenario_id, assigned_to_user_id,
          programs:program_id (name, kind),
-         scenarios:scenario_id (id, slug, title, difficulty, industry, summary, context, ambiguity_factors, stakeholders)`,
+         scenarios:scenario_id (${PUBLIC_SCENARIO_COLUMNS})`,
       )
       .eq("id", data.assignmentId)
       .single();
     if (error || !a) throw new Error("Assignment not found");
     if ((a as any).assigned_to_user_id !== context.userId) throw new Error("Forbidden");
-    return { assignment: a };
+    return { assignment: publicAssignment(a as unknown as Record<string, any>) };
   });
 
 // ──────────────────────────────────────────────────────────────────
