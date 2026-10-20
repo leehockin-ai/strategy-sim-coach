@@ -11,7 +11,7 @@ This is an audit/proposal only: no application code, permissions, simulation con
 - Stage 5.5.1 facilitation → participant speech → team work → coaching → revision/unresolved state: public-source validation, attribution, simulated provenance, intentional incompleteness.
 - Atomic ordered/idempotent events, optimistic checks, append-only history, frozen configurations, ownership/privacy protections.
 - Level 0 host-allowlisted connections, versions and launch records; existing detailed rubric, isolated calls, safe reports, reviewer roles, human-decision/progress guards.
-- Historical artifacts/readers/reports; no rewritten evidence or synthesized historical trajectories.
+- Historical artifacts/readers/reports remain unchanged.
 
 ## B. Extend existing systems
 Room-first Chapter 2, neutral instructions, compact outcome anchor, persistent Playbook/Brief links and explicit states. Visual team-owned wall over existing work/history, driven by one versioned adapter—not another store or candidate editor.
@@ -60,7 +60,7 @@ Mode, completion and immutable evidence must precede trustworthy counting/synthe
 - Approve content and prospective repeat/member-selection policy first. Proposal: legacy attempts do not automatically count; repeats add no distinct slots or silently replace frozen members.
 
 ## F. Validation and current evidence
-**Fresh audit:** 74 existing regressions passed; live read-only inventory confirmed availability constraints. Public page rendered without errors. No new simulation, database mutation or authenticated/reviewer-positive journey was exercised.
+**Fresh audit:** 74 existing regressions passed; live read-only inventory confirmed availability constraints. No new simulation, database mutation or authenticated/reviewer-positive journey was exercised.
 
 **5.5.2:** signed-in instructions → connection → participants/conversation → assignment → coaching revision → history/refresh → intentional conclusion. Verify privacy, no editing, persistent links, unavailable states and Level 0. Repeat strong/leading/rushed/uninvited/stopping comparisons; desktop/mobile. Database tests: owner/actor denial, lineage, retries, simultaneous conflicts. Reviewer checks require authorized access, no role grants.
 
