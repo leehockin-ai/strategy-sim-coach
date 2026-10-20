@@ -14,13 +14,11 @@ This is an audit/proposal only: no application code, permissions, simulation con
 - Historical artifacts/readers/reports; no rewritten evidence or synthesized historical trajectories.
 
 ## B. Extend existing systems
-**Chapter 2:** room-first composition; supplied neutral instructions; compact bound outcome/intervention/Playbook anchor; persistent Playbook/Brief links; secondary setup; explicit loading/error/unavailable states.
+Room-first Chapter 2, neutral instructions, compact outcome anchor, persistent Playbook/Brief links and explicit states. Visual team-owned wall over existing work/history, driven by one versioned adapter—not another store or candidate editor.
 
-**Team wall:** visual presentation of existing sections/items/history, not a second store. Team alone revises/removes/reclassifies through causal turns; candidates coach verbally, never edit. One versioned adapter drives layout/generation; existing Customer Profile POC only initially.
+Stage 5.6 adds committed mode, activity confirmation, contextual timing, enriched rubric evidence, versioned evaluations, distinct-environment portfolios and frozen human handoff.
 
-**Stage 5.6:** committed mode, activity confirmation, approximate contextual timing, richer rubric inputs, evaluation versions, distinct-environment portfolio synthesis and optional frozen human handoff.
-
-**Engagement Simulation Pack:** map scenarios to public context/stakeholders/pressure; Scope to outcome; interventions to choices; definitions to specifications; private team config to knowledge/dynamics; runs/events/history to evidence. Add approved specification/version links only where missing, not a parallel pack model.
+Engagement Pack maps onto existing scenarios/context, Scope/outcomes, interventions, definitions, private team knowledge and run evidence. Add missing approved specification/version links only, not a parallel model.
 
 ## C. Conflicts and prerequisites
 1. **Room availability is not just layout.** Chapter 2 uses legacy canvas branches; the room is on a sibling workspace and disappears when unavailable. Live checks found four scenarios, one unapproved POC config, zero allowlisted sessions, no activity definitions and two external runs lacking matching approved rooms. Server access and artifact writes enforce POC gates. Restore the eligible POC first; ordinary rooms require approved content and aligned permission rules—not bypassed gates.
