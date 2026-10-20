@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { beginWorkingSession, concludeWorkingSession, facilitateTeam, getLiveTeam, startSynthesis } from "@/lib/live-team.functions";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
+import { WorkingSessionInstructions } from "@/components/WorkingSessionInstructions";
+import { TeamWorkingWall } from "@/components/TeamWorkingWall";
+import { unavailableRoomCopy } from "@/lib/working-session";
 
 type Header = { assessmentReference: string | null; projectName: string; playbook: string; onOpen: () => void };
 
@@ -15,13 +18,15 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
   const key = ["live-team", runId];
   const fetchTeam = useServerFn(getLiveTeam);
   const begin = useServerFn(beginWorkingSession), say = useServerFn(facilitateTeam), synth = useServerFn(startSynthesis), conclude = useServerFn(concludeWorkingSession);
-  const { data } = useQuery({ queryKey: key, queryFn: () => fetchTeam({ data: { runId } }) });
+  const { data, isPending, error, refetch } = useQuery({ queryKey: key, queryFn: () => fetchTeam({ data: { runId } }) });
   const [msg, setMsg] = useState("");
   const [concluding, setConcluding] = useState(false);
   const [rationale, setRationale] = useState("");
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const pending = useRef<{ text: string; key: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
+  const [source, setSource] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: key });
   const keyed = (fn: (k: string) => Promise<unknown>) => { const k = crypto.randomUUID(); return () => fn(k); };
 
@@ -34,9 +39,16 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
     onError: e => toast.error(e.message),
   });
   const simple = useMutation({ mutationFn: (f: () => Promise<unknown>) => f(), onSuccess: refresh, onError: e => toast.error(e.message) });
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [data?.available ? data.events.length : 0, sayMut.isPending]);
+  useEffect(() => { const node = transcriptRef.current; if (node) node.scrollTop = node.scrollHeight; }, [data?.available ? data.events.length : 0, sayMut.isPending]);
+  function showSource(id: string) {
+    setSource(id);
+    const node = document.getElementById(`team-event-${id}`);
+    node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
 
-  if (!data?.available) return null;
+  if (isPending) return <p className="text-sm text-muted-foreground py-6" role="status">Loading client team…</p>;
+  if (error) return <section className="py-6 space-y-3" role="alert"><p>The client working session could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></section>;
+  if (!data?.available) return <section className="py-6 space-y-2"><h3 className="text-xl">Client working session unavailable</h3><p className="text-sm text-muted-foreground">{unavailableRoomCopy[data?.reason ?? "configuration_missing"]}</p></section>;
   const { config, phase, events } = data;
   const lines = events.filter(e => (e.metadata as { team_kind?: string }).team_kind !== "private_marker");
   const roles = Object.fromEntries(config.participants.map(p => [p.name, p.role]));
@@ -45,7 +57,7 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
 
   return <section className="border-t border-border pt-6 space-y-6">
     {config.poc && <p className="text-xs font-semibold text-destructive">POC simulation configuration · Not approved certification content</p>}
-    <div className="border border-border p-4 flex flex-wrap items-center justify-between gap-4 bg-muted/40">
+    <div className="sticky top-0 z-10 border-y border-border py-3 flex flex-wrap items-center justify-between gap-3 bg-background">
       <div className="text-sm min-w-0">
         <p className="text-xs uppercase text-muted-foreground">Assessment {header.assessmentReference}</p>
         <p className="font-medium break-words">{header.projectName}</p>
@@ -54,11 +66,11 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
       <Button onClick={header.onOpen}><ExternalLink />Open Strategyzer Playbook</Button>
     </div>
 
+    {phase === "not_started" ? <WorkingSessionInstructions /> : <details className="text-sm"><summary className="cursor-pointer font-medium">Working session instructions</summary><div className="pt-4"><WorkingSessionInstructions /></div></details>}
     <div>
       <p className="text-xs uppercase text-muted-foreground mb-1">Your working session</p>
       <h3 className="text-xl">{config.title}</h3>
-      <p className="text-sm text-muted-foreground">{config.exerciseLabel} · {config.expectedDurationMinutes} min</p>
-      <p className="text-sm mt-3 max-w-2xl">{config.instructions}</p>
+      <p className="text-sm text-muted-foreground">{config.exerciseLabel}</p>
       <p className="text-xs text-muted-foreground mt-2">Coach Compass cannot see which Strategyzer activity you have open or what your team writes there.</p>
     </div>
 
@@ -66,36 +78,29 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
       <h3 className="text-lg flex items-center gap-2 mb-3"><Users className="size-4" />Live Client Team</h3>
       <ul className="flex flex-wrap gap-x-8 gap-y-3 text-sm mb-4">{config.participants.map(p => <li key={p.name}><ParticipantIdentity participant={{ name: p.name, role: p.role }} size="sm" /></li>)}</ul>
       {phase === "not_started" && <Button disabled={!runActive || !data.connected || simple.isPending} onClick={() => simple.mutate(keyed(k => begin({ data: { runId, requestKey: k } })))}><Play />Begin working session</Button>}
-      {phase !== "not_started" && <div className="border border-border">
-        <div className="max-h-[480px] overflow-y-auto p-4 space-y-4">
+      {phase !== "not_started" && <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-5 items-start">
+       <div className="min-w-0 border border-border">
+        <div ref={transcriptRef} className="h-[420px] overflow-y-auto p-4 space-y-4" aria-label="Working session conversation">
           {lines.map(e => {
             const kind = (e.metadata as { team_kind?: string }).team_kind;
             if (kind === "session_started" || kind === "synthesis_started") return <p key={e.id} className="text-xs text-center text-muted-foreground">{kind === "session_started" ? "Working session started" : "Team brought back together for synthesis"}</p>;
             if (kind === "concluded") return <p key={e.id} className="text-xs text-center text-muted-foreground">Working session concluded</p>;
              if (kind === "work_product") return <p key={e.id} className="text-xs text-center text-muted-foreground">{e.content}</p>;
             const coach = e.actor_type === "coach";
-            return <div key={e.id} className={coach ? "pl-8" : "pr-8"}>
+            return <div id={`team-event-${e.id}`} key={e.id} className={`${coach ? "pl-5" : "pr-5"} ${source === e.id ? "bg-accent border-l-2 border-primary p-2" : ""}`}>
               {coach
                 ? <p className="text-xs text-muted-foreground">You</p>
                 : <ParticipantIdentity participant={{ name: e.actor_id ?? "", role: roles[e.actor_id ?? ""] }} size="sm" />}
               <p className={`text-sm mt-1 whitespace-pre-wrap break-words ${coach ? "border-l-2 border-primary pl-3" : ""}`}>{e.content}</p>
+              <time className="text-xs text-muted-foreground" dateTime={e.occurred_at}>{new Date(e.occurred_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
             </div>;
           })}
           {sayMut.isPending && <p className="text-xs text-muted-foreground">The team is responding…</p>}
           <div ref={endRef} />
         </div>
-         {shownWork && <section className="border-t border-border p-4 bg-muted/30 space-y-4" aria-label="Simulated client team work">
-           <div className="flex flex-wrap justify-between gap-3 items-start">
-             <div><h4 className="text-sm font-semibold uppercase">Team work — {data.revision === 1 ? "first pass" : "working draft"}</h4><p className="text-xs text-muted-foreground">Simulated client team work · Not verified Strategyzer artifact state</p></div>
-             <label className="text-xs text-muted-foreground">Revision <select aria-label="Team work revision" className="ml-2 bg-background border border-border rounded px-2 py-1 text-foreground" value={selectedRevision ?? "latest"} onChange={e => setSelectedRevision(e.target.value === "latest" ? null : Number(e.target.value))}><option value="latest">Latest ({data.revision})</option>{data.workHistory.map(h => <option key={h.revision} value={h.revision}>{h.revision}</option>)}</select></label>
-           </div>
-           <p className="text-xs text-muted-foreground capitalize">{shownWork.status.replaceAll("_", " ")}</p>
-           <div className="grid sm:grid-cols-2 gap-5">{shownWork.sections.map(s => <div key={s.key}><h5 className="text-sm font-medium mb-2">{s.label}</h5>{s.items.length ? <ul className="space-y-2 text-sm">{s.items.map((item, i) => <li key={`${item.sourceId}:${i}`} className="break-words"><p>{item.text}</p><span className="text-xs text-muted-foreground">{item.speaker}</span></li>)}</ul> : <p className="text-sm text-muted-foreground">—</p>}</div>)}</div>
-         </section>}
         {open && <div className="border-t border-border p-3 space-y-3">
            {data.work && <p className="text-xs uppercase text-muted-foreground">Continue coaching</p>}
-          {phase === "synthesis" && <p className="text-sm">Bring the team back together before moving on. Facilitate a short synthesis of what the team has established, what remains uncertain, and what matters next.</p>}
-          <Textarea value={msg} onChange={e => setMsg(e.target.value)} placeholder="Facilitate the team…" rows={3} maxLength={4000}
+          <Textarea aria-label="Speak to the client team" value={msg} onChange={e => setMsg(e.target.value)} placeholder="Speak to the team…" rows={3} maxLength={4000} disabled={sayMut.isPending || simple.isPending}
             onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && msg.trim()) sayMut.mutate(msg.trim()); }} />
           <div className="flex flex-wrap gap-3 justify-between">
             <Button disabled={!msg.trim() || sayMut.isPending} onClick={() => sayMut.mutate(msg.trim())}><Send />Speak to the room</Button>
@@ -103,12 +108,14 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
             {phase === "synthesis" && !concluding && <Button variant="outline" onClick={() => setConcluding(true)}>Conclude working session</Button>}
           </div>
           {concluding && <div className="border border-border p-3 space-y-2">
-            <p className="text-sm font-medium">Are you ready to conclude this assessed working session?</p>
+            <p className="text-sm font-medium">Are you ready to conclude this working session?</p>
             <label className="text-sm block">Why are you ready to move on?<Textarea className="mt-1" rows={3} value={rationale} onChange={e => setRationale(e.target.value)} maxLength={4000} /></label>
             <p className="text-xs text-muted-foreground">A finished artifact is not required.</p>
             <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending} onClick={() => simple.mutate(keyed(k => conclude({ data: { runId, requestKey: k, rationale: rationale.trim() } })))}>Conclude</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
           </div>}
         </div>}
+       </div>
+       <TeamWorkingWall work={shownWork} revision={data.revision} history={data.workHistory} selectedRevision={selectedRevision} onRevision={setSelectedRevision} onSource={showSource} />
       </div>}
     </div>
   </section>;
