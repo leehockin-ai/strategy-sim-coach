@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Consolidated product direction — audit and plan only
+- [ ] Audit coaching room, causal working wall, current gating and Level 0 boundaries against the consolidated brief.
+- [ ] Audit simulation evaluation, Practice/Formal distinctions, activity/timing evidence and three-distinct-environment portfolio implications.
+- [ ] Present staged implementation plan, conflicts, migration compatibility and behavioural validation; stop for Lee's review without implementation.
+
 ## Stage 5.5.1 — Causal team work-product proof
 - [x] Plan the narrow Customer Profile POC using existing runtime, events, artifacts and private team state.
 - [x] Implement semantic work assignments and team-owned simulated work with causal, append-only revisions.
