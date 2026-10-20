@@ -1325,9 +1325,14 @@ function Chapter2Container({
 
   return (
     <div>
-      {!suppressBanner && banner}
-      <ActivityRuntimeEntry sessionId={session.id} />
-      {body}
+      {pathwayType === "playbook" && session.chosen_intervention_slug ? <>
+        <ActivityRuntimeEntry sessionId={session.id} embedded />
+        {session.application_canvas && Object.keys(session.application_canvas).length > 0 && <details className="border-t border-border mt-8 py-4 text-sm"><summary className="cursor-pointer font-medium">Earlier working-session evidence · read-only</summary><pre className="whitespace-pre-wrap break-words mt-4 text-xs">{JSON.stringify(canvasForEditing(session.application_canvas).cells, null, 2)}</pre></details>}
+      </> : <>
+        {!suppressBanner && banner}
+        <ActivityRuntimeEntry sessionId={session.id} />
+        {body}
+      </>}
     </div>
   );
 }
@@ -3101,7 +3106,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No canvas has been mapped to your chosen approach yet. Return to Coaching Approach if you'd like to commit to a playbook.</p>
+          <p className="text-sm text-muted-foreground">A client working session is not available for this approach in this test release. Your saved engagement evidence remains available.</p>
         )}
       </StepShell>
     );
