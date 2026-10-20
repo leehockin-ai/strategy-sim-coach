@@ -9,19 +9,23 @@ import { getActivityRuntime, startActivityRun, appendActivityEvent, startStrateg
 import { StrategyzerWorkspace } from "@/components/StrategyzerWorkspace";
 import { workspaceKind, artifactForWorkspace, type ActivityEventInput } from "@/lib/activity-runtime";
 import type { Json } from "@/integrations/supabase/types";
+import { unavailableRoomCopy } from "@/lib/working-session";
 
 type RuntimeData = Awaited<ReturnType<typeof getActivityRuntime>>;
 type Run = RuntimeData["runs"][number];
 type Definition = RuntimeData["definitions"][number];
 
-export function ActivityRuntimeEntry({ sessionId }: { sessionId: string }) {
+export function ActivityRuntimeEntry({ sessionId, embedded = false }: { sessionId: string; embedded?: boolean }) {
   const fetchRuntime = useServerFn(getActivityRuntime);
-  const { data } = useQuery({ queryKey: ["activity-runtime", sessionId], queryFn: () => fetchRuntime({ data: { sessionId } }) });
+  const { data, isPending, error, refetch } = useQuery({ queryKey: ["activity-runtime", sessionId], queryFn: () => fetchRuntime({ data: { sessionId } }) });
+  if (embedded && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
+  if (embedded && error) return <div className="py-6 space-y-3" role="alert"><p>The working session could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
+  if (embedded && data) return <ActivityRuntime data={data} embedded />;
   if (!data || (!data.definitions.length && !data.runs.length && data.intervention?.pathway_type !== "playbook")) return null;
   return <div className="flex justify-end mb-4"><Button variant="outline" asChild><Link to="/sessions/$sessionId/activities" params={{ sessionId }}><Play />{data.testAllowed ? "TEST activity workspace" : "Strategyzer Playbook workspace"}</Link></Button></div>;
 }
 
-export function ActivityRuntime({ data }: { data: RuntimeData }) {
+export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData; embedded?: boolean }) {
   const qc = useQueryClient();
   const start = useServerFn(startActivityRun);
   const [selected, setSelected] = useState<string | null>(null);
@@ -43,20 +47,23 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
   });
   const hasActiveExternal = data.runs.some(r => r.runtime_type === "strategyzer_external" && r.status === "active");
   const run = data.runs.find(r => r.id === selected) ?? data.runs.at(-1);
-  return <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-8">
-    <Button variant="link" className="px-0 mb-6" asChild><Link to="/sessions/$sessionId" params={{ sessionId: data.session.id }}><ArrowLeft />Back to engagement</Link></Button>
+  const unavailable = data.roomUnavailableReason;
+  return <div className={embedded ? "min-w-0" : "mx-auto max-w-[1400px] px-4 md:px-10 py-8"}>
+    {!embedded && <Button variant="link" className="px-0 mb-6" asChild><Link to="/sessions/$sessionId" params={{ sessionId: data.session.id }}><ArrowLeft />Back to engagement</Link></Button>}
+    {!embedded &&
     <div className="border-b border-border pb-6 mb-8">
       <p className="text-xs uppercase text-muted-foreground mb-2">Facilitate the Work · {data.intervention?.label ?? "Activity runs"}</p>
       <h1 className="text-3xl md:text-4xl">Working session workspace</h1>
-    </div>
-    <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-8">
+    </div>}
+    {!run && unavailable && <section className="border-y border-border py-6 mb-6 space-y-2"><h2 className="text-xl">Client working session unavailable</h2><p className="text-sm text-muted-foreground">{unavailableRoomCopy[unavailable]}</p><p className="text-sm text-muted-foreground">Your saved Scope and engagement evidence remain available.</p></section>}
+    <div className="space-y-6">
       <aside className="min-w-0">
         {data.intervention?.pathway_type === "playbook" && !hasActiveExternal && <div className="border-b border-border pb-5 mb-5">
           <p className="font-medium">Strategyzer Playbook</p>
           <p className="text-xs text-muted-foreground mt-1">{data.intervention.label} · in your own Strategyzer account</p>
           <Button className="mt-3" disabled={extMut.isPending} onClick={() => extMut.mutate()}><Play />Set up assessment workspace</Button>
         </div>}
-        <h2 className="text-lg mb-4">Activities</h2>
+        {!!data.definitions.length && <h2 className="text-lg mb-4">Activities</h2>}
         {!data.definitions.length && data.intervention?.pathway_type !== "playbook" && <p className="text-sm text-muted-foreground">No approved activities configured.</p>}
         {data.definitions.map(def => <div key={def.id} className="border-b border-border pb-5 mb-5">
           {def.test_only && <p className="text-xs font-semibold text-destructive mb-2">TEST / NON-PRODUCTION · Not approved methodology</p>}
@@ -64,9 +71,9 @@ export function ActivityRuntime({ data }: { data: RuntimeData }) {
           <p className="text-xs text-muted-foreground mt-1">Version {def.version}</p>
           <Button variant="outline" className="mt-3" disabled={startMut.isPending} onClick={() => startMut.mutate(def.id)}><Play />Start activity</Button>
         </div>)}
-        {!!data.runs.length && <><h2 className="text-lg mt-8 mb-3">Attempts</h2>{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} className="w-full justify-start mb-1" onClick={() => setSelected(r.id)}>{r.assessment_reference ?? `Attempt ${i + 1}`} · {r.status}</Button>)}</>}
+        {data.runs.length > 1 && <details className="text-sm border-b border-border pb-3"><summary className="cursor-pointer font-medium">Saved working sessions</summary><div className="flex flex-wrap gap-2 mt-3">{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} onClick={() => setSelected(r.id)}>{r.assessment_reference ?? `Session ${i + 1}`} · {r.status}</Button>)}</div></details>}
       </aside>
-      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcome} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : <p className="text-muted-foreground text-sm py-4">No activity run started.</p>}</main>
+      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcomes[run.id]} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : !unavailable && <p className="text-muted-foreground text-sm py-4">Connect your Playbook to prepare the client working session.</p>}</main>
     </div>
   </div>;
 }

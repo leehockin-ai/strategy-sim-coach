@@ -15,13 +15,13 @@ type Event = RuntimeData["events"][number];
 
 const CAPABILITY = ["Linked", "Verified", "Observable", "Participatory", "Embedded"];
 
-export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; events: Event[]; briefOutcome?: RuntimeData["briefOutcome"] }) {
+export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; events: Event[]; briefOutcome?: RuntimeData["briefOutcomes"][string] }) {
   const qc = useQueryClient();
   const fetchConn = useServerFn(getStrategyzerConnections);
   const connect = useServerFn(connectStrategyzerPlaybook);
   const launch = useServerFn(recordStrategyzerLaunch);
   const key = ["strategyzer-connections", run.id];
-  const { data } = useQuery({ queryKey: key, queryFn: () => fetchConn({ data: { runId: run.id } }) });
+  const { data, isPending, error, refetch } = useQuery({ queryKey: key, queryFn: () => fetchConn({ data: { runId: run.id } }) });
   const current = data?.connections.find(c => c.status === "connected");
   const [editing, setEditing] = useState(false);
   const [url, setUrl] = useState("");
@@ -53,19 +53,23 @@ export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; 
     <div className="flex flex-wrap items-center gap-3"><code className="border border-border bg-muted px-3 py-2 text-sm break-all">{projectName}</code><Button variant="outline" onClick={copy}><Copy />Copy project name</Button></div>
     <p className="text-sm mt-4">Inside that project, create or open the <strong>{snap.intervention_label ?? run.intervention_slug}</strong> Playbook — the intervention you committed to in Scope.</p>
   </section>;
-  return <div className="space-y-8">
+  if (isPending) return <p className="text-sm text-muted-foreground" role="status">Loading Playbook connection…</p>;
+  if (error) return <div role="alert" className="space-y-3"><p>Playbook connection could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
+  return <div className="space-y-6">
     <div>
       <p className="text-xs uppercase text-muted-foreground mb-2">Assessment {run.assessment_reference} · Capability level {run.integration_capability_level} — {CAPABILITY[run.integration_capability_level ?? 0]}</p>
       <h2 className="text-2xl">Working session with the client team</h2>
-      <p className="text-sm text-muted-foreground mt-3 max-w-2xl">You facilitate the real work in your own Strategyzer Playbook environment while the client team responds here in Coach Compass. Keep both open alongside each other.</p>
-      <p className="text-sm mt-3 border-l-2 border-border pl-3">Coach Compass cannot see what you do inside Strategyzer.</p>
+      <p className="text-sm text-muted-foreground mt-2">{snap.intervention_label ?? run.intervention_slug} · Bound Scope revision {briefOutcome?.revision ?? "unavailable"}</p>
     </div>
 
-    {outcome && <section className="border border-border p-4 bg-muted/40">
+    {outcome && <section className="border-l-2 border-primary pl-4">
       <p className="text-xs uppercase text-muted-foreground mb-2">The outcome you're working toward · Engagement Brief{outcome.revision ? ` · revision ${outcome.revision}` : ""}</p>
       {outcome.success && <p className="text-sm"><span className="font-medium">Success: </span>{outcome.success}</p>}
       {outcome.decision_to_enable && <p className="text-sm mt-1"><span className="font-medium">Decision to enable: </span>{outcome.decision_to_enable}{outcome.decision_maker ? ` — ${outcome.decision_maker}` : ""}</p>}
     </section>}
+    {!outcome && <p className="text-sm text-muted-foreground">No outcome is available in this run’s saved Scope evidence. Later Scope edits are not substituted here.</p>}
+
+    {current && <LiveClientTeam runId={run.id} runActive={run.status === "active"} header={{ assessmentReference: run.assessment_reference, projectName: current.confirmed_project_name ?? projectName, playbook: snap.intervention_label || run.intervention_slug, onOpen: open }} />}
 
     {current && !editing ? <details className="border-t border-border py-4 text-sm">
       <summary className="cursor-pointer font-medium">Setup & connection · {current.confirmed_project_name ?? projectName}</summary>
@@ -100,10 +104,8 @@ export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; 
       {data.connections.map(c => <div key={c.id} className="py-3 border-b border-border"><p>Connection {c.version} · {c.status === "connected" ? "current" : "replaced"} · {new Date(c.connected_at).toLocaleString()}</p><p className="text-xs text-muted-foreground break-all">{c.supplied_url}</p></div>)}
     </details>}
 
-    {current && <LiveClientTeam runId={run.id} runActive={run.status === "active"} header={{ assessmentReference: run.assessment_reference, projectName: current.confirmed_project_name ?? projectName, playbook: current.confirmed_playbook_title || snap.intervention_label || run.intervention_slug, onOpen: open }} />}
-
-    <section className="border-t border-border pt-6"><h3 className="text-lg mb-3">Activity record</h3>
+    <details className="border-t border-border pt-4"><summary className="cursor-pointer text-sm font-medium">Connection & activity record</summary>
       <ol className="divide-y divide-border">{events.filter(e => !(e.metadata && typeof e.metadata === "object" && "team_kind" in e.metadata)).map(e => <li key={e.id} className="py-3 text-sm"><div className="text-xs text-muted-foreground">Event {e.sequence} · {e.actor_type === "coach" ? "candidate" : e.actor_type} · {new Date(e.occurred_at).toLocaleString()}</div><p className="break-words">{e.content}</p></li>)}</ol>
-    </section>
+    </details>
   </div>;
 }

@@ -7,6 +7,7 @@ import { initialRoom, publicTeamConfig, roomPhase, sanitizeTurn, type RawTurn, t
 import { customerProfileWork, readTeamWork, workIntents, type WorkIntent, type WorkSource } from "./team-work";
 import { FOUNDATIONAL_CONCEPTS } from "./strategyzer-methodology";
 import { disclosedConfig, validDisclosures } from "./team-disclosure";
+import { roomEligibility } from "./working-session";
 
 type Ctx = { supabase: any; userId: string };
 
@@ -14,15 +15,18 @@ type Ctx = { supabase: any; userId: string };
 async function loadEligibleRun(ctx: Ctx, runId: string) {
   const { data: run } = await ctx.supabase.from("activity_runs").select("id,session_id,scenario_id,intervention_slug,runtime_type,status,candidate_id,artifact_state,artifact_revision,last_sequence").eq("id", runId).maybeSingle();
   if (!run || run.candidate_id !== ctx.userId || run.runtime_type !== "strategyzer_external") throw new Error("Forbidden");
-  const { data: allowed } = await ctx.supabase.rpc("activity_runtime_test_allowed", { _session: run.session_id, _candidate: ctx.userId });
+  const { data: allowed, error: allowedError } = await ctx.supabase.rpc("activity_runtime_test_allowed", { _session: run.session_id, _candidate: ctx.userId });
+  if (allowedError) throw new Error("Working session eligibility could not be checked");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: cfg } = await supabaseAdmin.from("team_activity_configs").select("*").eq("scenario_id", run.scenario_id).eq("intervention_slug", run.intervention_slug).eq("status", "active").order("version", { ascending: false }).limit(1).maybeSingle();
+  const { data: cfg, error: cfgError } = await supabaseAdmin.from("team_activity_configs").select("*").eq("scenario_id", run.scenario_id).eq("intervention_slug", run.intervention_slug).eq("status", "active").order("version", { ascending: false }).limit(1).maybeSingle();
+  if (cfgError) throw new Error("Working session configuration could not be checked");
   const { data: privateRun } = await supabaseAdmin.from("activity_run_private").select("internal_configuration").eq("run_id", runId).maybeSingle();
   const saved = (privateRun?.internal_configuration as any)?.team?.config_snapshot;
   const config = (saved ?? cfg) as unknown as TeamConfig | null;
   // POC configuration is unapproved content: only explicitly allowlisted disposable sessions may use it.
-  if (!config || (config.poc && !allowed) || (!config.poc && !config.methodology_approved)) return { run, config: null, admin: supabaseAdmin };
-  return { run, config, admin: supabaseAdmin };
+  const unavailableReason = roomEligibility(config, !!allowed);
+  if (unavailableReason) return { run, config: null, admin: supabaseAdmin, unavailableReason };
+  return { run, config, admin: supabaseAdmin, unavailableReason: null };
 }
 
 async function connected(ctx: Ctx, runId: string) {
@@ -34,12 +38,13 @@ export const getLiveTeam = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { runId: string }) => z.object({ runId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { config, run } = await loadEligibleRun(context, data.runId);
-    if (!config) return { available: false as const };
+    const { config, run, unavailableReason } = await loadEligibleRun(context, data.runId);
+    if (!config) return { available: false as const, reason: unavailableReason ?? "configuration_missing" as const };
     const { data: events, error } = await context.supabase.from("activity_events").select(PUBLIC_EVENT_COLUMNS).eq("run_id", data.runId).order("sequence");
     if (error) throw new Error("Working session could not be loaded");
     const room = (events ?? []).filter(e => e.metadata && typeof e.metadata === "object" && "team_kind" in (e.metadata as object));
-    const { data: history } = await context.supabase.from("activity_artifact_history").select("revision,state,event_id").eq("run_id", data.runId).order("revision");
+    const { data: history, error: historyError } = await context.supabase.from("activity_artifact_history").select("revision,state,event_id").eq("run_id", data.runId).order("revision");
+    if (historyError) throw new Error("Team work history could not be loaded");
     return { available: true as const, config: publicTeamConfig(config), phase: roomPhase(room), events: room, connected: await connected(context, data.runId), work: readTeamWork(run.artifact_state), revision: run.artifact_revision, workHistory: (history ?? []).map(h => ({ revision: h.revision, eventId: h.event_id, work: readTeamWork(h.state) })).filter(h => h.work) };
   });
 

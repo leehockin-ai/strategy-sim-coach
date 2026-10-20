@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { assertReviewerAccess } from "@/lib/reviewer-access";
 import { activityEventSchema, PUBLIC_EVENT_COLUMNS, normalizeStrategyzerUrl, type ActivityEventInput } from "./activity-runtime";
+import { boundScopeOutcome, roomEligibility } from "./working-session";
 
 const sessionInput = z.object({ sessionId: z.string().uuid() });
 
@@ -24,20 +25,15 @@ export const getActivityRuntime = createServerFn({ method: "POST" })
     const events = ids.length ? await context.supabase.from("activity_events").select(PUBLIC_EVENT_COLUMNS).in("run_id", ids).order("sequence") : { data: [], error: null };
     const artifacts = ids.length ? await context.supabase.from("activity_artifact_history").select("*").in("run_id", ids).order("revision") : { data: [], error: null };
     if (events.error || artifacts.error) throw new Error("Activity evidence could not be loaded");
-    // Outcome continuity: the working session shows the candidate's own
-    // committed Engagement Brief outcome so the room stays anchored to the
-    // customer outcome. Candidate-authored, safe to return to the owner.
-    const { data: latestRevision } = await context.supabase.from("scope_revisions")
-      .select("revision, snapshot").eq("session_id", session.id).order("revision", { ascending: false }).limit(1).maybeSingle();
-    const { readEngagementBrief } = await import("./scope-brief");
-    const brief = readEngagementBrief(latestRevision?.snapshot);
-    const briefOutcome = {
-      revision: latestRevision?.revision ?? null,
-      success: brief.success,
-      decision_to_enable: brief.decision_to_enable,
-      decision_maker: brief.decision_maker,
-    };
-    return { session, intervention, testAllowed: !!testAllowed, definitions: (definitions.data ?? []).filter(d => d.test_only ? !!testAllowed : d.methodology_approved), runs: runs ?? [], events: events.data ?? [], artifacts: artifacts.data ?? [], briefOutcome };
+    const revisionIds = (runs ?? []).flatMap(r => r.scope_revision_id ? [r.scope_revision_id] : []);
+    const revisions = revisionIds.length ? await context.supabase.from("scope_revisions").select("id,revision,snapshot").eq("session_id", session.id).in("id", revisionIds) : { data: [], error: null };
+    if (revisions.error) throw new Error("Bound engagement brief could not be loaded");
+    const briefOutcomes = Object.fromEntries((runs ?? []).map(r => [r.id, boundScopeOutcome(revisions.data?.find(v => v.id === r.scope_revision_id))]));
+    // Only eligibility leaves the server, never private team configuration.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: config, error: configError } = await supabaseAdmin.from("team_activity_configs").select("poc,methodology_approved").eq("scenario_id", session.scenario_id).eq("intervention_slug", session.chosen_intervention_slug ?? "").eq("status", "active").order("version", { ascending: false }).limit(1).maybeSingle();
+    if (configError) throw new Error("Working session availability could not be checked");
+    return { session, intervention, testAllowed: !!testAllowed, roomUnavailableReason: roomEligibility(config, !!testAllowed), definitions: (definitions.data ?? []).filter(d => d.test_only ? !!testAllowed : d.methodology_approved), runs: runs ?? [], events: events.data ?? [], artifacts: artifacts.data ?? [], briefOutcomes };
   });
 
 export const startActivityRun = createServerFn({ method: "POST" })
