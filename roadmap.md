@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Stage 5.5.2 — Approved restricted candidate working session
+- [ ] Correct assignment privacy and bound Scope anchor with regressions.
+- [ ] Restore canonical Chapter 2, neutral instructions, persistent Playbook access and read-only Customer Profile wall; preserve POC gates and honest unavailable states.
+- [ ] Exercise five candidate facilitation comparisons, provenance/history/refresh and desktop/mobile; report results and stop before Stage 5.6.
+
 ## Consolidated product direction — audit and plan only
 - [x] Audit coaching room, causal working wall, current gating and Level 0 boundaries against the consolidated brief.
 - [x] Audit simulation evaluation, Practice/Formal distinctions, activity/timing evidence and three-distinct-environment portfolio implications.
