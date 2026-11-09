@@ -2,8 +2,10 @@
 // Each section gets ONLY the inputs that should bias its score, so the model
 // can't "leak" one transcript moment into seven section scores.
 import { scopeEvidenceForSection, DECISION_CLARITY_RULE } from "@/lib/scope-brief";
+import { renderLiveEvidence, type LiveEvidence } from "./evaluation-live-evidence";
 
 export type SessionForEval = {
+  live_evidence?: LiveEvidence;
   candidate_name: string;
   framing_notes: string | null;
   engagement_brief?: unknown;
@@ -106,6 +108,8 @@ export function extractInputQualitySignals(s: SessionForEval, turns: TranscriptT
   const cellsWithContent = cells.filter((c) => c.value.trim().length > 0).length;
   const cellsWithEvidenceFlag = cells.filter((c) => c.confidence && c.confidence !== "unset" && c.confidence !== "none").length;
   const coachTurns = (turns ?? []).filter((t) => t.role === "candidate");
+  const liveRuns = s.live_evidence?.runs ?? [];
+  const liveCoach = liveRuns.flatMap(r => r.moments.filter(m => m.kind === "coach" || m.kind === "conclusion"));
 
   return {
     framing_chars: charCount(s.framing_notes),
@@ -122,6 +126,14 @@ export function extractInputQualitySignals(s: SessionForEval, turns: TranscriptT
     canvas_cells_total: cells.length,
     canvas_cells_with_content: cellsWithContent,
     canvas_cells_with_evidence_marker: cellsWithEvidenceFlag,
+    evidence_mode: liveRuns.length ? "public_live_room" : "legacy",
+    legacy_canvas_applicable: liveRuns.length === 0,
+    live_runs: liveRuns.length,
+    live_coach_turns: liveCoach.length,
+    live_team_turns: liveRuns.reduce((n, r) => n + r.moments.filter(m => m.kind === "team").length, 0),
+    live_work_revisions: liveRuns.reduce((n, r) => n + r.revisions.length, 0),
+    live_observable_conclusions: liveRuns.filter(r => r.moments.some(m => m.kind === "conclusion")).length,
+    live_evidence_sampled: liveRuns.some(r => r.truncated) || (s.live_evidence?.omittedRuns ?? 0) > 0,
     coach_transcript_turns: coachTurns.length,
     coach_transcript_total_chars: coachTurns.reduce((sum, t) => sum + charCount(t.content), 0),
     ai_suggestions_consulted: Array.isArray(s.playbook_suggestions) ? s.playbook_suggestions.length : 0,
@@ -154,6 +166,23 @@ function renderAssistanceLog(log: any[] | null | undefined): string {
 }
 
 export function buildSectionInput(
+  key: SectionKey,
+  s: SessionForEval,
+  turns: TranscriptTurn[] | null | undefined
+): string {
+  const legacy = buildLegacySectionInput(key, s, turns);
+  const live = renderLiveEvidence(s.live_evidence, key);
+  if (!live) return legacy;
+  if (key === "working_session_facilitation") return `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}\n${live}\nAssess ONLY observed facilitation: open probing vs leading/prescription, specificity, ownership transfer, participation and responses to uncertainty. Examine coaching and revision causality, not wall completeness. Legacy canvas is not required for this live room.`;
+  if (key === "intervention_execution") return `SCENARIO: ${s.scenarios.title}\n${live}\nAssess ONLY execution of each run's ORIGINAL committed intervention relative to its BOUND Scope/outcome, not today's mutable session choice. Evaluate actual work assignments, team ownership, evidence reasoning, revisions, honest progress and stopping rationale. No-work or incomplete work is not automatically poor execution. Current Chapter 3 plans are not proof of Chapter 2 execution.`;
+  if (key === "stakeholder_navigation") {
+    // Live assessment uses public behavior, never simulator's hidden state explanations.
+    return `${buildLegacySectionInput(key, { ...s, stakeholder_state_trajectory: [] }, turns)}\n${live}\nAssess observed participation, invitations, resistance and ownership without inferring hidden trust or motivations.`;
+  }
+  return `${legacy}\n${live}\n${key === "engagement_pathway" ? "Use the live conclusion/latest work only as context to judge the existing Chapter 3 pathway; it does not replace missing Chapter 3 evidence." : key === "intervention_discipline" ? "Use observed conclusion and remaining gaps only to judge recommendation restraint; do not rescore facilitation." : "Use observable applied methodology and source-linked team work, not external Playbook completion. Legacy canvas blanks are not missing live-room evidence."}`;
+}
+
+function buildLegacySectionInput(
   key: SectionKey,
   s: SessionForEval,
   turns: TranscriptTurn[] | null | undefined
