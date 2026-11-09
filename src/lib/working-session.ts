@@ -8,9 +8,9 @@ export function roomEligibility(config: { poc: boolean; methodology_approved: bo
   return null;
 }
 export const unavailableRoomCopy: Record<RoomUnavailableReason, string> = {
-  configuration_missing: "A client team working session is not configured for this environment and approach in this test release.",
-  poc_not_allowlisted: "This client team is available only in designated TEST / NON-PRODUCTION sessions. This session is not designated for that proof of concept.",
-  content_unapproved: "The client team content for this environment and approach has not been approved for use.",
+  configuration_missing: "A client team working session isn't set up yet for this client and approach.",
+  poc_not_allowlisted: "The simulated client team is currently switched on only for designated test sessions, so it isn't available in this session.",
+  content_unapproved: "The client team for this client and approach hasn't been approved for use yet.",
 };
 
 export function boundScopeOutcome(revision: { revision: number; snapshot: unknown } | null | undefined) {
