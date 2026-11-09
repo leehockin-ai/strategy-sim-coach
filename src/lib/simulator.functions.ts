@@ -357,7 +357,9 @@ export const getSessionForReviewer = createServerFn({ method: "POST" })
       .order("stakeholder_id", { ascending: true })
       .order("turn_index", { ascending: true });
     if (stateError) throw new Error(stateError.message);
-    return { session, messages: messages ?? [], evaluation, stakeholderStates: stakeholderStates ?? [] };
+    const { loadLiveEvaluationEvidence } = await import("@/lib/evaluation-live-evidence.server");
+    const liveEvidence = await loadLiveEvaluationEvidence(context.supabase, session);
+    return { session, messages: messages ?? [], evaluation, stakeholderStates: stakeholderStates ?? [], liveEvidence };
   });
 
 
