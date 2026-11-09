@@ -426,8 +426,12 @@ export const generateEvaluation = createServerFn({ method: "POST" })
     if (stateError) throw new Error(stateError.message);
     const s = session as unknown as SessionForEval & { id: string };
     s.live_evidence = liveEvidence;
+    if (liveEvidence.runs.length) {
+      // Live-room assessment does not need hidden scenario diagnostics or legacy state calibration.
+      s.scenarios = { title: s.scenarios.title, summary: s.scenarios.summary };
+    }
     const turns = transcript as TranscriptTurn[] | null;
-    s.stakeholder_state_trajectory = (stakeholderStates ?? []) as any;
+    s.stakeholder_state_trajectory = liveEvidence.runs.length ? [] : (stakeholderStates ?? []) as any;
     const { data: scopeRevisions, error: revisionError } = await supabaseAdmin.from("scope_revisions").select("revision, snapshot, evidence_message_ids").eq("session_id", data.sessionId).order("revision", { ascending: true });
     if (revisionError) throw new Error(revisionError.message);
     s.scope_revisions = scopeRevisions ?? [];
