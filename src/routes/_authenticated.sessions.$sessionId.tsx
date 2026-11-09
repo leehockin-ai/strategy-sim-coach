@@ -104,8 +104,8 @@ function SessionPage() {
     if (scopeDirty) { toast.error("Save your engagement brief before leaving Scope."); return; }
     const target = chapterMeta(targetKey);
     const nextStep = target.steps[0];
-    setActiveStep(nextStep);
-    // Only persist status when moving forward past the furthest reached.
+    // Only persist status when moving forward past the furthest reached; stay
+    // in place if the server refuses the move (e.g. Chapter 2 not finished).
     if (target.index > furthestChapter.index) {
       try {
         await save({ data: { sessionId: session.id, status: CHAPTER_ENTRY_STATUS[targetKey] as any } });
@@ -113,8 +113,10 @@ function SessionPage() {
         qc.invalidateQueries({ queryKey: ["my-sessions"] });
       } catch (e: any) {
         toast.error(e?.message ?? "Could not advance chapter");
+        return;
       }
     }
+    setActiveStep(nextStep);
   }
 
   const renderKey = RENDER_KEY[activeStep];
