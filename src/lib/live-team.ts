@@ -67,3 +67,17 @@ export function roomPhase(events: PublicEvent[]): "not_started" | "working" | "s
   if (kinds.includes("session_started")) return "working";
   return "not_started";
 }
+
+/** How a coach ends the room. "early_stop" is a direct coach decision from the working phase with no synthesis step. */
+export type ConclusionMode = "after_synthesis" | "early_stop";
+/** Server rule: which conclusion (if any) is valid for the current phase. Never fabricates a synthesis step. */
+export function conclusionModeFor(phase: ReturnType<typeof roomPhase>, requested: ConclusionMode): { ok: true; mode: ConclusionMode } | { ok: false; error: string } {
+  if (phase === "concluded") return { ok: false, error: "The working session is already concluded" };
+  if (requested === "early_stop") return phase === "working" ? { ok: true, mode: "early_stop" } : phase === "synthesis" ? { ok: false, error: "The team is already brought back together; conclude normally" } : { ok: false, error: "The working session is not open" };
+  return phase === "synthesis" ? { ok: true, mode: "after_synthesis" } : { ok: false, error: "Bring the team back together before concluding, or stop the session early" };
+}
+/** Read the conclusion type of a stored event. Older records without the marker stay "unspecified" — never relabelled. */
+export function readConclusionMode(metadata: unknown): ConclusionMode | "unspecified" {
+  const m = (metadata as { conclusion_mode?: unknown } | null)?.conclusion_mode;
+  return m === "early_stop" || m === "after_synthesis" ? m : "unspecified";
+}
