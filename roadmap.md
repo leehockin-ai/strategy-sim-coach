@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Evaluation Evidence Integration and Validation
+- [ ] Assemble bounded public live-room evidence with owner authorization, bound Scope and validated revision lineage.
+- [ ] Route observable evidence into existing section/skills assessments and quality signals; preserve rubric and historical evaluations.
+- [ ] Add read-only reviewer evidence, deterministic regressions and verification report; stop before Stage 5.6.
+
 ## Stage 5.5.2 — Approved restricted candidate working session
 - [x] Correct assignment privacy and bound Scope anchor with regressions.
 - [x] Restore canonical Chapter 2, neutral instructions, persistent Playbook access and read-only Customer Profile wall; preserve POC gates and honest unavailable states.
