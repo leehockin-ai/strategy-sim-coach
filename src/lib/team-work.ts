@@ -85,14 +85,14 @@ export function reconcileTeamWork(current: TeamWork, proposed: TeamWork | null, 
         const guess = /^(?:['"])?(?: thing)?[\s.,…]*(?:is|was|remains|is still|was just|is just|is only|is still only|i guess that was) (?:a |an |only a |just a |bit of a )?(?:guess|assumption|unknown|untested hypothesis)\b/.test(after)
           || /\b(?:riskiest guess|we(?:'re| are) (?:still )?guessing)\b/.test(before);
         const retract = /\b(?:i|we) (?:retract|withdraw)\s*['"]?$/.test(before);
-        const replacement = retract ? after.match(/['"]?[\s;,.-]+(?:instead|replace it with)\s+['"]([^'"]+)['"]/) : null;
+        const replacement = retract ? quote.match(/['"’”]?[\s;,.-]+(?:instead|replace it with)\s+['"‘“]([^'"’”]+)['"’”]/i) : null;
         const target = move ? (move[1] === "assumptions" ? "unknowns" : move[1]) : guess ? "unknowns" : retract ? (replacement ? entry.from : null) : undefined;
         if (target === undefined) continue;
         if (source.speaker !== entry.item.speaker) { conflict = true; continue; }
         candidates.push({ ...entry, source, target, quote: replacement?.[1] ?? quote });
       }
     }
-    if (conflict || new Set(candidates.map(c => c.target)).size > 1) { blocked.push(entry.item); continue; }
+    if (conflict || new Set(candidates.map(c => c.target)).size > 1 || new Set(candidates.filter(c => c.target === entry.from).map(c => c.quote)).size > 1) { blocked.push(entry.item); continue; }
     const correction = candidates[0];
     if (correction) changes.push(correction);
   }

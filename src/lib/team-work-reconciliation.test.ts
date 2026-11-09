@@ -26,8 +26,8 @@ describe("deterministic team-owned wall reconciliation", () => {
     expect(items(next, "unknowns")[0]).toMatchObject({ text: exact.text, speaker: "Sofia", sourceId: exact.id });
   });
   it("withdraws an own prior claim and preserves a literal replacement", () => {
-    const next = reconcileTeamWork(wall(), null, [response('I retract "every university student"; instead "international postgraduates".')]);
-    expect(items(next, "customer")).toEqual([{ text: "international postgraduates", sourceId: "response:0", speaker: "Maya" }]);
+    const next = reconcileTeamWork(wall(), null, [response('I retract "every university student"; instead "International postgraduates".')]);
+    expect(items(next, "customer")).toEqual([{ text: "International postgraduates", sourceId: "response:0", speaker: "Maya" }]);
   });
   it.each([
     response("'every university student' is a guess.", "Jordan"),
@@ -50,6 +50,17 @@ describe("deterministic team-owned wall reconciliation", () => {
     const current = wall();
     const proposed = { ...current, sections: current.sections.map(s => ({ ...s, items: [] })) };
     expect(reconcileTeamWork(current, proposed, [response("Okay.")])).toBe(current);
+  });
+  it("does not manufacture a social-feed item absent from the wall", () => {
+    const current = wall();
+    expect(reconcileTeamWork(current, null, [response("I'll move 'social feed' to unknowns.", "Sofia")])).toBe(current);
+  });
+  it("ambiguous short references and conflicting categories remain unchanged", () => {
+    const current = wall();
+    current.sections.find(s => s.key === "customer")?.items.push({ text: "every university student in London", sourceId: "other", speaker: "Maya" });
+    expect(reconcileTeamWork(current, null, [response("I'll move 'every university student' to unknowns.")])).toBe(current);
+    const unique = wall();
+    expect(reconcileTeamWork(unique, null, [response("I'll move 'every university student' to unknowns. I'll move 'every university student' to evidence.")])).toBe(unique);
   });
   it("retry and refresh keep revision stable; historical snapshot is unchanged", () => {
     const old = wall(), saved = JSON.stringify(old), source = response("'every university student' is a guess.");
