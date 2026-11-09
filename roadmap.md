@@ -59,3 +59,5 @@
 - [x] Phase 1: resumable background assessment generation, report progress/retry, "Generate my assessment" CTA, current copy (hosted site not yet verified — needs publish)
 - [x] Phase 2: Chapter 2 clarity — one-link Playbook connection, plain wording, single entry point, start/facilitate/bring together/conclude stages with early stop, Chapter 3 gated on conclusion or recorded reason (server enforced, legacy-compatible)
 - [ ] Phase 3+ (connect Chapter 3 to the working-session outcome, navigation tidy-up) — awaiting user go-ahead
+- [x] Phase 3: Chapter 3 connected to bound Engagement Brief outcome, attributed team work/statements, open items and truthful session ending; old Step labels replaced; read-only, no migration. "Outcome unavailable" traced to test fixtures (empty brief / copied sessions without binding), not a binding bug.
+- [ ] Phase 3 follow-up: full fresh signed-in run (Scope → room with team turns → Chapter 3 → assessment) on a new disposable session; hosted site check.

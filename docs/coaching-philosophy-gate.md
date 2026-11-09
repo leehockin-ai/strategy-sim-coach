@@ -28,3 +28,9 @@ Acceptance criteria for all Coach Compass work. They don't change the rubric or 
 - **Evidence vs hypothesis:** check that surfaced evidence is attributed only when its holder speaks (the rule exists) and that the candidate's own challenges are credited.
 - **Adapting the Playbook:** check that choosing or skipping activities with a clear purpose is credited, not marked down as incomplete.
 - **A recorded reason for moving on is not yet fed to the evaluator.** Decide whether it should be, as evidence of judgment, without penalising it.
+
+## Phase 3 check (Chapter 3 summary)
+- Shows only the run-bound intended outcome; never fills in or substitutes one.
+- Early stop, skip with reason, unavailable room and legacy "unspecified" endings are all presented as legitimate, without implying a synthesis that did not happen.
+- Empty wall is stated as not a failure; a full wall carries "doesn't by itself mean progress". No counts of work are rewarded.
+- Team words are attributed by speaker; the coach's own room turns and Chapter 3 writing are labelled separately as the coach's.
