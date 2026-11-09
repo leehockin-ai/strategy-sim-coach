@@ -128,6 +128,39 @@ async function assertSessionOwner(sessionId: string, userId: string) {
   if (data.owner_id !== userId) throw new Error("Forbidden");
 }
 
+// Server-side Chapter 2 → 3 guard (call after the owner check). Only the
+// modern Playbook working session is gated; see chapter2-progress.ts.
+async function chapter3ReadinessFor(sessionId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { chapter3Readiness, hasConcludedEvent } = await import("@/lib/chapter2-progress");
+  const { data: s, error } = await supabaseAdmin.from("sessions").select("status,chosen_intervention_slug,working_session_skip,application_canvas").eq("id", sessionId).single();
+  if (error) throw new Error(error.message);
+  const { data: iv } = await supabaseAdmin.from("interventions").select("pathway_type").eq("slug", s.chosen_intervention_slug ?? "").maybeSingle();
+  const { data: runs } = await supabaseAdmin.from("activity_runs").select("id").eq("session_id", sessionId).eq("runtime_type", "strategyzer_external");
+  const ids = (runs ?? []).map(r => r.id);
+  const { data: concluded } = ids.length ? await supabaseAdmin.from("activity_events").select("metadata").in("run_id", ids).eq("metadata->>team_kind", "concluded").limit(1) : { data: [] };
+  return { session: s, runIds: ids, readiness: chapter3Readiness({ pathwayType: iv?.pathway_type ?? "playbook", chosenSlug: s.chosen_intervention_slug, currentStatus: s.status, concludedRun: hasConcludedEvent(concluded ?? []), skip: s.working_session_skip, legacyCanvas: s.application_canvas }) };
+}
+async function assertChapter3Ready(sessionId: string) {
+  const { readiness } = await chapter3ReadinessFor(sessionId);
+  if (!readiness.allowed) throw new Error("Conclude the client working session, or record why you are moving on, before continuing to Chapter 3.");
+}
+
+export const recordWorkingSessionSkip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; reason: string }) => z.object({ sessionId: z.string().uuid(), reason: z.string().trim().min(10).max(4000) }).strict().parse(d))
+  .handler(async ({ data, context }) => {
+    await assertSessionOwner(data.sessionId, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { session, runIds } = await chapter3ReadinessFor(data.sessionId);
+    // Written once: an existing reason is preserved as evidence, never replaced.
+    if (session.working_session_skip) return { skip: session.working_session_skip, created: false };
+    const skip = { reason: data.reason, recorded_at: new Date().toISOString(), run_ids: runIds };
+    const { error } = await supabaseAdmin.from("sessions").update({ working_session_skip: skip }).eq("id", data.sessionId).is("working_session_skip", null);
+    if (error) throw new Error(error.message);
+    return { skip, created: true };
+  });
+
 // ────────────────────────────────────────────────────────────────────
 // Stakeholder state (Patch 3): hidden per-stakeholder trust/engagement/
 // guardedness state that accumulates across dialogue turns. Seeded at
