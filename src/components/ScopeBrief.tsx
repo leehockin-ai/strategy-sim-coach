@@ -7,6 +7,25 @@ import { Button } from "@/components/ui/button";
 import { updateSession, listInterventions } from "@/lib/simulator.functions";
 import { BRIEF_FIELDS, readEngagementBrief, legacyFraming, type EngagementBrief } from "@/lib/scope-brief";
 
+const BRIEF_GROUPS = [
+  { key: "understand", title: "Understand", hint: "What's going on, and what the client says they want." },
+  { key: "frame", title: "Frame", hint: "What you think the real challenge is — and what's evidence vs. still a guess." },
+  { key: "decide", title: "Decide", hint: "The decision the work should enable, who makes it, and the outcome that matters." },
+  { key: "scope", title: "Scope & commit", hint: "Who's involved and what's in bounds before you choose how to help." },
+] as const;
+const ADVANCED_FIELDS = new Set<string>(["out_of_scope", "dependencies"]);
+const FIELD_EXAMPLES: Record<string, string> = {
+  client_situation: "e.g. Three founders, six weeks to a pitch, no interviews yet",
+  stated_challenge: "e.g. 'Help us finish the feature list'",
+  coaching_challenge: "e.g. They haven't confirmed who has this problem",
+  evidence: "e.g. What the client actually reported, and how they know",
+  assumptions: "e.g. Students want a weekly plan (untested)",
+  decision_to_enable: "e.g. Which customer segment to pitch",
+  decision_maker: "e.g. Maya, with input from Jordan",
+  success: "e.g. Team can name one segment's jobs and pains from real evidence",
+  scope: "e.g. Customer profile for one segment",
+  participants: "e.g. All three founders",
+};
 type Message = { id: string; phase: string; role: string; stakeholder_name: string | null; content: string };
 type Revision = { id: string; revision: number; snapshot: unknown; evidence_message_ids: string[]; created_at: string };
 export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyChange }: {
@@ -61,13 +80,38 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
       <div><div className="text-xs uppercase text-muted-foreground">Scope · working hypothesis</div><h2 className="text-xl mt-1">Engagement Brief</h2><div role="status" className="text-xs text-muted-foreground mt-2">{saving.isPending ? "Saving…" : saveState} · Revision {session.scope_revision ?? 0}</div></div>
       <Button variant="outline" size="icon" title="Save engagement brief" aria-label="Save engagement brief" disabled={!dirty || saving.isPending} onClick={() => saving.mutate(latest.current)}><Save /></Button>
     </div>
-    {(["understand", "frame", "decide", "scope"] as const).map((group, i) => <section key={group} className="mb-5">
-      <h3 className="text-xs uppercase border-b border-ink pb-2 mb-3">0{i + 1} · {group}</h3>
-      <div className="space-y-3">{BRIEF_FIELDS.filter(f => f.group === group).map(f => <div key={f.key}>
+    <div className="mb-5 border border-input bg-secondary/40 p-3 text-xs leading-relaxed space-y-2">
+      <p>Your Engagement Brief is your working interpretation of what you hear. It informs your intervention choice and later reflection and assessment.</p>
+      <ol className="list-decimal pl-4 space-y-0.5 text-muted-foreground">
+        <li><strong className="text-foreground">Listen</strong> first — ask the team questions on the left.</li>
+        <li><strong className="text-foreground">Draft</strong> a line or two as things become clear. Blank is fine.</li>
+        <li><strong className="text-foreground">Refine</strong> when something changes your mind, and say what changed.</li>
+        <li><strong className="text-foreground">Commit</strong> your approach under "Your Approach" when you're ready.</li>
+      </ol>
+      <p className="text-muted-foreground">Write in your own words — this is your hypothesis, not the client's statement. To show what the client actually said, tick their lines under "Conversation evidence" below. Nothing here is filled in for you.</p>
+    </div>
+    {BRIEF_GROUPS.map((g, i) => {
+      const fields = BRIEF_FIELDS.filter(f => f.group === g.key);
+      const filled = fields.filter(f => brief[f.key].trim()).length;
+      const core = fields.filter(f => !ADVANCED_FIELDS.has(f.key));
+      const advanced = fields.filter(f => ADVANCED_FIELDS.has(f.key));
+      const field = (f: typeof fields[number]) => <div key={f.key}>
         <label htmlFor={`brief-${f.key}`} className="text-xs block mb-1">{f.label}</label>
-        <textarea id={`brief-${f.key}`} value={brief[f.key]} rows={2} maxLength={4000} onChange={e => edit({ ...brief, [f.key]: e.target.value })} className="w-full resize-y border border-input bg-background p-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-      </div>)}</div>
-    </section>)}
+        <textarea id={`brief-${f.key}`} value={brief[f.key]} rows={2} maxLength={4000} placeholder={FIELD_EXAMPLES[f.key]} onChange={e => edit({ ...brief, [f.key]: e.target.value })} className="w-full resize-y border border-input bg-background p-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-ring" />
+      </div>;
+      return <details key={g.key} className="mb-3 border-b border-ink pb-3 group" open={filled > 0 || i === 0} data-brief-section={g.key}>
+        <summary className="cursor-pointer list-none flex items-baseline justify-between gap-2">
+          <span className="text-xs uppercase">0{i + 1} · {g.title}</span>
+          <span className="text-[11px] text-muted-foreground">{filled}/{fields.length} drafted</span>
+        </summary>
+        <p className="text-[11px] text-muted-foreground mt-1 mb-3">{g.hint}</p>
+        <div className="space-y-3">{core.map(field)}</div>
+        {advanced.length > 0 && <details className="mt-3" open={advanced.some(f => brief[f.key].trim())}>
+          <summary className="text-xs cursor-pointer text-muted-foreground">More scope detail ({advanced.map(f => f.label.toLowerCase()).join(", ")})</summary>
+          <div className="space-y-3 mt-3">{advanced.map(field)}</div>
+        </details>}
+      </details>;
+    })}
     <section className="mb-5 border-t border-ink pt-4"><h3 className="text-sm mb-2">Intervention / Playbook reasoning</h3>
       <p className="text-xs mb-2"><strong>Primary intervention:</strong> {options.find(o => o.slug === session.chosen_intervention_slug)?.label ?? session.chosen_intervention_slug ?? "Not selected"}</p>
       {session.intervention_rationale && <p className="text-xs text-muted-foreground mb-3 whitespace-pre-wrap">{session.intervention_rationale}</p>}
