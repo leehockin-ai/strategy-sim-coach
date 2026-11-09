@@ -8,14 +8,14 @@ export type EvidenceRevisionRow = { id: string; run_id: string; event_id: string
 export type EvidenceScopeRow = { id: string; session_id: string; revision: number; snapshot: unknown };
 export type LiveMoment = { id: string; sequence: number; timestamp: string; kind: "coach" | "team" | "work" | "checkpoint" | "conclusion"; speaker: string; text: string };
 export type LiveRevision = { id: string; revision: number; baseRevision: number; eventId: string; instructionEventId: string; timestamp: string; work: TeamWork; emptySections: string[] };
-export type LiveRunEvidence = { id: string; intervention: string; startedAt: string; throughSequence: number; scope: { id: string; revision: number; brief: EngagementBrief } | null; participants: string[]; moments: LiveMoment[]; revisions: LiveRevision[]; gaps: string[]; truncated: boolean };
+export type LiveRunEvidence = { id: string; intervention: string; startedAt: string; throughSequence: number; scope: { id: string; revision: number; brief: EngagementBrief } | null; participants: string[]; identities: { name: string; role: string }[]; moments: LiveMoment[]; revisions: LiveRevision[]; gaps: string[]; truncated: boolean };
 export type LiveEvidence = { version: "public_live_v1"; runs: LiveRunEvidence[]; omittedRuns: number };
 const record = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export function assertEvidenceOwner(session: { id: string; owner_id: string | null }, userId: string) {
   if (session.owner_id !== userId) throw new Error("Forbidden");
 }
 
-export function assembleLiveEvidence(input: { sessionId: string; ownerId: string; scenarioId: string; runs: EvidenceRunRow[]; events: EvidenceEventRow[]; revisions: EvidenceRevisionRow[]; scopes: EvidenceScopeRow[]; omittedRuns?: number }): LiveEvidence {
+export function assembleLiveEvidence(input: { sessionId: string; ownerId: string; scenarioId: string; runs: EvidenceRunRow[]; events: EvidenceEventRow[]; revisions: EvidenceRevisionRow[]; scopes: EvidenceScopeRow[]; omittedRuns?: number; identities?: { name: string; role: string }[] }): LiveEvidence {
   const runs: LiveRunEvidence[] = [];
   for (const run of input.runs.slice(0, 4)) {
     if (run.session_id !== input.sessionId || run.candidate_id !== input.ownerId || run.scenario_id !== input.scenarioId || run.runtime_type !== "strategyzer_external") continue;
@@ -28,7 +28,7 @@ export function assembleLiveEvidence(input: { sessionId: string; ownerId: string
       const kind = record(e.metadata).team_kind;
       const type = e.actor_type === "coach" && kind === "utterance" ? "coach" : e.actor_type === "team" && kind === "response" ? "team" : e.actor_type === "team" && kind === "work_product" ? "work" : e.actor_type === "coach" && kind === "concluded" && e.event_type === "decision" ? "conclusion" : e.actor_type === "system" && (kind === "session_started" || kind === "synthesis_started") ? "checkpoint" : null;
       if (!type) return [];
-      return [{ id: e.id, sequence: e.sequence, timestamp: e.occurred_at, kind: type, speaker: type === "coach" || type === "conclusion" ? "Coach" : e.actor_id ?? "System", text: e.content.slice(0, 4000) }];
+      return [{ id: e.id, sequence: e.sequence, timestamp: e.occurred_at, kind: type, speaker: type === "coach" || type === "conclusion" ? "Coach" : (e.actor_id ?? "System").slice(0, 120), text: e.content.slice(0, 4000) }];
     });
     const gaps: string[] = [];
     const histories = input.revisions.filter(h => h.run_id === run.id).sort((a, b) => a.revision - b.revision);
@@ -57,9 +57,9 @@ export function assembleLiveEvidence(input: { sessionId: string; ownerId: string
     const sourceIds = new Set(revisions.flatMap(r => [r.eventId, r.instructionEventId, ...r.work.sections.flatMap(s => s.items.map(i => i.sourceId))]));
     const keep = new Set([...moments.slice(0, 12), ...moments.slice(-100), ...moments.filter(m => sourceIds.has(m.id) || m.kind === "conclusion" || m.kind === "checkpoint")].map(m => m.id));
     const selected = moments.filter(m => keep.has(m.id));
-    const truncated = selected.length < moments.length || histories.length > 8 || events.length >= 601;
+    const truncated = selected.length < moments.length || histories.length > 8 || events.length >= 601 || gaps.some(g => g.includes("excluded"));
     if (truncated) gaps.push("Bounded evidence sample: omitted conversation/history must not be treated as absent behavior.");
-    runs.push({ id: run.id, intervention: run.intervention_slug, startedAt: run.started_at, throughSequence: run.last_sequence, scope, participants: [...new Set(moments.filter(m => m.kind === "team").map(m => m.speaker))], moments: selected, revisions, gaps: [...new Set(gaps)], truncated });
+    runs.push({ id: run.id, intervention: run.intervention_slug, startedAt: run.started_at, throughSequence: run.last_sequence, scope, participants: [...new Set(moments.filter(m => m.kind === "team").map(m => m.speaker))], identities: (input.identities ?? []).slice(0, 20).map(p => ({ name: p.name.slice(0, 120), role: p.role.slice(0, 200) })), moments: selected, revisions, gaps: [...new Set(gaps)], truncated });
   }
   return { version: "public_live_v1", runs, omittedRuns: (input.omittedRuns ?? 0) + Math.max(0, input.runs.length - 4) };
 }
@@ -75,7 +75,7 @@ export function renderLiveEvidence(evidence: LiveEvidence | undefined, purpose: 
   return `\n── LIVE CHAPTER 2 — ${purpose} ──\n${LIVE_EVIDENCE_RULES}\nOmitted runs: ${evidence.omittedRuns}\n` + evidence.runs.map(run => {
     const brief = run.scope?.brief;
     const boundScope = run.scope ? { id: run.scope.id, revision: run.scope.revision, success: brief?.success.slice(0, 2000), decision_to_enable: brief?.decision_to_enable.slice(0, 2000), decision_maker: brief?.decision_maker.slice(0, 1000), scope: brief?.scope.slice(0, 2000), assumptions: brief?.assumptions.slice(0, 2000) } : null;
-    const header = JSON.stringify({ runId: run.id, intervention: run.intervention, throughSequence: run.throughSequence, boundScope, observedSpeakers: run.participants, gaps: run.gaps, sampled: run.truncated });
+    const header = JSON.stringify({ runId: run.id, intervention: run.intervention, throughSequence: run.throughSequence, boundScope, publicIdentities: run.identities, observedSpeakers: run.participants, gaps: run.gaps, sampled: run.truncated });
     let remaining = 20000 - header.length;
     const selected: LiveMoment[] = [], revisions: LiveRevision[] = [];
     const wanted = run.moments.filter(m => summaryOnly ? m.kind === "conclusion" : participationOnly ? m.kind !== "work" : true);

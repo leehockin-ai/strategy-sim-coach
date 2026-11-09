@@ -7,6 +7,7 @@ export function ReviewLiveEvidence({ evidence }: { evidence: LiveEvidence }) {
     {!evidence.runs.length && <p className="text-sm text-muted-foreground">No observable live client-team session recorded. Legacy evidence remains below.</p>}
     {evidence.runs.map(run => <div key={run.id} className="border-t border-border pt-4 space-y-4">
       <p className="font-medium break-words">{run.intervention} · Run {run.id}</p>
+      <p className="text-sm">{run.identities.map(p => `${p.name} · ${p.role}`).join(" / ")}</p>
       <details><summary className="cursor-pointer text-sm font-medium">Bound Scope {run.scope ? `· Revision ${run.scope.revision}` : "unavailable"}</summary>
         {run.scope && <dl className="text-sm space-y-2 mt-3"><dt>Intended outcome</dt><dd className="whitespace-pre-wrap">{run.scope.brief.success || "Not articulated"}</dd><dt>Decision to enable</dt><dd>{run.scope.brief.decision_to_enable || "Not articulated"}</dd><dt>Decision-maker</dt><dd>{run.scope.brief.decision_maker || "Not articulated"}</dd><dt>Scope reference</dt><dd className="break-all">{run.scope.id}</dd></dl>}
       </details>
