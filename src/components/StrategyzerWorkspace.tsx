@@ -13,8 +13,8 @@ type RuntimeData = Awaited<ReturnType<typeof getActivityRuntime>>;
 type Run = RuntimeData["runs"][number];
 type Event = RuntimeData["events"][number];
 
-const CAPABILITY = ["Linked", "Verified", "Observable", "Participatory", "Embedded"];
-
+// Level 0 "Linked": the candidate supplies and confirms a link. Coach Compass
+// never fetches it and never claims it was verified by Strategyzer.
 export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; events: Event[]; briefOutcome?: RuntimeData["briefOutcomes"][string] }) {
   const qc = useQueryClient();
   const fetchConn = useServerFn(getStrategyzerConnections);
@@ -25,17 +25,18 @@ export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; 
   const current = data?.connections.find(c => c.status === "connected");
   const [editing, setEditing] = useState(false);
   const [url, setUrl] = useState("");
-  const [playbookTitle, setPlaybookTitle] = useState("");
-  const [c1, setC1] = useState(false), [c2, setC2] = useState(false), [c3, setC3] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const pending = useRef<string | null>(null);
   const snap = run.definition_snapshot as { intervention_label?: string };
+  const playbook = snap.intervention_label ?? run.intervention_slug ?? "selected";
   const projectName = run.required_project_name ?? "";
   const check = url ? normalizeStrategyzerUrl(url, data?.allowedHosts ?? []) : null;
 
   const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: key }), qc.invalidateQueries({ queryKey: ["activity-runtime", run.session_id] })]);
   const connectMut = useMutation({
-    mutationFn: () => { pending.current ??= crypto.randomUUID(); return connect({ data: { runId: run.id, requestKey: pending.current, url, confirmProject: true, confirmName: true, confirmPlaybook: true, projectName, playbookTitle } }); },
-    onSuccess: async () => { pending.current = null; setEditing(false); setUrl(""); setC1(false); setC2(false); setC3(false); await refresh(); toast.success("Playbook connected"); },
+    // One candidate confirmation covers project, name and Playbook.
+    mutationFn: () => { pending.current ??= crypto.randomUUID(); return connect({ data: { runId: run.id, requestKey: pending.current, url, confirmProject: true, confirmName: true, confirmPlaybook: true, projectName, playbookTitle: "" } }); },
+    onSuccess: async () => { pending.current = null; setEditing(false); setUrl(""); setConfirmed(false); await refresh(); toast.success("Playbook link saved"); },
     onError: e => toast.error(e.message),
   });
   async function open() {
@@ -45,67 +46,61 @@ export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; 
   }
   async function copy() { await navigator.clipboard.writeText(projectName); toast.success("Project name copied"); }
 
-  const showForm = !current || editing;
+  const showForm = (!current || editing) && run.status === "active";
   const outcome = briefOutcome && (briefOutcome.success || briefOutcome.decision_to_enable) ? briefOutcome : null;
-  const setupSection = <section className="border-t border-border pt-6">
-    <h3 className="text-xl mb-2">1. Create your Strategyzer assessment project</h3>
-    <p className="text-sm mb-4">Sign into your Strategyzer Playbook Library account and create a new project using the exact name below. Coach Compass never asks for your Strategyzer password.</p>
-    <div className="flex flex-wrap items-center gap-3"><code className="border border-border bg-muted px-3 py-2 text-sm break-all">{projectName}</code><Button variant="outline" onClick={copy}><Copy />Copy project name</Button></div>
-    <p className="text-sm mt-4">Inside that project, create or open the <strong>{snap.intervention_label ?? run.intervention_slug}</strong> Playbook — the intervention you committed to in Scope.</p>
-  </section>;
-  if (isPending) return <p className="text-sm text-muted-foreground" role="status">Loading Playbook connection…</p>;
-  if (error) return <div role="alert" className="space-y-3"><p>Playbook connection could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
+  if (isPending) return <p className="text-sm text-muted-foreground" role="status">Loading your Playbook link…</p>;
+  if (error) return <div role="alert" className="space-y-3"><p>Your Playbook link could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
   return <div className="space-y-6">
     <div>
-      <p className="text-xs uppercase text-muted-foreground mb-2">Assessment {run.assessment_reference} · Capability level {run.integration_capability_level} — {CAPABILITY[run.integration_capability_level ?? 0]}</p>
       <h2 className="text-2xl">Working session with the client team</h2>
-      <p className="text-sm text-muted-foreground mt-2">{snap.intervention_label ?? run.intervention_slug} · Bound Scope revision {briefOutcome?.revision ?? "unavailable"}</p>
+      <p className="text-sm text-muted-foreground mt-2">{playbook} Playbook</p>
     </div>
 
     {outcome && <section className="border-l-2 border-primary pl-4">
-      <p className="text-xs uppercase text-muted-foreground mb-2">The outcome you're working toward · Engagement Brief{outcome.revision ? ` · revision ${outcome.revision}` : ""}</p>
+      <p className="text-xs uppercase text-muted-foreground mb-2">The outcome you're working toward · from your Engagement Brief</p>
       {outcome.success && <p className="text-sm"><span className="font-medium">Success: </span>{outcome.success}</p>}
       {outcome.decision_to_enable && <p className="text-sm mt-1"><span className="font-medium">Decision to enable: </span>{outcome.decision_to_enable}{outcome.decision_maker ? ` — ${outcome.decision_maker}` : ""}</p>}
     </section>}
-    {!outcome && <p className="text-sm text-muted-foreground">No outcome is available in this run’s saved Scope evidence. Later Scope edits are not substituted here.</p>}
+    {!outcome && <p className="text-sm text-muted-foreground">The outcome from your Engagement Brief isn't available for this working session.</p>}
 
-    {current && <LiveClientTeam runId={run.id} runActive={run.status === "active"} header={{ assessmentReference: run.assessment_reference, projectName: current.confirmed_project_name ?? projectName, playbook: snap.intervention_label || run.intervention_slug, onOpen: open }} />}
-
-    {current && !editing ? <details className="border-t border-border py-4 text-sm">
-      <summary className="cursor-pointer font-medium">Setup & connection · {current.confirmed_project_name ?? projectName}</summary>
-      <div className="pt-4 space-y-6">
-        {setupSection}
-        <section className="border-t border-border pt-6">
-          <h3 className="text-xl mb-3">Connected workspace</h3>
-          <p className="font-medium break-words">{current.confirmed_project_name ?? projectName}</p>
-          <p className="text-sm mt-1">Playbook: {current.confirmed_playbook_title || snap.intervention_label}</p>
-          <p className="text-sm mt-1">Status: <strong>Connected by candidate</strong> · Candidate confirmed (not verified by Strategyzer)</p>
-          <p className="text-xs text-muted-foreground mt-1 break-all">{current.launch_url}</p>
-          <div className="flex flex-wrap gap-3 mt-4"><Button onClick={open}><ExternalLink />Open Strategyzer Playbook</Button><Button variant="outline" onClick={() => setEditing(true)} disabled={run.status !== "active"}>Change connection</Button></div>
-        </section>
+    {current && <div className="sticky top-0 z-10 border-y border-border py-3 flex flex-wrap items-center justify-between gap-3 bg-background">
+      <div className="text-sm min-w-0">
+        <p className="font-medium break-words">{current.confirmed_project_name ?? projectName}</p>
+        <p className="text-xs text-muted-foreground">{playbook} · Linked by you · Coach Compass can't see inside Strategyzer</p>
       </div>
-    </details> : setupSection}
+      <Button onClick={open}><ExternalLink />Open Strategyzer Playbook</Button>
+    </div>}
 
-    {showForm && run.status === "active" && <section className="border-t border-border pt-6">
-      <h3 className="text-xl mb-2">2. Connect your Strategyzer Playbook</h3>
-      <label className="text-sm block">Project / Playbook URL<Input className="mt-1" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…strategyzer.com/…" /></label>
-      {check && !check.ok && <p className="text-xs text-destructive mt-1">{check.error}</p>}
-      <label className="text-sm block mt-4">Playbook title as shown in Strategyzer (optional)<Input className="mt-1" value={playbookTitle} maxLength={300} onChange={e => setPlaybookTitle(e.target.value)} /></label>
-      <div className="space-y-2 mt-4 text-sm">
-        <label className="flex gap-2 items-start"><input type="checkbox" checked={c1} onChange={e => setC1(e.target.checked)} />This is the project I created for this assessment.</label>
-        <label className="flex gap-2 items-start"><input type="checkbox" checked={c2} onChange={e => setC2(e.target.checked)} />It uses the required name: {projectName}</label>
-        <label className="flex gap-2 items-start"><input type="checkbox" checked={c3} onChange={e => setC3(e.target.checked)} />It uses the {snap.intervention_label ?? "selected"} Playbook I chose in Scope.</label>
-      </div>
-      <div className="flex gap-3 mt-4"><Button disabled={!check?.ok || !c1 || !c2 || !c3 || connectMut.isPending} onClick={() => connectMut.mutate()}><Link2 />Connect Playbook</Button>{editing && <Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>}</div>
-      {editing && <p className="text-xs text-muted-foreground mt-2">The previous connection stays in your history.</p>}
+    {showForm && <section className="border border-border p-5 space-y-4" aria-labelledby="connect-playbook">
+      <h3 id="connect-playbook" className="text-xl">{editing ? "Change your Playbook link" : "Link your Strategyzer Playbook"}</h3>
+      <ol className="text-sm list-decimal pl-5 space-y-2">
+        <li>In your own Strategyzer account, create a project with this name:
+          <div className="flex flex-wrap items-center gap-2 mt-2"><code className="border border-border bg-muted px-3 py-1.5 text-sm break-all">{projectName}</code><Button size="sm" variant="outline" onClick={copy}><Copy />Copy</Button></div>
+        </li>
+        <li>Open the <strong>{playbook}</strong> Playbook in that project and copy its link from your browser.</li>
+        <li>Paste the link below. Coach Compass never asks for your Strategyzer password.</li>
+      </ol>
+      <label className="text-sm block">Playbook link<Input className="mt-1" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…strategyzer.com/…" /></label>
+      {check && !check.ok && <p className="text-xs text-destructive">{check.error}</p>}
+      <label className="flex gap-2 items-start text-sm"><input type="checkbox" className="mt-1" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} /><span>I confirm this is the project I created for this assessment, named as shown, using the {playbook} Playbook. <span className="text-muted-foreground">This is your confirmation — Coach Compass cannot check it.</span></span></label>
+      <div className="flex gap-3"><Button disabled={!check?.ok || !confirmed || connectMut.isPending} onClick={() => connectMut.mutate()}><Link2 />Save Playbook link</Button>{editing && <Button variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>}</div>
+      {editing && <p className="text-xs text-muted-foreground">Your previous link stays in your history.</p>}
     </section>}
 
-    {!!data?.connections.length && <details className="border-t border-border py-4 text-sm"><summary className="cursor-pointer font-medium">Connection history · {data.connections.length}</summary>
-      {data.connections.map(c => <div key={c.id} className="py-3 border-b border-border"><p>Connection {c.version} · {c.status === "connected" ? "current" : "replaced"} · {new Date(c.connected_at).toLocaleString()}</p><p className="text-xs text-muted-foreground break-all">{c.supplied_url}</p></div>)}
-    </details>}
+    {current && <LiveClientTeam runId={run.id} sessionId={run.session_id} runActive={run.status === "active"} />}
 
-    <details className="border-t border-border pt-4"><summary className="cursor-pointer text-sm font-medium">Connection & activity record</summary>
-      <ol className="divide-y divide-border">{events.filter(e => !(e.metadata && typeof e.metadata === "object" && "team_kind" in e.metadata)).map(e => <li key={e.id} className="py-3 text-sm"><div className="text-xs text-muted-foreground">Event {e.sequence} · {e.actor_type === "coach" ? "candidate" : e.actor_type} · {new Date(e.occurred_at).toLocaleString()}</div><p className="break-words">{e.content}</p></li>)}</ol>
-    </details>
+    {current && !editing && <details className="border-t border-border py-4 text-sm">
+      <summary className="cursor-pointer font-medium">Playbook link details</summary>
+      <div className="pt-4 space-y-2">
+        <p>Project: {current.confirmed_project_name ?? projectName}</p>
+        <p>Playbook: {current.confirmed_playbook_title || playbook}</p>
+        <p className="text-xs text-muted-foreground break-all">{current.launch_url}</p>
+        <Button variant="outline" onClick={() => setEditing(true)} disabled={run.status !== "active"}>Change link</Button>
+        {data!.connections.length > 1 && <ul className="pt-3">{data!.connections.map(c => <li key={c.id} className="py-2 border-b border-border"><p>Link {c.version} · {c.status === "connected" ? "current" : "replaced"} · {new Date(c.connected_at).toLocaleString()}</p><p className="text-xs text-muted-foreground break-all">{c.supplied_url}</p></li>)}</ul>}
+        <details className="pt-3"><summary className="cursor-pointer">Link activity</summary>
+          <ol className="divide-y divide-border">{events.filter(e => !(e.metadata && typeof e.metadata === "object" && "team_kind" in e.metadata)).map(e => <li key={e.id} className="py-2"><div className="text-xs text-muted-foreground">{e.actor_type === "coach" ? "You" : "System"} · {new Date(e.occurred_at).toLocaleString()}</div><p className="break-words">{e.content}</p></li>)}</ol>
+        </details>
+      </div>
+    </details>}
   </div>;
 }

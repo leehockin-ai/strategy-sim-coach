@@ -1,0 +1,2 @@
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS working_session_skip jsonb;
+COMMENT ON COLUMN public.sessions.working_session_skip IS 'Candidate-recorded reason for moving past the Chapter 2 client working session without concluding it. Written once by the server; null when not skipped.';

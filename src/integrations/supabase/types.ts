@@ -1119,6 +1119,7 @@ export type Database = {
           scope_revision: number
           status: string
           submission_requested_at: string | null
+          working_session_skip: Json | null
         }
         Insert: {
           alignment_workspace?: Json | null
@@ -1153,6 +1154,7 @@ export type Database = {
           scope_revision?: number
           status?: string
           submission_requested_at?: string | null
+          working_session_skip?: Json | null
         }
         Update: {
           alignment_workspace?: Json | null
@@ -1187,6 +1189,7 @@ export type Database = {
           scope_revision?: number
           status?: string
           submission_requested_at?: string | null
+          working_session_skip?: Json | null
         }
         Relationships: [
           {

@@ -9,7 +9,9 @@ import { ScopeBrief } from "@/components/ScopeBrief";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { Button } from "@/components/ui/button";
-import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
+import { getActivityRuntime } from "@/lib/activity-runtime.functions";
+import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
+import { recordWorkingSessionSkip, getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
 import { voiceForStakeholder } from "@/lib/voices";
@@ -102,8 +104,8 @@ function SessionPage() {
     if (scopeDirty) { toast.error("Save your engagement brief before leaving Scope."); return; }
     const target = chapterMeta(targetKey);
     const nextStep = target.steps[0];
-    setActiveStep(nextStep);
-    // Only persist status when moving forward past the furthest reached.
+    // Only persist status when moving forward past the furthest reached; stay
+    // in place if the server refuses the move (e.g. Chapter 2 not finished).
     if (target.index > furthestChapter.index) {
       try {
         await save({ data: { sessionId: session.id, status: CHAPTER_ENTRY_STATUS[targetKey] as any } });
@@ -111,8 +113,10 @@ function SessionPage() {
         qc.invalidateQueries({ queryKey: ["my-sessions"] });
       } catch (e: any) {
         toast.error(e?.message ?? "Could not advance chapter");
+        return;
       }
     }
+    setActiveStep(nextStep);
   }
 
   const renderKey = RENDER_KEY[activeStep];
@@ -180,14 +184,16 @@ function SessionPage() {
         {renderKey === "playbook" && <EngagementPathwayStep session={session} onSaved={refreshOnly} />}
 
         {activeChapter !== "scope" && showChapterTransition && nextChapter && !suppressSharedContinue && (
-          <div className="mt-12 border-t border-ink pt-8 flex justify-end">
-            <button
-              onClick={() => goToChapter(nextChapter.key)}
-              className="bg-ink text-paper px-6 py-3 text-sm rounded-sm hover:opacity-90"
-            >
-              Continue to Chapter {nextChapter.index} — {nextChapter.label} →
-            </button>
-          </div>
+          activeStep === "live_playbook"
+            ? <Chapter2Exit session={session} label={`Continue to Chapter ${nextChapter.index} — ${nextChapter.label} →`} onContinue={() => goToChapter(nextChapter.key)} />
+            : <div className="mt-12 border-t border-ink pt-8 flex justify-end">
+                <button
+                  onClick={() => goToChapter(nextChapter.key)}
+                  className="bg-ink text-paper px-6 py-3 text-sm rounded-sm hover:opacity-90"
+                >
+                  Continue to Chapter {nextChapter.index} — {nextChapter.label} →
+                </button>
+              </div>
         )}
       </div>
     </Shell>
@@ -243,6 +249,47 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
       </div>
     </section>
   );
+}
+
+// Chapter 2 exit. The modern Playbook working session continues to Chapter 3
+// only after it is concluded or the candidate records why they are moving on.
+// Legacy pathways and sessions already past Chapter 2 keep the plain button;
+// the server applies the same rule (chapter2-progress.ts).
+function Chapter2Exit({ session, label, onContinue }: { session: any; label: string; onContinue: () => void | Promise<void> }) {
+  const qc = useQueryClient();
+  const fetchInterventions = useServerFn(listInterventions);
+  const fetchRuntime = useServerFn(getActivityRuntime);
+  const recordSkip = useServerFn(recordWorkingSessionSkip);
+  const slug = session.chosen_intervention_slug as string | null;
+  const { data: iData, isLoading: ivLoading } = useQuery({ queryKey: ["interventions"], queryFn: () => fetchInterventions(), staleTime: 5 * 60 * 1000 });
+  const pathwayType = slug ? ((iData?.interventions ?? []) as InterventionRow[]).find((r) => r.slug === slug)?.pathway_type ?? "playbook" : null;
+  const gated = !!slug && pathwayType === "playbook";
+  const { data: rt, isLoading: rtLoading } = useQuery({ queryKey: ["activity-runtime", session.id], queryFn: () => fetchRuntime({ data: { sessionId: session.id } }), enabled: gated });
+  const externalIds = new Set((rt?.runs ?? []).filter((r) => r.runtime_type === "strategyzer_external").map((r) => r.id));
+  const readiness = chapter3Readiness({ pathwayType, chosenSlug: slug, currentStatus: session.status, concludedRun: hasConcludedEvent((rt?.events ?? []).filter((e) => externalIds.has(e.run_id))), skip: session.working_session_skip, legacyCanvas: session.application_canvas });
+  const [reason, setReason] = useState("");
+  const [skipping, setSkipping] = useState(false);
+  const skipMut = useMutation({
+    mutationFn: () => recordSkip({ data: { sessionId: session.id, reason: reason.trim() } }),
+    onSuccess: async () => { await qc.invalidateQueries({ queryKey: ["session", session.id] }); await onContinue(); },
+    onError: (e: any) => toast.error(e?.message ?? "Could not record your reason"),
+  });
+  const continueButton = <button onClick={() => onContinue()} className="bg-ink text-paper px-6 py-3 text-sm rounded-sm hover:opacity-90">{label}</button>;
+  if (ivLoading || (gated && rtLoading)) return <div className="mt-12 border-t border-ink pt-8 text-sm text-muted-foreground" role="status">Checking your working session…</div>;
+  if (readiness.allowed) return <div className="mt-12 border-t border-ink pt-8 flex flex-wrap items-center justify-between gap-4">
+    <p className="text-sm text-muted-foreground">{readiness.basis === "concluded" ? "Working session concluded." : readiness.basis === "skipped" ? "You recorded why you moved on without concluding the working session." : ""}</p>
+    {continueButton}
+  </div>;
+  const unavailable = rt?.roomUnavailableReason;
+  return <section className="mt-12 border-t border-ink pt-8 space-y-4" aria-labelledby="chapter2-exit">
+    <h3 id="chapter2-exit" className="text-lg">Ready for Chapter 3?</h3>
+    <p className="text-sm text-muted-foreground">{unavailable ? "The client working session isn't available in this session. To continue, record why you are moving on — it stays with your evidence." : "Conclude the working session above to continue. If you decide not to run or finish it, you can move on by recording why."}</p>
+    {!skipping ? <Button variant="outline" onClick={() => setSkipping(true)}>{unavailable ? "Continue without the working session" : "Move on without concluding"}</Button> : <div className="border border-border p-4 space-y-3">
+      <label className="text-sm block">Why are you moving on without concluding the working session?<textarea className="mt-1 w-full border border-border bg-background p-2 text-sm" rows={3} maxLength={4000} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+      <p className="text-xs text-muted-foreground">Recorded once and kept with your evidence. At least 10 characters.</p>
+      <div className="flex gap-3"><Button disabled={reason.trim().length < 10 || skipMut.isPending} onClick={() => skipMut.mutate()}>Record reason and continue to Chapter 3</Button><Button variant="ghost" onClick={() => setSkipping(false)}>Cancel</Button></div>
+    </div>}
+  </section>;
 }
 
 function ChapterNav({

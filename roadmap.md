@@ -57,4 +57,5 @@
 - [x] Report changes, root cause, compatibility results and risks; stopped before Stage 2.- [x] Revised Stage 4: Strategyzer Playbook handoff & external runtime (Level 0). Waiting on Lee's real Strategyzer account test and approval before the AI-team stage.
 
 - [x] Phase 1: resumable background assessment generation, report progress/retry, "Generate my assessment" CTA, current copy (hosted site not yet verified — needs publish)
-- [ ] Phase 2+ (Chapter 2 clarity, connect Chapter 3, navigation) — awaiting user go-ahead
+- [x] Phase 2: Chapter 2 clarity — one-link Playbook connection, plain wording, single entry point, start/facilitate/bring together/conclude stages with early stop, Chapter 3 gated on conclusion or recorded reason (server enforced, legacy-compatible)
+- [ ] Phase 3+ (connect Chapter 3 to the working-session outcome, navigation tidy-up) — awaiting user go-ahead

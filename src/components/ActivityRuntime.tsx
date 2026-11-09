@@ -21,8 +21,9 @@ export function ActivityRuntimeEntry({ sessionId, embedded = false }: { sessionI
   if (embedded && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
   if (embedded && error) return <div className="py-6 space-y-3" role="alert"><p>The working session could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
   if (embedded && data) return <ActivityRuntime data={data} embedded />;
-  if (!data || (!data.definitions.length && !data.runs.length && data.intervention?.pathway_type !== "playbook")) return null;
-  return <div className="flex justify-end mb-4"><Button variant="outline" asChild><Link to="/sessions/$sessionId/activities" params={{ sessionId }}><Play />{data.testAllowed ? "TEST activity workspace" : "Strategyzer Playbook workspace"}</Link></Button></div>;
+  // The separate /activities page remains reachable for older links, but
+  // Chapter 2 is the only candidate entry point (no duplicate button).
+  return null;
 }
 
 export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData; embedded?: boolean }) {
@@ -55,13 +56,13 @@ export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData;
       <p className="text-xs uppercase text-muted-foreground mb-2">Facilitate the Work · {data.intervention?.label ?? "Activity runs"}</p>
       <h1 className="text-3xl md:text-4xl">Working session workspace</h1>
     </div>}
-    {!run && unavailable && <section className="border-y border-border py-6 mb-6 space-y-2"><h2 className="text-xl">Client working session unavailable</h2><p className="text-sm text-muted-foreground">{unavailableRoomCopy[unavailable]}</p><p className="text-sm text-muted-foreground">Your saved Scope and engagement evidence remain available.</p></section>}
+    {!run && unavailable && <section className="border-y border-border py-6 mb-6 space-y-2"><h2 className="text-xl">Client working session unavailable</h2><p className="text-sm text-muted-foreground">{unavailableRoomCopy[unavailable]}</p><p className="text-sm text-muted-foreground">Your saved Scope work is kept. You can still link your Playbook, and you can move on to Chapter 3 below by recording why.</p></section>}
     <div className="space-y-6">
       <aside className="min-w-0">
         {data.intervention?.pathway_type === "playbook" && !hasActiveExternal && <div className="border-b border-border pb-5 mb-5">
-          <p className="font-medium">Strategyzer Playbook</p>
-          <p className="text-xs text-muted-foreground mt-1">{data.intervention.label} · in your own Strategyzer account</p>
-          <Button className="mt-3" disabled={extMut.isPending} onClick={() => extMut.mutate()}><Play />Set up assessment workspace</Button>
+          <p className="font-medium">Step 1 · Link your Strategyzer Playbook</p>
+          <p className="text-sm text-muted-foreground mt-1">You'll work in the {data.intervention.label} Playbook in your own Strategyzer account, then facilitate the client team here.</p>
+          <Button className="mt-3" disabled={extMut.isPending} onClick={() => extMut.mutate()}><Play />Get started</Button>
         </div>}
         {!!data.definitions.length && <h2 className="text-lg mb-4">Activities</h2>}
         {!data.definitions.length && data.intervention?.pathway_type !== "playbook" && <p className="text-sm text-muted-foreground">No approved activities configured.</p>}
@@ -71,9 +72,9 @@ export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData;
           <p className="text-xs text-muted-foreground mt-1">Version {def.version}</p>
           <Button variant="outline" className="mt-3" disabled={startMut.isPending} onClick={() => startMut.mutate(def.id)}><Play />Start activity</Button>
         </div>)}
-        {data.runs.length > 1 && <details className="text-sm border-b border-border pb-3"><summary className="cursor-pointer font-medium">Saved working sessions</summary><div className="flex flex-wrap gap-2 mt-3">{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} onClick={() => setSelected(r.id)}>{r.assessment_reference ?? `Session ${i + 1}`} · {r.status}</Button>)}</div></details>}
+        {data.runs.length > 1 && <details className="text-sm border-b border-border pb-3"><summary className="cursor-pointer font-medium">Saved working sessions</summary><div className="flex flex-wrap gap-2 mt-3">{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} onClick={() => setSelected(r.id)}>Working session {i + 1} · {r.status === "active" ? "open" : r.status}</Button>)}</div></details>}
       </aside>
-      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcomes[run.id]} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : !unavailable && <p className="text-muted-foreground text-sm py-4">Connect your Playbook to prepare the client working session.</p>}</main>
+      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcomes[run.id]} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : null}</main>
     </div>
   </div>;
 }
