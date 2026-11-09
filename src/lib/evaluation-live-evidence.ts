@@ -19,7 +19,9 @@ export function assembleLiveEvidence(input: { sessionId: string; ownerId: string
   const runs: LiveRunEvidence[] = [];
   for (const run of input.runs.slice(0, 4)) {
     if (run.session_id !== input.sessionId || run.candidate_id !== input.ownerId || run.scenario_id !== input.scenarioId || run.runtime_type !== "strategyzer_external") continue;
-    const events = input.events.filter(e => e.run_id === run.id && e.sequence <= run.last_sequence).sort((a, b) => a.sequence - b.sequence);
+    const candidates = input.events.filter(e => e.run_id === run.id && e.sequence <= run.last_sequence);
+    if (new Set(candidates.map(e => e.id)).size !== candidates.length || new Set(candidates.map(e => e.sequence)).size !== candidates.length) continue;
+    const events = candidates.sort((a, b) => a.sequence - b.sequence);
     // A durable server-created room start proves this was a live room, not merely an external link.
     if (!events.some(e => e.actor_type === "system" && record(e.metadata).team_kind === "session_started")) continue;
     const moments = events.flatMap((e): LiveMoment[] => {
@@ -35,12 +37,12 @@ export function assembleLiveEvidence(input: { sessionId: string; ownerId: string
       const work = readTeamWork(h.state), contribution = record(h.contribution);
       const event = events.find(e => e.id === h.event_id);
       const instruction = events.find(e => e.id === contribution.instruction_event_id);
-      if (!work || h.actor_type !== "team" || !event || event.actor_type !== "team" || record(event.metadata).team_kind !== "work_product" || !instruction || instruction.actor_type !== "coach" || instruction.sequence >= event.sequence || contribution.base_revision !== h.revision - 1) {
+      if (!work || h.actor_type !== "team" || !event || event.actor_type !== "team" || !["artifact_edit", "artifact_contribution"].includes(event.event_type) || record(event.metadata).team_kind !== "work_product" || !instruction || instruction.actor_type !== "coach" || record(instruction.metadata).team_kind !== "utterance" || instruction.sequence >= event.sequence || contribution.base_revision !== h.revision - 1 || histories.filter(r => r.revision === h.revision).length !== 1) {
         gaps.push(`Revision ${h.revision}: unavailable or invalid public lineage; excluded.`); continue;
       }
       const sections = customerProfileSections.map(section => ({ ...section, items: (work.sections.find(s => s.key === section.key)?.items ?? []).filter(item => {
         const source = events.find(e => e.id === item.sourceId);
-        const valid = source?.actor_type === "team" && record(source.metadata).team_kind === "response" && source.actor_id === item.speaker && source.sequence < event.sequence && item.text.length > 0 && source.content.includes(item.text);
+        const valid = source?.actor_type === "team" && record(source.metadata).team_kind === "response" && source.actor_id === item.speaker && source.sequence < event.sequence && item.text.length > 0 && item.text.length <= 900 && source.content.includes(item.text);
         if (!valid) gaps.push(`Revision ${h.revision}: unsupported contribution excluded.`);
         return valid;
       }).slice(0, 12) }));
@@ -69,10 +71,26 @@ export function renderLiveEvidence(evidence: LiveEvidence | undefined, purpose: 
   if (!["stakeholder_navigation", "working_session_facilitation", "methodological_soundness", "intervention_execution", "intervention_discipline", "engagement_pathway", "soft", "methodology"].includes(purpose)) return "";
   const summaryOnly = purpose === "intervention_discipline" || purpose === "engagement_pathway";
   const participationOnly = purpose === "stakeholder_navigation" || purpose === "soft";
-  return `\n── LIVE CHAPTER 2 — ${purpose} ──\n${LIVE_EVIDENCE_RULES}\nOmitted runs: ${evidence.omittedRuns}\n` + evidence.runs.map(run => JSON.stringify({ runId: run.id, intervention: run.intervention, throughSequence: run.throughSequence, boundScope: run.scope, observedSpeakers: run.participants, gaps: run.gaps, truncated: run.truncated,
-    moments: run.moments.filter(m => summaryOnly ? m.kind === "conclusion" : participationOnly ? m.kind !== "work" : true),
-    revisions: participationOnly ? undefined : summaryOnly ? run.revisions.slice(-1) : run.revisions,
-  })).join("\n");
+  // Per-run 20K character budget; complete records only, no cut JSON or invented source links.
+  return `\n── LIVE CHAPTER 2 — ${purpose} ──\n${LIVE_EVIDENCE_RULES}\nOmitted runs: ${evidence.omittedRuns}\n` + evidence.runs.map(run => {
+    const brief = run.scope?.brief;
+    const boundScope = run.scope ? { id: run.scope.id, revision: run.scope.revision, success: brief?.success.slice(0, 2000), decision_to_enable: brief?.decision_to_enable.slice(0, 2000), decision_maker: brief?.decision_maker.slice(0, 1000), scope: brief?.scope.slice(0, 2000), assumptions: brief?.assumptions.slice(0, 2000) } : null;
+    const header = JSON.stringify({ runId: run.id, intervention: run.intervention, throughSequence: run.throughSequence, boundScope, observedSpeakers: run.participants, gaps: run.gaps, sampled: run.truncated });
+    let remaining = 20000 - header.length;
+    const selected: LiveMoment[] = [], revisions: LiveRevision[] = [];
+    const wanted = run.moments.filter(m => summaryOnly ? m.kind === "conclusion" : participationOnly ? m.kind !== "work" : true);
+    // Conclusions first, then recent conversation; output remains sequence ordered.
+    for (const m of [...wanted.filter(m => m.kind === "conclusion"), ...wanted.filter(m => m.kind !== "conclusion").reverse()]) {
+      const size = JSON.stringify(m).length;
+      if (size <= remaining && (summaryOnly || remaining > 6000 || participationOnly)) { selected.push(m); remaining -= size; }
+    }
+    if (!participationOnly) for (const r of (summaryOnly ? run.revisions.slice(-1) : run.revisions).slice().reverse()) {
+      const size = JSON.stringify(r).length;
+      if (size <= remaining) { revisions.push(r); remaining -= size; }
+    }
+    const sampled = run.truncated || selected.length < wanted.length || (!participationOnly && revisions.length < (summaryOnly ? Math.min(1, run.revisions.length) : run.revisions.length));
+    return `${header}\n${JSON.stringify({ moments: selected.sort((a, b) => a.sequence - b.sequence), ...(participationOnly ? {} : { revisions: revisions.sort((a, b) => a.revision - b.revision) }), promptSampled: sampled, limitation: sampled ? "Evidence omitted by prompt budget; do not treat omitted behavior/work as absent." : null })}`;
+  }).join("\n");
 }
 
 // Reject unknown structured references and suspicious IDs/timestamps in free-form model feedback.
@@ -80,6 +98,7 @@ export function validateLiveFeedback<T extends { evidence: string; confidence?: 
   const prompt = renderLiveEvidence(evidence, purpose);
   if (!prompt) return value;
   const refs = value.evidence.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/gi) ?? [];
-  const invalid = refs.some(ref => !prompt.includes(ref));
+  const known = new Set(evidence?.runs.flatMap(r => [r.id, r.scope?.id ?? "", ...r.moments.flatMap(m => [m.id, m.timestamp]), ...r.revisions.flatMap(h => [h.id, h.timestamp, h.eventId, h.instructionEventId, ...h.work.sections.flatMap(s => s.items.map(i => i.sourceId))])]) ?? []);
+  const invalid = refs.some(ref => !known.has(ref) || !prompt.includes(ref));
   return invalid ? { ...value, evidence: "Unverified evidence reference returned by AI; inspect the public live-room evidence before relying on this assessment.", confidence: "low", reviewer_flag: true } : value;
 }
