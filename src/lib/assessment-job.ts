@@ -150,3 +150,36 @@ export async function advanceAssessment(
   await store.save(job.id, input.token, fatal ? { steps, status: "failed", error: fatal } : { steps });
   return { ...toStatus(next), ...(retrying ? { retryAfterMs: 4000 } : {}) };
 }
+
+/**
+ * Client-side driver: repeatedly asks the server to run the next batch until
+ * the job completes, fails, or the call budget is spent. Transport failures
+ * are retried with backoff a bounded number of times; the persisted job lets
+ * any later page load resume where this one stopped.
+ */
+export async function driveAssessment(
+  advance: () => Promise<AssessmentStatus>,
+  opts: { onStatus?: (s: AssessmentStatus) => void; sleep?: (ms: number) => Promise<void>; maxCalls?: number; maxTransportErrors?: number; isCancelled?: () => boolean } = {},
+): Promise<AssessmentStatus | { state: "transport_error"; error: string }> {
+  const sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const maxCalls = opts.maxCalls ?? 40;
+  const maxErrors = opts.maxTransportErrors ?? 3;
+  let errors = 0;
+  let last: AssessmentStatus | null = null;
+  for (let i = 0; i < maxCalls; i++) {
+    if (opts.isCancelled?.()) break;
+    try {
+      last = await advance();
+      errors = 0;
+    } catch (e) {
+      errors += 1;
+      if (errors >= maxErrors) return { state: "transport_error", error: e instanceof Error ? e.message : String(e) };
+      await sleep(3000 * errors);
+      continue;
+    }
+    opts.onStatus?.(last);
+    if (last.state === "completed" || last.state === "failed" || last.state === "not_started") return last;
+    if (last.retryAfterMs) await sleep(last.retryAfterMs);
+  }
+  return last ?? { state: "transport_error", error: "Assessment did not respond" };
+}
