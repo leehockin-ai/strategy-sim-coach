@@ -3,7 +3,7 @@ import { assembleLiveEvidence, assertEvidenceOwner, renderLiveEvidence, validate
 import { buildSectionInput, extractInputQualitySignals, type SessionForEval } from "./evaluation.io";
 
 const run = { id: "run", session_id: "session", candidate_id: "owner", scenario_id: "scenario", runtime_type: "strategyzer_external", intervention_slug: "original", scope_revision_id: "bound", started_at: "2026-11-09T10:00:00Z", last_sequence: 10 };
-const event = (id: string, sequence: number, actor: string, kind: string, content: string, speaker = actor): EvidenceEventRow => ({ id, run_id: "run", sequence, event_type: kind === "concluded" ? "decision" : "event", actor_type: actor, actor_id: speaker, content, occurred_at: `2026-11-09T10:00:${String(sequence).padStart(2, "0")}Z`, metadata: { team_kind: kind, private_hint: "SECRET", evaluator: "SECRET" } });
+const event = (id: string, sequence: number, actor: string, kind: string, content: string, speaker = actor): EvidenceEventRow => ({ id, run_id: "run", sequence, event_type: kind === "concluded" ? "decision" : kind === "work_product" ? "artifact_contribution" : "event", actor_type: actor, actor_id: speaker, content, occurred_at: `2026-11-09T10:00:${String(sequence).padStart(2, "0")}Z`, metadata: { team_kind: kind, private_hint: "SECRET", evaluator: "SECRET" } });
 const scopes = [{ id: "bound", session_id: "session", revision: 1, snapshot: { engagement_brief: { success: "Decide which customer problem to test", decision_maker: "Maya" }, private: "SECRET" } }, { id: "new", session_id: "session", revision: 2, snapshot: { engagement_brief: { success: "NEW OUTCOME" } } }];
 function fixture(coach = "Sofia, what have you observed?", status = "partial", withWork = true) {
   const events = [event("start", 1, "system", "session_started", "Started"), event("coach", 2, "coach", "utterance", coach), event("team", 3, "team", "response", "We have only two interviews; the problem is uncertain.", "Sofia"), event("work", 4, "team", "work_product", "First pass", "client_team"), event("end", 5, "coach", "concluded", "Stop here: insufficient evidence; Sofia will test the problem.")];
@@ -58,7 +58,7 @@ describe("observable live evaluation evidence (not AI semantic validity)", () =>
   it("rejects broken or future revision lineage", () => {
     const input = fixture(); input.revisions[0].contribution.base_revision = 5;
     expect(assembleLiveEvidence(input).runs[0].revisions).toHaveLength(0);
-    input.revisions[0].contribution.base_revision = 0; input.events.find(e => e.id === "team")?.sequence;
+    input.revisions[0].contribution.base_revision = 0;
     input.events[2].sequence = 8;
     expect(assembleLiveEvidence(input).runs[0].revisions[0].work.sections.every(s => s.items.length === 0)).toBe(true);
   });
@@ -89,5 +89,21 @@ describe("observable live evaluation evidence (not AI semantic validity)", () =>
     expect(validateLiveFeedback({ evidence: "Event 11111111-1111-4111-8111-111111111111", confidence: "high" }, evidence, "soft").confidence).toBe("low");
     const feedback = { evidence: "2026-11-09T10:00:03Z Sofia stated uncertainty", confidence: "high" };
     expect(validateLiveFeedback(feedback, evidence, "soft")).toEqual(feedback);
+  });
+  it("rejects duplicate ordering and excludes private-only rooms", () => {
+    const input = fixture(); input.events.push({ ...input.events[1], id: "duplicate" });
+    expect(assembleLiveEvidence(input).runs).toHaveLength(0);
+    const missing = fixture(); missing.events = missing.events.filter(e => e.id !== "start");
+    expect(assembleLiveEvidence(missing).runs).toHaveLength(0);
+  });
+  it("bounds large section evidence without silently claiming full coverage", () => {
+    const input = fixture();
+    for (let i = 6; i < 606; i++) input.events.push(event(`large-${i}`, i, "coach", "utterance", "Long observation ".repeat(200)));
+    input.runs = [{ ...run, last_sequence: 606 }];
+    const evidence = assembleLiveEvidence(input);
+    const prompt = renderLiveEvidence(evidence, "working_session_facilitation");
+    expect(prompt.length).toBeLessThan(23000);
+    expect(prompt).toContain('"promptSampled":true');
+    expect(evidence.runs[0].truncated).toBe(true);
   });
 });
