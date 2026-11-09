@@ -10,7 +10,7 @@ export type EvidenceScopeRow = { id: string; session_id: string; revision: numbe
 export type LiveMoment = { id: string; sequence: number; timestamp: string; kind: "coach" | "team" | "work" | "checkpoint" | "conclusion"; speaker: string; text: string; conclusionType?: "early_stop" | "after_synthesis" | "unspecified" };
 export type LiveRevision = { id: string; revision: number; baseRevision: number; eventId: string; instructionEventId: string; timestamp: string; work: TeamWork; emptySections: string[] };
 export type LiveRunEvidence = { id: string; intervention: string; startedAt: string; throughSequence: number; scope: { id: string; revision: number; brief: EngagementBrief } | null; participants: string[]; identities: { name: string; role: string }[]; moments: LiveMoment[]; revisions: LiveRevision[]; gaps: string[]; truncated: boolean };
-export type LiveEvidence = { version: "public_live_v1"; runs: LiveRunEvidence[]; omittedRuns: number };
+export type LiveEvidence = { version: "public_live_v1"; runs: LiveRunEvidence[]; omittedRuns: number; assessmentPolicy?: "three_chapter_v1" };
 const record = (v: unknown): Record<string, unknown> => v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {};
 export function assertEvidenceOwner(session: { id: string; owner_id: string | null }, userId: string) {
   if (session.owner_id !== userId) throw new Error("Forbidden");

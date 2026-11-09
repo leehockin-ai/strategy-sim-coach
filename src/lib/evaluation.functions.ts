@@ -5,6 +5,7 @@ import { assertEvidenceOwner, renderLiveEvidence, validateLiveFeedback } from "@
 import { DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
+import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY, freezeAssessmentEvidence } from "./assessment-evidence-policy";
 import {
   buildSectionInput,
   extractInputQualitySignals,
@@ -225,7 +226,8 @@ ${["situation_summary", "immediate_intervention", "pathway", "risks", "success_c
   .map((k) => `${k}: ${s.playbook_application?.[k] ?? "(empty)"}`)
   .join("\n")}
 ${renderLiveEvidence(s.live_evidence, kind)}
-${s.live_evidence?.runs.length ? "Assess actual live-room coaching, not obsolete canvas completion. Separate coach assertions from team speech; cite supplied public IDs/timestamps. Soft skills: observable invitations, resistance and ownership. Methodology: applied evidence reasoning, assumptions, customer specificity and revisions. State uncertainty, never infer hidden state or verified external work." : ""}`;
+${s.live_evidence?.runs.length ? "Assess actual live-room coaching, not obsolete canvas completion. Separate coach assertions from team speech; cite supplied public IDs/timestamps. Soft skills: observable invitations, resistance and ownership. Methodology: applied evidence reasoning, assumptions, customer specificity and revisions. State uncertainty, never infer hidden state or verified external work." : ""}
+${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITMENT_EVIDENCE_RULE : ""}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -294,7 +296,8 @@ async function synthesizeFinal(
   const methSkillsDigest = input.methodologySkills.map((sk) => `  ${sk.rating === "concern" ? "⚠" : sk.rating === "strength" ? "✓" : "·"} ${sk.label}: ${sk.explanation}`).join("\n");
 
   const q = input.inputQualitySignals;
-  const qualityDigest = `framing: ${q.framing_chars} chars · methodology rationale: ${q.methodology_rationale_chars} chars · intervention: ${q.intervention_chars} chars · commitments captured: ${q.dialogue_commitments_chars} chars · pathway sections filled: ${q.pathway_sections_filled}/5 (${q.pathway_total_chars} chars total) · canvas cells: ${q.canvas_cells_with_content}/${q.canvas_cells_total} with content, ${q.canvas_cells_with_evidence_marker} with evidence marker · coach transcript: ${q.coach_transcript_turns} turns, ${q.coach_transcript_total_chars} chars · AI suggestions consulted: ${q.ai_suggestions_consulted}`;
+  const commitmentsDigest = q.standalone_commitments_optional ? "standalone commitments notes: optional, not a missing-evidence/quality signal; use section evidence for actual agreements" : `commitments captured: ${q.dialogue_commitments_chars} chars`;
+  const qualityDigest = `framing: ${q.framing_chars} chars · methodology rationale: ${q.methodology_rationale_chars} chars · intervention: ${q.intervention_chars} chars · ${commitmentsDigest} · pathway sections filled: ${q.pathway_sections_filled}/5 (${q.pathway_total_chars} chars total) · canvas cells: ${q.canvas_cells_with_content}/${q.canvas_cells_total} with content, ${q.canvas_cells_with_evidence_marker} with evidence marker · coach transcript: ${q.coach_transcript_turns} turns, ${q.coach_transcript_total_chars} chars · AI suggestions consulted: ${q.ai_suggestions_consulted}`;
 
   const systemPrompt = `You are an expert Strategyzer certification reviewer producing a FINAL assessment.
 
@@ -337,6 +340,7 @@ ${methSkillsDigest}
 INPUT-QUALITY SIGNALS
 ══════════════════════════════════════════
 ${qualityDigest}
+${q.standalone_commitments_optional ? COMMITMENT_EVIDENCE_RULE : ""}
 Live evidence signals: ${JSON.stringify({ evidence_mode: q.evidence_mode, legacy_canvas_applicable: q.legacy_canvas_applicable, live_runs: q.live_runs, live_coach_turns: q.live_coach_turns, live_team_turns: q.live_team_turns, live_work_revisions: q.live_work_revisions, live_observable_conclusions: q.live_observable_conclusions, sampled: q.live_evidence_sampled })}
 For live rooms, obsolete canvas fields are NOT required evidence. Work absence/completeness and counts alone are not coaching scores. Intentional incompleteness can be legitimate; rely on observable section evidence and acknowledge sampling/uncertainty. This is a single-session developmental recommendation, NOT a three-environment certification decision.
 
@@ -579,10 +583,10 @@ function hasAdvancePathway(app: unknown) {
 }
 
 async function ownedSession(context: { supabase: any; userId: string }, sessionId: string) {
-  const r = await context.supabase.from("sessions").select("id,owner_id,scenario_id,playbook_application").eq("id", sessionId).maybeSingle();
+  const r = await context.supabase.from("sessions").select("id,owner_id,scenario_id,playbook_application,created_at").eq("id", sessionId).maybeSingle();
   if (r.error || !r.data) throw new Error("Session not found");
   assertEvidenceOwner(r.data, context.userId);
-  return r.data as { id: string; owner_id: string; scenario_id: string; playbook_application: unknown };
+  return r.data as { id: string; owner_id: string; scenario_id: string; playbook_application: unknown; created_at: string };
 }
 
 const sessionInput = (d: { sessionId: string; retry?: boolean }) =>
@@ -606,7 +610,7 @@ export const startAssessmentJob = createServerFn({ method: "POST" })
       retry: data.retry,
       snapshotEvidence: async () => {
         const { loadLiveEvaluationEvidence } = await import("@/lib/evaluation-live-evidence.server");
-        return loadLiveEvaluationEvidence(context.supabase, session);
+        return freezeAssessmentEvidence(await loadLiveEvaluationEvidence(context.supabase, session), session.created_at);
       },
     });
   });

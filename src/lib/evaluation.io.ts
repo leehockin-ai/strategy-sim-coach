@@ -3,6 +3,7 @@
 // can't "leak" one transcript moment into seven section scores.
 import { scopeEvidenceForSection, DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { renderLiveEvidence, type LiveEvidence } from "./evaluation-live-evidence";
+import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY } from "./assessment-evidence-policy";
 
 export type SessionForEval = {
   live_evidence?: LiveEvidence;
@@ -116,6 +117,7 @@ export function extractInputQualitySignals(s: SessionForEval, turns: TranscriptT
     methodology_rationale_chars: charCount(s.methodology_rationale),
     intervention_chars: charCount(s.intervention_recommendation),
     dialogue_commitments_chars: charCount(s.dialogue_commitments),
+    standalone_commitments_optional: s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY,
     pathway_sections_filled: ["situation_summary", "immediate_intervention", "pathway", "risks", "success_criteria"].filter(
       (k) => charCount((pa as any)[k]) > 0
     ).length,
@@ -170,16 +172,26 @@ export function buildSectionInput(
   s: SessionForEval,
   turns: TranscriptTurn[] | null | undefined
 ): string {
-  const legacy = buildLegacySectionInput(key, s, turns);
+  const modern = s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY;
+  // Scope/fit retain their time boundary. Chapter 3 plans are later candidate
+  // interpretations, never retrospectively treated as stakeholder agreement.
+  const context = modern && key === "stakeholder_navigation" ? `\n── CHAPTER 3 CANDIDATE-AUTHORED NEXT STEPS (not proof of client agreement; context only, do not rescore the pathway) ──\n${JSON.stringify({ decision: s.decision, recommendation: s.intervention_recommendation, pathway: s.playbook_application })}` : "";
+  const legacy = `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, s, turns)}${context}`;
   const live = renderLiveEvidence(s.live_evidence, key);
   if (!live) return legacy;
   if (key === "working_session_facilitation") return `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}\n${live}\nAssess ONLY observed facilitation: open probing vs leading/prescription, specificity, ownership transfer, participation and responses to uncertainty. Examine coaching and revision causality, not wall completeness. Legacy canvas is not required for this live room.`;
   if (key === "intervention_execution") return `SCENARIO: ${s.scenarios.title}\n${live}\nAssess ONLY execution of each run's ORIGINAL committed intervention relative to its BOUND Scope/outcome, not today's mutable session choice. Evaluate actual work assignments, team ownership, evidence reasoning, revisions, honest progress and stopping rationale. No-work or incomplete work is not automatically poor execution. Current Chapter 3 plans are not proof of Chapter 2 execution.`;
   if (key === "stakeholder_navigation") {
     // Live assessment uses public behavior, never simulator's hidden state explanations.
-    return `${buildLegacySectionInput(key, { ...s, stakeholder_state_trajectory: [] }, turns)}\n${live}\nAssess observed participation, invitations, resistance and ownership without inferring hidden trust or motivations.`;
+    return `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, { ...s, stakeholder_state_trajectory: [] }, turns)}${context}\n${live}\nAssess observed participation, invitations, resistance and ownership without inferring hidden trust or motivations.`;
   }
   return `${legacy}\n${live}\n${key === "engagement_pathway" ? "Use the live conclusion/latest work only as context to judge the existing Chapter 3 pathway; it does not replace missing Chapter 3 evidence." : key === "intervention_discipline" ? "Use observed conclusion and remaining gaps only to judge recommendation restraint; do not rescore facilitation." : "Use observable applied methodology and source-linked team work, not external Playbook completion. Legacy canvas blanks are not missing live-room evidence."}`;
+}
+
+function commitmentsInput(s: SessionForEval, legacyEmpty: string): string {
+  if (s.dialogue_commitments?.trim()) return s.dialogue_commitments;
+  return s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY
+    ? "(optional standalone notes not supplied; refer to observable agreements in the supplied evidence)" : legacyEmpty;
 }
 
 function buildLegacySectionInput(
@@ -245,7 +257,7 @@ Score ONLY on coaching approach: methodology fit-for-purpose, restraint, sequenc
 ${renderTranscript(scopeTurns)}
 
 ── COMMITMENTS & DECISIONS CAPTURED ──
-${s.dialogue_commitments || "(none captured)"}
+${commitmentsInput(s, "(none captured)")}
 
 ── HIDDEN STAKEHOLDER STATE TRAJECTORY (context, not a formula) ──
 This is the hidden per-turn state assessor's read on each stakeholder's engagement / trust / guardedness after each coach turn. The trajectory below is CONTEXT for your reasoning about how the coach navigated stakeholders. Do NOT compute the score directly from the state values — a coach who ended with a cold Marcus might have made the right calls if Marcus was resistant for good reasons. Judge the coach's behavior in relation to the trajectory, not the trajectory alone.
@@ -311,7 +323,7 @@ ${s.methodology_choice || "(none)"}
 ${s.methodology_rationale || "(none)"}
 
 ── COMMITMENTS ──
-${s.dialogue_commitments || "(none)"}
+${commitmentsInput(s, "(none)")}
 
 ── CANVAS WORK ──
 ${canvas}
@@ -343,7 +355,7 @@ ${(scenario.ambiguity_factors ?? []).map((a) => `• ${a}`).join("\n") || "(none
 ${s.framing_notes || "(none)"}
 
 ── STAKEHOLDER COMMITMENTS CAPTURED (Step 3) ──
-${s.dialogue_commitments || "(none captured)"}
+${commitmentsInput(s, "(none captured)")}
 
 ── COMMITTED INTERVENTION (authoritative — from the intervention picker) ──
 Chosen slug: ${s.chosen_intervention_slug || "(none committed)"}
