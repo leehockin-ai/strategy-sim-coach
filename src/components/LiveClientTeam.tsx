@@ -107,15 +107,15 @@ export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string;
             onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && msg.trim()) sayMut.mutate(msg.trim()); }} />
           <div className="flex flex-wrap gap-3 justify-between">
             <Button disabled={!msg.trim() || sayMut.isPending} onClick={() => sayMut.mutate(msg.trim())}><Send />Speak to the room</Button>
-            {phase === "working" && <Button variant="outline" disabled={simple.isPending} onClick={() => simple.mutate(keyed(k => synth({ data: { runId, requestKey: k } })))}>Bring the team back together</Button>}
-            {phase === "synthesis" && !concluding && <Button variant="outline" onClick={() => setConcluding("conclude")}>Conclude working session</Button>}
-            {phase === "working" && !concluding && <Button variant="ghost" onClick={() => setConcluding("early")}>Stop the session early</Button>}
+            {phase === "working" && <Button variant="outline" disabled={simple.isPending || sayMut.isPending} onClick={() => simple.mutate(keyed(k => synth({ data: { runId, requestKey: k } })))}>Bring the team back together</Button>}
+            {phase === "synthesis" && !concluding && <Button variant="outline" disabled={sayMut.isPending} onClick={() => setConcluding("conclude")}>Conclude working session</Button>}
+            {phase === "working" && !concluding && <Button variant="ghost" disabled={sayMut.isPending} onClick={() => setConcluding("early")}>Stop the session early</Button>}
           </div>
           {concluding && <div className="border border-border p-3 space-y-2">
             <p className="text-sm font-medium">{concluding === "early" ? "Stop this working session now?" : "Are you ready to conclude this working session?"}</p>
             <label className="text-sm block">Why are you ready to move on?<Textarea className="mt-1" rows={3} value={rationale} onChange={e => setRationale(e.target.value)} maxLength={4000} /></label>
             <p className="text-xs text-muted-foreground">{concluding === "early" ? "Stopping early is a valid coaching choice. The team is brought back together and the session ends; your reason is kept with your evidence." : "A finished artifact is not required."}</p>
-            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending} onClick={() => simple.mutate(async () => { if (phase === "working") await synth({ data: { runId, requestKey: crypto.randomUUID() } }); await conclude({ data: { runId, requestKey: crypto.randomUUID(), rationale: rationale.trim() } }); setConcluding(false); })}>{concluding === "early" ? "Stop and conclude" : "Conclude"}</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
+            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending || sayMut.isPending} onClick={() => simple.mutate(async () => { if (phase === "working") await synth({ data: { runId, requestKey: crypto.randomUUID() } }); await conclude({ data: { runId, requestKey: crypto.randomUUID(), rationale: rationale.trim() } }); setConcluding(false); })}>{concluding === "early" ? "Stop and conclude" : "Conclude"}</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
           </div>}
         </div>}
        </div>
