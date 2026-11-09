@@ -11,6 +11,7 @@ import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { Button } from "@/components/ui/button";
 import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
+import { Chapter3Summary } from "@/components/Chapter3Summary";
 import { recordWorkingSessionSkip, getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
@@ -357,6 +358,7 @@ function ChapterBanner({ chapter }: { chapter: ChapterKey }) {
         Chapter {meta.index} · {meta.label}
       </div>
       <p className="text-sm text-muted-foreground leading-relaxed mt-1 max-w-3xl">{meta.descriptor}</p>
+      {chapter === "progress" && <div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground mt-2"><span>Synthesize learning</span><span>→ Assess progress and gaps</span><span>→ Choose the next move</span><span>→ Sustain value</span><span>→ Generate my assessment</span></div>}
     </div>
   );
 }
@@ -3475,24 +3477,26 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
   const commitments: string = (session.dialogue_commitments ?? "").trim();
 
   return (
+    <>
+    <Chapter3Summary sessionId={session.id} />
     <StepShell
-      title="Next-Step Judgment"
-      hint="The intervention has already happened in Live Playbook Facilitation. Now interpret what emerged. What did the session actually reveal? What is realistically true now? What should the team do next — and just as importantly, what should NOT happen yet? Then make the call: continue, pivot, escalate, or stop. Anchor your reasoning in the stakeholder commitments below."
+      title="Synthesize and choose the next move"
+      hint="Using what the team actually said and did, interpret what the work established relative to the intended outcome, what is still uncertain, and the smallest responsible next move — including what should NOT happen yet. Continue, pivot, escalate or stop are all legitimate calls. What you write here is your interpretation; it is kept separate from the team's own words."
     >
       {commitments && (
         <div className="mb-4 border border-ink p-3 text-xs" style={{ backgroundColor: "var(--brand-lime)" }}>
-          <div className="uppercase tracking-[0.12em] font-medium mb-1">Commitments from your 1:1s</div>
+          <div className="uppercase tracking-[0.12em] font-medium mb-1">Commitments noted in your earlier 1:1s</div>
           <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{commitments}</pre>
         </div>
       )}
 
-      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Next-best action</label>
+      <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Your interpretation and next-best action</label>
       <div className="relative">
         <textarea
           value={rec}
           onChange={(e) => setRec(e.target.value)}
           rows={8}
-          placeholder="What exactly happens next? Who, what, by when. What evidence are you trying to generate? Build on the commitments above."
+          placeholder="What did the work establish, and what is still uncertain? What exactly happens next — who, what, by when — and what evidence would it generate?"
           className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary font-mono"
         />
         <div className="absolute top-2 right-2">
@@ -3520,10 +3524,11 @@ function InterventionStep({ session, onSaved }: { session: any; onSaved: () => v
           disabled={submit.isPending || !rec.trim() || !decision}
           className="bg-ink text-paper px-6 py-3 text-sm font-medium rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Saving…" : "Continue to engagement orchestration →"}
+          {submit.isPending ? "Saving…" : "Continue to sustain value →"}
         </button>
       </div>
     </StepShell>
+    </>
   );
 }
 
@@ -3615,9 +3620,13 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
 
   return (
     <div>
+      <details className="mb-6">
+        <summary className="cursor-pointer text-xs uppercase tracking-[0.12em] text-muted-foreground mb-3">Show where the engagement stands</summary>
+        <Chapter3Summary sessionId={session.id} />
+      </details>
       <div className="border border-ink p-5 bg-secondary mb-6">
-        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Step 06 · Portfolio-level orchestration</div>
-        <h2 className="text-2xl tracking-tight">Engagement Orchestration</h2>
+        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Chapter 3 · Sustain value</div>
+        <h2 className="text-2xl tracking-tight">Sustain value beyond this session</h2>
         <p className="text-sm text-muted-foreground leading-relaxed mt-2 max-w-3xl">
           Design the smallest responsible pathway forward. How would you guide this engagement over time?
           Sequence future playbooks, workshop cadence, evidence checkpoints, stakeholder alignment moves, and
