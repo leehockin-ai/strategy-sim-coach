@@ -1,3 +1,4 @@
+import { readConclusionMode } from "./live-team";
 import { readEngagementBrief, type EngagementBrief } from "./scope-brief";
 import { readTeamWork, customerProfileSections, type TeamWork } from "./team-work";
 
@@ -6,7 +7,7 @@ export type EvidenceRunRow = { id: string; session_id: string; candidate_id: str
 export type EvidenceEventRow = { id: string; run_id: string; sequence: number; event_type: string; actor_type: string; actor_id: string | null; content: string; occurred_at: string; metadata: unknown };
 export type EvidenceRevisionRow = { id: string; run_id: string; event_id: string; revision: number; state: unknown; actor_type: string; contribution: unknown; created_at: string };
 export type EvidenceScopeRow = { id: string; session_id: string; revision: number; snapshot: unknown };
-export type LiveMoment = { id: string; sequence: number; timestamp: string; kind: "coach" | "team" | "work" | "checkpoint" | "conclusion"; speaker: string; text: string };
+export type LiveMoment = { id: string; sequence: number; timestamp: string; kind: "coach" | "team" | "work" | "checkpoint" | "conclusion"; speaker: string; text: string; conclusionType?: "early_stop" | "after_synthesis" | "unspecified" };
 export type LiveRevision = { id: string; revision: number; baseRevision: number; eventId: string; instructionEventId: string; timestamp: string; work: TeamWork; emptySections: string[] };
 export type LiveRunEvidence = { id: string; intervention: string; startedAt: string; throughSequence: number; scope: { id: string; revision: number; brief: EngagementBrief } | null; participants: string[]; identities: { name: string; role: string }[]; moments: LiveMoment[]; revisions: LiveRevision[]; gaps: string[]; truncated: boolean };
 export type LiveEvidence = { version: "public_live_v1"; runs: LiveRunEvidence[]; omittedRuns: number };
@@ -28,7 +29,7 @@ export function assembleLiveEvidence(input: { sessionId: string; ownerId: string
       const kind = record(e.metadata).team_kind;
       const type = e.actor_type === "coach" && kind === "utterance" ? "coach" : e.actor_type === "team" && kind === "response" ? "team" : e.actor_type === "team" && kind === "work_product" ? "work" : e.actor_type === "coach" && kind === "concluded" && e.event_type === "decision" ? "conclusion" : e.actor_type === "system" && (kind === "session_started" || kind === "synthesis_started") ? "checkpoint" : null;
       if (!type) return [];
-      return [{ id: e.id, sequence: e.sequence, timestamp: e.occurred_at, kind: type, speaker: type === "coach" || type === "conclusion" ? "Coach" : (e.actor_id ?? "System").slice(0, 120), text: e.content.slice(0, 4000) }];
+      return [{ id: e.id, sequence: e.sequence, timestamp: e.occurred_at, kind: type, speaker: type === "coach" || type === "conclusion" ? "Coach" : (e.actor_id ?? "System").slice(0, 120), text: e.content.slice(0, 4000), ...(type === "conclusion" ? { conclusionType: readConclusionMode(e.metadata) } : {}) }];
     });
     const gaps: string[] = [];
     const histories = input.revisions.filter(h => h.run_id === run.id).sort((a, b) => a.revision - b.revision);
