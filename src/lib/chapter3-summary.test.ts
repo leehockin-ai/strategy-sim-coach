@@ -5,9 +5,9 @@ import { buildChapter3Summary } from "./chapter3-summary";
 
 // Phase 3: Chapter 3 summary is built only from bound public evidence. These assert
 // routing/provenance/disposition, not coaching quality.
-const run = { id: "run", session_id: "session", candidate_id: "owner", scenario_id: "scenario", runtime_type: "strategyzer_external", intervention_slug: "map", scope_revision_id: "bound", started_at: "2026-11-09T10:00:00Z", last_sequence: 10 };
+const run: { id: string; session_id: string; candidate_id: string; scenario_id: string; runtime_type: string; intervention_slug: string; scope_revision_id: string | null; started_at: string; last_sequence: number } = { id: "run", session_id: "session", candidate_id: "owner", scenario_id: "scenario", runtime_type: "strategyzer_external", intervention_slug: "map", scope_revision_id: "bound", started_at: "2026-11-09T10:00:00Z", last_sequence: 10 };
 const ev = (id: string, seq: number, actor: string, kind: string, content: string, speaker = actor, extra: Record<string, unknown> = {}): EvidenceEventRow => ({ id, run_id: "run", sequence: seq, event_type: kind === "concluded" ? "decision" : kind === "work_product" ? "artifact_contribution" : "event", actor_type: actor, actor_id: speaker, content, occurred_at: `2026-11-09T10:00:0${seq}Z`, metadata: { team_kind: kind, private_hint: "SECRET_TRUTH", ...extra } });
-const scopes = [
+const scopes: { id: string; session_id: string; revision: number; snapshot: unknown }[] = [
   { id: "bound", session_id: "session", revision: 1, snapshot: { engagement_brief: { success: "Decide which customer problem to test", decision_to_enable: "Pick one segment", decision_maker: "Maya", assumptions: "Segment B cares about speed" } } },
   { id: "later", session_id: "session", revision: 3, snapshot: { engagement_brief: { success: "NEWER OUTCOME" } } },
 ];
