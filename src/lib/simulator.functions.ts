@@ -467,7 +467,11 @@ export const updateSession = createServerFn({ method: "POST" })
     if (data.methodologyRationale !== undefined) patch.methodology_rationale = data.methodologyRationale;
     if (data.interventionRecommendation !== undefined) patch.intervention_recommendation = data.interventionRecommendation;
     if (data.decision !== undefined) patch.decision = data.decision;
-    if (data.status !== undefined) patch.status = data.status;
+    if (data.status !== undefined) {
+      const { CHAPTER3_STATUSES } = await import("@/lib/chapter2-progress");
+      if (CHAPTER3_STATUSES.has(data.status)) await assertChapter3Ready(data.sessionId);
+      patch.status = data.status;
+    }
     if (data.dialogueCommitments !== undefined) patch.dialogue_commitments = data.dialogueCommitments;
     if (data.chosenInterventionSlug !== undefined) patch.chosen_intervention_slug = data.chosenInterventionSlug;
     if (data.interventionRationale !== undefined) patch.intervention_rationale = data.interventionRationale;
