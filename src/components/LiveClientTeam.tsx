@@ -47,7 +47,7 @@ export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string;
     onSuccess: async () => { pending.current = null; setMsg(""); await refresh(); },
     onError: e => toast.error(e.message),
   });
-  const simple = useMutation({ mutationFn: (f: () => Promise<unknown>) => f(), onSuccess: refresh, onError: e => toast.error(e.message) });
+  const simple = useMutation({ mutationFn: (f: () => Promise<unknown>) => f(), onSuccess: refresh, onError: e => { toast.error(e.message); void refresh(); } });
   useEffect(() => { const node = transcriptRef.current; if (node) node.scrollTop = node.scrollHeight; }, [data?.available ? data.events.length : 0, sayMut.isPending]);
   function showSource(id: string) {
     setSource(id);
