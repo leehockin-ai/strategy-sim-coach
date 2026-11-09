@@ -552,7 +552,7 @@ export function supabaseAssessmentStore(admin: AdminClient): AssessmentStore {
       const r = await admin.from("evaluation_jobs")
         .update({ lease_token: token, lease_until: leaseUntilIso, updated_at: nowIso })
         .eq("id", jobId).eq("status", "running")
-        .or(`lease_until.is.null,lease_until.lt.${nowIso}`)
+        .or(`lease_until.is.null,lease_until.lt."${nowIso}"`)
         .select(cols).maybeSingle();
       if (r.error) throw new Error("Assessment progress could not be claimed");
       return r.data ?? null;
