@@ -25,7 +25,7 @@ describe("early stop conclusion rule", () => {
   it("an early-stopped room reads as concluded and passes the Chapter 2 guard, even with an empty wall", () => {
     const events = [sys("session_started"), concluded("early_stop")];
     expect(roomPhase(events)).toBe("concluded");
-    expect(roomStage("concluded", true)).toBe("concluded");
+    expect(roomStage(true, "concluded")).toBe("concluded");
     expect(hasConcludedEvent(events as never)).toBe(true);
     expect(events.some(e => (e.metadata as { team_kind: string }).team_kind === "synthesis_started")).toBe(false);
   });
