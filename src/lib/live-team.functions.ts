@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 import { PUBLIC_EVENT_COLUMNS } from "./activity-runtime";
 import { initialRoom, publicTeamConfig, roomPhase, conclusionModeFor, sanitizeTurn, type ConclusionMode, type RawTurn, type RoomState, type TeamConfig } from "./live-team";
-import { customerProfileWork, readTeamWork, workIntents, type WorkIntent, type WorkSource } from "./team-work";
+import { customerProfileWork, readTeamWork, reconcileTeamWork, workIntents, type WorkIntent, type WorkSource } from "./team-work";
 import { FOUNDATIONAL_CONCEPTS } from "./strategyzer-methodology";
 import { disclosedConfig, validDisclosures } from "./team-disclosure";
 import { roomEligibility } from "./working-session";
@@ -243,8 +243,9 @@ export const facilitateTeam = createServerFn({ method: "POST" })
     }
     let work = intent === "conversation" || (intent === "coach_work" && !currentWork) ? null : customerProfileWork(rawWork, allSources);
     if ((intent === "assign_work" || intent === "revise_work") && !work) throw new Error("The team's work could not be recorded. Try again.");
-    // A team can reaffirm, remove or recategorize an earlier contribution;
-    // source age alone must not prevent that meaningful revision.
+    // Every spoken self-correction is checked, even on conversation turns.
+    // The model's replacement snapshot cannot alone remove/reclassify old work.
+    if (currentWork) work = reconcileTeamWork(currentWork, work, allSources.filter(s => s.id.startsWith("response:")));
     if (intent === "intentional_stop" && currentWork) work = { ...currentWork, status: "stopped_intentionally" };
     if (work && JSON.stringify(work) === JSON.stringify(currentWork)) work = null;
     // Replace ephemeral response refs with deterministic request-scoped provenance.
