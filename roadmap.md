@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Bounded post-Phase-4 corrections
+- [ ] Trace and correct obsolete commitments input for new three-chapter assessments without changing rubric or prior reports.
+- [ ] Reconcile explicit team-owned wall corrections conservatively with public provenance and append-only history.
+- [ ] Replace candidate internal POC label; run regressions and authorized disposable walkthrough (new allowlist entry needs permission).
+
 ## Evaluation Evidence Integration and Validation
 - [x] Assemble bounded public live-room evidence with owner authorization, bound Scope and validated revision lineage.
 - [x] Route observable evidence into existing section/skills assessments and quality signals; preserve rubric and historical evaluations.
