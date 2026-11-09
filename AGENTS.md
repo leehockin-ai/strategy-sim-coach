@@ -24,3 +24,4 @@
 - Simulated work is an activity-adapted extractive snapshot of public participant contributions, not external platform state; private team configuration is frozen at room start for reproducible reviewer evidence.
 - Working-session outcomes read the run-bound Scope revision by ID and unwrap its Engagement Brief; missing bound evidence never falls back to newer Scope, preserving historical identity.
 - The read-only working wall uses presentation adapters over existing team-work revisions and source events; it creates no new evidence store or hidden-truth-derived candidate signals.
+- Assessment generation is a resumable job in the server-only evaluation_jobs table: owner-checked start/advance/status functions run one bounded batch per request under an atomic lease, so no single request carries the whole generation and progress survives refreshes; existing evaluations are never overwritten.

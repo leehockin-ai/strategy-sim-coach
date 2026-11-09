@@ -55,3 +55,6 @@
 - [x] Diagnose stakeholder persistence; new-session seeds and two real 1:1 turns persist across refresh.
 - [x] Restrict hidden-state reads and server reviewer endpoints; candidate denial verified.
 - [x] Report changes, root cause, compatibility results and risks; stopped before Stage 2.- [x] Revised Stage 4: Strategyzer Playbook handoff & external runtime (Level 0). Waiting on Lee's real Strategyzer account test and approval before the AI-team stage.
+
+- [x] Phase 1: resumable background assessment generation, report progress/retry, "Generate my assessment" CTA, current copy (hosted site not yet verified — needs publish)
+- [ ] Phase 2+ (Chapter 2 clarity, connect Chapter 3, navigation) — awaiting user go-ahead

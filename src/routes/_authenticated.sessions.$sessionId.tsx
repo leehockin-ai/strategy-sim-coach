@@ -13,7 +13,7 @@ import { getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sen
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
 import { voiceForStakeholder } from "@/lib/voices";
-import { generateEvaluation } from "@/lib/evaluation.functions";
+import { startAssessmentJob } from "@/lib/evaluation.functions";
 import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
@@ -3540,7 +3540,7 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
   const active = PATHWAY_SECTIONS.find((s) => s.key === activeKey)!;
 
   const saveApp = useServerFn(savePlaybookApplication);
-  const evalFn = useServerFn(generateEvaluation);
+  const startAssessment = useServerFn(startAssessmentJob);
   const qc = useQueryClient();
 
   function persist(next: Record<string, string>) {
@@ -3551,16 +3551,17 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
   const submit = useMutation({
     mutationFn: async () => {
       await saveApp({ data: { sessionId: session.id, application: values } });
-      await evalFn({ data: { sessionId: session.id } });
+      // Starts (or reuses) the resumable job; the report page drives progress.
+      await startAssessment({ data: { sessionId: session.id } });
     },
     onSuccess: () => {
-      toast.success("Evaluation generated");
+      toast.success("Generating your assessment");
       qc.invalidateQueries({ queryKey: ["my-sessions"] });
       qc.invalidateQueries({ queryKey: ["session", session.id] });
       onSaved();
       navigate({ to: "/sessions/$sessionId/report", params: { sessionId: session.id } });
     },
-    onError: (e: any) => toast.error(e?.message ?? "Evaluation failed"),
+    onError: (e: any) => toast.error(e?.message ?? "Could not start your assessment"),
   });
 
   const filledCount = PATHWAY_SECTIONS.filter((s) => (values[s.key] ?? "").trim().length > 0).length;
@@ -3660,7 +3661,7 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
           disabled={submit.isPending || filledCount === 0}
           className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
         >
-          {submit.isPending ? "Submitting…" : "Submit for assessment →"}
+          {submit.isPending ? "Starting…" : "Generate my assessment →"}
         </button>
       </div>
     </div>

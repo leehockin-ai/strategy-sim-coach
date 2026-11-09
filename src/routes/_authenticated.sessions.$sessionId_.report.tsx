@@ -5,6 +5,7 @@ import { Shell } from "@/components/Shell";
 import { getSession, requestSubmissionForAssessment } from "@/lib/simulator.functions";
 import { SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { toast } from "sonner";
+import { AssessmentGenerator } from "@/components/AssessmentGenerator";
 import React from "react";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/report")({
@@ -89,18 +90,11 @@ function AssessmentPage() {
   const scenario = session.scenarios;
 
   if (!evaluation) {
+    const app = session.playbook_application as Record<string, unknown> | null;
+    const canGenerate = !!app && Object.values(app).some((v) => typeof v === "string" && v.trim().length > 0);
     return (
       <Shell>
-        <div className="mx-auto max-w-[900px] px-6 py-16">
-          <span className="chip mb-3 inline-flex">Your assessment</span>
-          <h1 className="text-3xl mb-3">Not generated yet</h1>
-          <p className="text-muted-foreground mb-6">
-            Complete the intervention step in your session to generate the AI rubric.
-          </p>
-          <Link to="/sessions/$sessionId" params={{ sessionId }} className="bg-ink text-paper px-4 py-2 text-sm rounded-sm">
-            Return to session
-          </Link>
-        </div>
+        <AssessmentGenerator sessionId={sessionId} canGenerate={canGenerate} />
       </Shell>
     );
   }
