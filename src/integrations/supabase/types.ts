@@ -616,6 +616,57 @@ export type Database = {
           },
         ]
       }
+      evaluation_jobs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          evaluation_id: string | null
+          id: string
+          lease_token: string | null
+          lease_until: string | null
+          live_evidence: Json | null
+          owner_id: string
+          run_count: number
+          session_id: string
+          status: string
+          steps: Json
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          evaluation_id?: string | null
+          id?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          live_evidence?: Json | null
+          owner_id: string
+          run_count?: number
+          session_id: string
+          status?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          evaluation_id?: string | null
+          id?: string
+          lease_token?: string | null
+          lease_until?: string | null
+          live_evidence?: Json | null
+          owner_id?: string
+          run_count?: number
+          session_id?: string
+          status?: string
+          steps?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       evaluations: {
         Row: {
           ai_detection: Json | null
