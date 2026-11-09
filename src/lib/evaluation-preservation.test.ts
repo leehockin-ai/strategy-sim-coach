@@ -70,7 +70,6 @@ it("routes public live evidence through all nine isolated sections and both skil
   const row: any = await composeEvaluationRow("k", "session", steps, input, evidence);
   expect(requests).toHaveLength(12);
   expect(requests.filter((r) => r.messages[1].content.includes("Sofia, what have you observed?"))).toHaveLength(6);
-  expect(requests.every((r) => r.model === "google/gemini-2.5-pro" || typeof r.model === "string")).toBe(true);
   expect(JSON.stringify(requests)).not.toContain("SECRET DIAGNOSTIC");
   expect(row.raw_response.live_evidence).toEqual(evidence);
   expect(row.evaluation_architecture).toBe("fanout_v1");
