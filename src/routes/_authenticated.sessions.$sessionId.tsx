@@ -3620,6 +3620,10 @@ function EngagementPathwayStep({ session, onSaved }: { session: any; onSaved: ()
 
   return (
     <div>
+      <details className="mb-6">
+        <summary className="cursor-pointer text-xs uppercase tracking-[0.12em] text-muted-foreground mb-3">Show where the engagement stands</summary>
+        <Chapter3Summary sessionId={session.id} />
+      </details>
       <div className="border border-ink p-5 bg-secondary mb-6">
         <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">Chapter 3 · Sustain value</div>
         <h2 className="text-2xl tracking-tight">Sustain value beyond this session</h2>
