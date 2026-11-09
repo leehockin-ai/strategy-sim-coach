@@ -68,17 +68,17 @@ export function reconcileTeamWork(current: TeamWork, proposed: TeamWork | null, 
     const candidates: Correction[] = [];
     let conflict = false;
     for (const source of responses.filter(s => s.kind === "team")) {
-      for (const quote of source.text.split(/(?<=[.!?])\s+(?=[A-Z])/)) {
+      for (const quote of source.text.split(/(?<=[^.!?][.!?])\s+(?=[A-Z])/)) {
         const clause = normalized(quote);
         // A literal quoted short reference is accepted only if it identifies
         // exactly one existing item, never fuzzy similarity or a pronoun.
-        const references = [...clause.matchAll(/['"]([^'"]{5,})['"]/g)].map(m => m[1]).filter(ref => anchor.includes(ref) && originals.filter(x => normalized(x.item.text).includes(ref)).length === 1);
+        const references = [...clause.matchAll(/(?:^|[\s(])['"]([^'"]{5,})['"]/g)].map(m => m[1]).filter(ref => anchor.includes(ref) && originals.filter(x => normalized(x.item.text).includes(ref)).length === 1);
         const reference = clause.includes(anchor) ? anchor : references[0];
         if (!reference) continue;
         const at = clause.indexOf(reference);
         if (at < 0 || quote.length > 900) continue;
         // Reject questions, hypotheticals, negation and explicit disagreement.
-        if (/\?|\b(if|maybe|perhaps|could|should|might|would)\b/.test(clause)) { conflict = true; continue; }
+        if (/\?|\b(maybe|perhaps|could|should|might|would)\b|(?:^|[,;]\s*)if\b/.test(clause)) { conflict = true; continue; }
         if (/\b(not|isn't|wasn't|don't|disagree|keep)\b/.test(clause)) { conflict = true; continue; }
         const before = clause.slice(Math.max(0, at - 100), at), after = clause.slice(at + reference.length, at + reference.length + 130);
         const move = /\b(?:i(?:'ll| will)?|we(?:'ll| will)?) (?:move|reclassify|put)\b/.test(before) && after.match(/\b(?:to|under|in) (?:the )?(unknowns|assumptions|evidence|gains|pains|jobs|customer)\b/);

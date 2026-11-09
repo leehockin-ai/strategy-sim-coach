@@ -3,7 +3,14 @@ import { freezeAssessmentEvidence, THREE_CHAPTER_EVIDENCE_FROM, THREE_CHAPTER_EV
 import { buildSectionInput, extractInputQualitySignals, type SessionForEval } from "./evaluation.io";
 
 const evidence = { version: "public_live_v1" as const, runs: [], omittedRuns: 0 };
-const session = (modern = true): SessionForEval => ({ candidate_name: "Test", scenarios: { title: "Client", summary: "Public" }, live_evidence: modern ? freezeAssessmentEvidence(evidence, THREE_CHAPTER_EVIDENCE_FROM) : evidence } as SessionForEval);
+const session = (modern = true): SessionForEval => ({
+  candidate_name: "Test", scenarios: { title: "Client", summary: "Public" }, live_evidence: modern ? freezeAssessmentEvidence(evidence, THREE_CHAPTER_EVIDENCE_FROM) : evidence,
+  framing_notes: null, methodology_choice: null, methodology_rationale: null, dialogue_commitments: null,
+  application_canvas: null, playbook_application: null, intervention_recommendation: null, decision: null, playbook_suggestions: null,
+  chosen_intervention_slug: null, intervention_rationale: null, intervention_committed_at: null, alignment_workspace: null,
+  evidence_gathering_plan: null, pause_justification: null, playbook_facilitation_plan: null, playbook_activity_run: null,
+  playbook_interpretation: null, resolved_intervention: null,
+});
 
 it("only newly created sessions get the frozen applicability policy; historical/unknown sessions remain legacy", () => {
   expect(freezeAssessmentEvidence(evidence, "2026-11-09T16:17:59Z")).toBe(evidence);
