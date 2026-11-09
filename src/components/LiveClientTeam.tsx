@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Play, Send, Users } from "lucide-react";
+import { Play, Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,24 +10,33 @@ import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { WorkingSessionInstructions } from "@/components/WorkingSessionInstructions";
 import { TeamWorkingWall } from "@/components/TeamWorkingWall";
 import { unavailableRoomCopy } from "@/lib/working-session";
+import { roomStage, type RoomStage } from "@/lib/chapter2-progress";
 
-type Header = { assessmentReference: string | null; projectName: string; playbook: string; onOpen: () => void };
+const STAGES: Array<[RoomStage, string]> = [["begin", "Begin"], ["facilitate", "Facilitate"], ["bring_together", "Bring together"], ["concluded", "Conclude"]];
 
-export function LiveClientTeam({ runId, runActive, header }: { runId: string; runActive: boolean; header: Header }) {
+const STAGE_HINT: Record<RoomStage, string> = {
+  connect: "",
+  begin: "Begin when you are ready to work with the team.",
+  facilitate: "Coach the team through the work. You can bring them back together at any point, or stop early.",
+  bring_together: "The team is back together. Make sense of what was learned, then conclude when you are ready.",
+  concluded: "This working session is concluded. Continue to Chapter 3 below.",
+};
+
+export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string; sessionId: string; runActive: boolean }) {
   const qc = useQueryClient();
   const key = ["live-team", runId];
   const fetchTeam = useServerFn(getLiveTeam);
   const begin = useServerFn(beginWorkingSession), say = useServerFn(facilitateTeam), synth = useServerFn(startSynthesis), conclude = useServerFn(concludeWorkingSession);
   const { data, isPending, error, refetch } = useQuery({ queryKey: key, queryFn: () => fetchTeam({ data: { runId } }) });
   const [msg, setMsg] = useState("");
-  const [concluding, setConcluding] = useState(false);
+  const [concluding, setConcluding] = useState<false | "conclude" | "early">(false);
   const [rationale, setRationale] = useState("");
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const pending = useRef<{ text: string; key: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<string | null>(null);
-  const refresh = () => qc.invalidateQueries({ queryKey: key });
+  const refresh = () => Promise.all([qc.invalidateQueries({ queryKey: key }), qc.invalidateQueries({ queryKey: ["activity-runtime", sessionId] })]);
   const keyed = (fn: (k: string) => Promise<unknown>) => { const k = crypto.randomUUID(); return () => fn(k); };
 
   const sayMut = useMutation({
@@ -53,19 +62,13 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
   const lines = events.filter(e => (e.metadata as { team_kind?: string }).team_kind !== "private_marker");
   const roles = Object.fromEntries(config.participants.map(p => [p.name, p.role]));
   const open = runActive && (phase === "working" || phase === "synthesis");
+  const stage = roomStage(true, phase);
   const shownWork = selectedRevision === null ? data.work : data.workHistory.find(h => h.revision === selectedRevision)?.work;
 
   return <section className="border-t border-border pt-6 space-y-6">
     {config.poc && <p className="text-xs font-semibold text-destructive">POC simulation configuration · Not approved certification content</p>}
-    <div className="sticky top-0 z-10 border-y border-border py-3 flex flex-wrap items-center justify-between gap-3 bg-background">
-      <div className="text-sm min-w-0">
-        <p className="text-xs uppercase text-muted-foreground">Assessment {header.assessmentReference}</p>
-        <p className="font-medium break-words">{header.projectName}</p>
-        <p className="text-xs text-muted-foreground">{header.playbook} · Connected by candidate (not verified by Strategyzer)</p>
-      </div>
-      <Button onClick={header.onOpen}><ExternalLink />Open Strategyzer Playbook</Button>
-    </div>
-
+    <ol aria-label="Working session progress" className="flex flex-wrap gap-2 text-xs uppercase">{STAGES.map(([k, label], i) => { const idx = STAGES.findIndex(([x]) => x === stage); const done = i < idx || stage === "concluded"; const on = k === stage; return <li key={k} aria-current={on ? "step" : undefined} className={`border px-3 py-1.5 ${on ? "border-primary bg-primary text-primary-foreground" : done ? "border-border text-foreground" : "border-border text-muted-foreground"}`}>{i + 1}. {label}{done && !on ? " ✓" : ""}</li>; })}</ol>
+    <p className="text-sm text-muted-foreground">{STAGE_HINT[stage]}</p>
     {phase === "not_started" ? <WorkingSessionInstructions /> : <details className="text-sm"><summary className="cursor-pointer font-medium">Working session instructions</summary><div className="pt-4"><WorkingSessionInstructions /></div></details>}
     <div>
       <p className="text-xs uppercase text-muted-foreground mb-1">Your working session</p>
@@ -105,13 +108,14 @@ export function LiveClientTeam({ runId, runActive, header }: { runId: string; ru
           <div className="flex flex-wrap gap-3 justify-between">
             <Button disabled={!msg.trim() || sayMut.isPending} onClick={() => sayMut.mutate(msg.trim())}><Send />Speak to the room</Button>
             {phase === "working" && <Button variant="outline" disabled={simple.isPending} onClick={() => simple.mutate(keyed(k => synth({ data: { runId, requestKey: k } })))}>Bring the team back together</Button>}
-            {phase === "synthesis" && !concluding && <Button variant="outline" onClick={() => setConcluding(true)}>Conclude working session</Button>}
+            {phase === "synthesis" && !concluding && <Button variant="outline" onClick={() => setConcluding("conclude")}>Conclude working session</Button>}
+            {phase === "working" && !concluding && <Button variant="ghost" onClick={() => setConcluding("early")}>Stop the session early</Button>}
           </div>
           {concluding && <div className="border border-border p-3 space-y-2">
-            <p className="text-sm font-medium">Are you ready to conclude this working session?</p>
+            <p className="text-sm font-medium">{concluding === "early" ? "Stop this working session now?" : "Are you ready to conclude this working session?"}</p>
             <label className="text-sm block">Why are you ready to move on?<Textarea className="mt-1" rows={3} value={rationale} onChange={e => setRationale(e.target.value)} maxLength={4000} /></label>
-            <p className="text-xs text-muted-foreground">A finished artifact is not required.</p>
-            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending} onClick={() => simple.mutate(keyed(k => conclude({ data: { runId, requestKey: k, rationale: rationale.trim() } })))}>Conclude</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
+            <p className="text-xs text-muted-foreground">{concluding === "early" ? "Stopping early is a valid coaching choice. The team is brought back together and the session ends; your reason is kept with your evidence." : "A finished artifact is not required."}</p>
+            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending} onClick={() => simple.mutate(async () => { if (phase === "working") await synth({ data: { runId, requestKey: crypto.randomUUID() } }); await conclude({ data: { runId, requestKey: crypto.randomUUID(), rationale: rationale.trim() } }); setConcluding(false); })}>{concluding === "early" ? "Stop and conclude" : "Conclude"}</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
           </div>}
         </div>}
        </div>
