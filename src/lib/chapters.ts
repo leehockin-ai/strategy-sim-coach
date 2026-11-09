@@ -70,8 +70,8 @@ export const STEP_LABELS: Record<StepKey, string> = {
   stakeholder_workspace: "Conversations",
   coaching_approach: "Your Approach",
   live_playbook: "Working Session",
-  next_step_judgment: "Judgment",
-  engagement_orchestration: "Orchestration",
+  next_step_judgment: "Synthesize & next move",
+  engagement_orchestration: "Sustain value & assessment",
 };
 
 // The status value to persist when the coach crosses INTO a chapter.
