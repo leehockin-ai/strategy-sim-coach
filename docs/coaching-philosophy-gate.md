@@ -19,10 +19,10 @@ Acceptance criteria for all Coach Compass work. They don't change the rubric or 
 | G4 | Nothing in the interface requires completing the whole Playbook or a set number of turns | Code review: the rule depends only on conclusion or a reason, never on the number of turns or revisions |
 | G5 | Linking the Playbook records only the candidate's confirmation, never "verified" | Observed in the interface text |
 | G6 | No Strategyzer content is fetched or copied into Coach Compass | Code review: the link is stored and opened only |
-| G7 | The early stop's "bring together" marker records an actual coach action, labelled as such | Gap: see below |
+| G7 | An early stop records only the coach's decision, marked as an early stop, with no made-up synthesis step | Fixed (fix #1); unit tests in `early-stop.test.ts` |
 
 ## Gaps for a later, targeted methodology audit (not changed now)
-- **Early stop records a "Synthesis checkpoint" before the conclusion**, because the room requires one. It is a real transition, but the evaluator could read it as a coach-led synthesis. Recommend a separate "stopped early" marker.
+- ~~Early stop recorded a made-up "Synthesis checkpoint"~~. Fixed: new early stops carry `conclusion_mode: early_stop`; older records are left as they are and read as "unspecified".
 - **Evaluator signals:** check that the working-session dimensions don't treat more turns or wall revisions as better, or a full wall as good coaching. The evidence integration added guards, but they haven't been checked against real AI output.
 - **Tension:** check whether participant prompts and scoring treat disagreement and pushback as legitimate, and avoid rewarding harmony or positive sentiment.
 - **Evidence vs hypothesis:** check that surfaced evidence is attributed only when its holder speaks (the rule exists) and that the candidate's own challenges are credited.

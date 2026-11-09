@@ -5,6 +5,7 @@ import { Play, Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { readConclusionMode } from "@/lib/live-team";
 import { beginWorkingSession, concludeWorkingSession, facilitateTeam, getLiveTeam, startSynthesis } from "@/lib/live-team.functions";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { WorkingSessionInstructions } from "@/components/WorkingSessionInstructions";
@@ -87,7 +88,7 @@ export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string;
           {lines.map(e => {
             const kind = (e.metadata as { team_kind?: string }).team_kind;
             if (kind === "session_started" || kind === "synthesis_started") return <p key={e.id} className="text-xs text-center text-muted-foreground">{kind === "session_started" ? "Working session started" : "Team brought back together for synthesis"}</p>;
-            if (kind === "concluded") return <p key={e.id} className="text-xs text-center text-muted-foreground">Working session concluded</p>;
+            if (kind === "concluded") return <p key={e.id} className="text-xs text-center text-muted-foreground">{readConclusionMode(e.metadata) === "early_stop" ? "You stopped the working session early" : "Working session concluded"}</p>;
              if (kind === "work_product") return <p key={e.id} className="text-xs text-center text-muted-foreground">{e.content}</p>;
             const coach = e.actor_type === "coach";
             return <div id={`team-event-${e.id}`} key={e.id} className={`${coach ? "pl-5" : "pr-5"} ${source === e.id ? "bg-accent border-l-2 border-primary p-2" : ""}`}>
@@ -114,8 +115,8 @@ export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string;
           {concluding && <div className="border border-border p-3 space-y-2">
             <p className="text-sm font-medium">{concluding === "early" ? "Stop this working session now?" : "Are you ready to conclude this working session?"}</p>
             <label className="text-sm block">Why are you ready to move on?<Textarea className="mt-1" rows={3} value={rationale} onChange={e => setRationale(e.target.value)} maxLength={4000} /></label>
-            <p className="text-xs text-muted-foreground">{concluding === "early" ? "Stopping early is a valid coaching choice. The team is brought back together and the session ends; your reason is kept with your evidence." : "A finished artifact is not required."}</p>
-            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending || sayMut.isPending} onClick={() => simple.mutate(async () => { if (phase === "working") await synth({ data: { runId, requestKey: crypto.randomUUID() } }); await conclude({ data: { runId, requestKey: crypto.randomUUID(), rationale: rationale.trim() } }); setConcluding(false); })}>{concluding === "early" ? "Stop and conclude" : "Conclude"}</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
+            <p className="text-xs text-muted-foreground">{concluding === "early" ? "Stopping early is a valid coaching choice. The session ends now, without a synthesis step; your reason is kept with your evidence as an early stop." : "A finished artifact is not required."}</p>
+            <div className="flex gap-3"><Button disabled={rationale.trim().length < 10 || simple.isPending || sayMut.isPending} onClick={() => simple.mutate(async () => { await conclude({ data: { runId, requestKey: crypto.randomUUID(), rationale: rationale.trim(), mode: concluding === "early" ? "early_stop" : "after_synthesis" } }); setConcluding(false); })}>{concluding === "early" ? "Stop and conclude" : "Conclude"}</Button><Button variant="ghost" onClick={() => setConcluding(false)}>Cancel</Button></div>
           </div>}
         </div>}
        </div>

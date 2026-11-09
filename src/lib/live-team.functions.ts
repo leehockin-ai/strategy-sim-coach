@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 import { PUBLIC_EVENT_COLUMNS } from "./activity-runtime";
-import { initialRoom, publicTeamConfig, roomPhase, sanitizeTurn, type RawTurn, type RoomState, type TeamConfig } from "./live-team";
+import { initialRoom, publicTeamConfig, roomPhase, conclusionModeFor, sanitizeTurn, type ConclusionMode, type RawTurn, type RoomState, type TeamConfig } from "./live-team";
 import { customerProfileWork, readTeamWork, workIntents, type WorkIntent, type WorkSource } from "./team-work";
 import { FOUNDATIONAL_CONCEPTS } from "./strategyzer-methodology";
 import { disclosedConfig, validDisclosures } from "./team-disclosure";
@@ -99,15 +99,17 @@ export const startSynthesis = createServerFn({ method: "POST" })
 
 export const concludeWorkingSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { runId: string; requestKey: string; rationale: string }) => z.object({ runId: z.string().uuid(), requestKey: z.string().uuid(), rationale: z.string().trim().min(10).max(4000) }).strict().parse(d))
+  .inputValidator((d: { runId: string; requestKey: string; rationale: string; mode?: ConclusionMode }) => z.object({ runId: z.string().uuid(), requestKey: z.string().uuid(), rationale: z.string().trim().min(10).max(4000), mode: z.enum(["after_synthesis", "early_stop"]).default("after_synthesis") }).strict().parse(d))
   .handler(async ({ data, context }) => {
     const { config, admin, run } = await loadEligibleRun(context, data.runId);
     if (!config) throw new Error("Working session not available");
     const { data: prior } = await admin.from("activity_events").select("content,request_payload").eq("run_id", run.id).eq("request_key", data.requestKey).maybeSingle();
-    if (prior) { if (prior.content !== data.rationale || (prior.request_payload as any)?.identity?.action !== "conclude") throw new Error("Idempotency key reused with different request"); return { ok: true }; }
+    if (prior) { const id = (prior.request_payload as any)?.identity; if (prior.content !== data.rationale || id?.action !== "conclude" || (id?.mode ?? "after_synthesis") !== data.mode) throw new Error("Idempotency key reused with different request"); return { ok: true }; }
     const { data: events } = await admin.from("activity_events").select("event_type,actor_type,metadata").eq("run_id", run.id);
-    if (roomPhase(events ?? []) !== "synthesis") throw new Error("Bring the team back together before concluding");
-    const { error } = await admin.rpc("append_team_work_turn", { _run: data.runId, _candidate: context.userId, _request: data.requestKey, _identity: { action: "conclude", rationale: data.rationale }, _expected_sequence: run.last_sequence, _expected_revision: run.artifact_revision, _events: [{ type: "decision", actor: "coach", actor_id: context.userId, content: data.rationale, metadata: { team_kind: "concluded" } }] as unknown as Json });
+    const rule = conclusionModeFor(roomPhase(events ?? []), data.mode);
+    if (!rule.ok) throw new Error(rule.error);
+    // Truthful record: an early stop is a coach decision from the working phase; no synthesis event is written.
+    const { error } = await admin.rpc("append_team_work_turn", { _run: data.runId, _candidate: context.userId, _request: data.requestKey, _identity: { action: "conclude", rationale: data.rationale, mode: rule.mode }, _expected_sequence: run.last_sequence, _expected_revision: run.artifact_revision, _events: [{ type: "decision", actor: "coach", actor_id: context.userId, content: data.rationale, metadata: { team_kind: "concluded", conclusion_mode: rule.mode } }] as unknown as Json });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
