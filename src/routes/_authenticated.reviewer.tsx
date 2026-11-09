@@ -9,6 +9,7 @@ import { getSessionForReviewer } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { useMyRoles } from "@/hooks/use-my-roles";
 import { ReviewLiveEvidence } from "@/components/ReviewLiveEvidence";
+import type { LiveEvidence } from "@/lib/evaluation-live-evidence";
 
 export const Route = createFileRoute("/_authenticated/reviewer")({
   head: () => ({ meta: [
@@ -285,6 +286,7 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
   const messages: any[] = data.messages ?? [];
   const stakeholderStates: any[] = (data as any).stakeholderStates ?? [];
   const raw: any = evaluation?.raw_response ?? {};
+  const recordedEvidence = raw.live_evidence?.version === "public_live_v1" ? raw.live_evidence as LiveEvidence : null;
   const sections: Record<string, any> = raw.sections ?? evaluation?.scores?.sections ?? {};
 
 
@@ -336,7 +338,7 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
           )}
 
           {tab === "context" && <ContextTab scenario={scenario} session={session} evaluation={evaluation} stakeholderStates={stakeholderStates} />}
-          {tab === "inputs" && <><ReviewLiveEvidence evidence={data.liveEvidence} /><InputsTab session={session} messages={messages} /></>}
+          {tab === "inputs" && <><p className="text-xs text-muted-foreground">{recordedEvidence ? "Public live evidence saved with this AI assessment." : "Current public live evidence; older AI assessments did not consume this evidence."}</p><ReviewLiveEvidence evidence={recordedEvidence ?? data.liveEvidence} /><InputsTab session={session} messages={messages} /></>}
           {tab === "rubric" && <RubricTab sections={sections} raw={raw} />}
           {tab === "soft" && <SkillsList items={evaluation?.soft_skills ?? raw.soft_skills ?? []} emptyHint="Soft-skill assessment not generated." />}
           {tab === "methodology" && <SkillsList items={evaluation?.methodology_skills ?? raw.methodology_skills ?? []} emptyHint="Methodology assessment not generated." />}
