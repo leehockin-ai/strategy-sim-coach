@@ -62,6 +62,15 @@ describe("deterministic team-owned wall reconciliation", () => {
     const unique = wall();
     expect(reconcileTeamWork(unique, null, [response("I'll move 'every university student' to unknowns. I'll move 'every university student' to evidence.")])).toBe(unique);
   });
+  it("public correction quotes survive the existing extraction and saved-format validators", () => {
+    const source = response("'every university student' was only a guess.");
+    const next = reconcileTeamWork(wall(), null, [source]);
+    const sanitized = customerProfileWork({ status: next.status, sections: next.sections.map(s => ({ key: s.key, label: s.label, items: s.items.map(i => ({ source_id: i.sourceId, quote: i.text })) })) }, [original, source]);
+    expect(sanitized).toEqual(next);
+    expect(readTeamWork(sanitized)).toEqual(next);
+    const forged = customerProfileWork({ status: "revised", sections: [{ key: "unknowns", label: "", items: [{ source_id: source.id, quote: "the coach invented this" }] }] }, [source]);
+    expect(items(forged as TeamWork, "unknowns")).toEqual([]);
+  });
   it("retry and refresh keep revision stable; historical snapshot is unchanged", () => {
     const old = wall(), saved = JSON.stringify(old), source = response("'every university student' is a guess.");
     const next = reconcileTeamWork(old, null, [source]);

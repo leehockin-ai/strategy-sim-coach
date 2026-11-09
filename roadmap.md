@@ -1,9 +1,10 @@
 # Stabilization roadmap
 
 ## Bounded post-Phase-4 corrections
-- [ ] Trace and correct obsolete commitments input for new three-chapter assessments without changing rubric or prior reports.
-- [ ] Reconcile explicit team-owned wall corrections conservatively with public provenance and append-only history.
-- [ ] Replace candidate internal POC label; run regressions and authorized disposable walkthrough (new allowlist entry needs permission).
+- [x] Trace and correct obsolete commitments input for new three-chapter assessments without changing rubric or prior reports.
+- [x] Reconcile explicit team-owned wall corrections conservatively with public provenance and append-only history.
+- [x] Replace candidate internal POC label and run regression tests.
+- [ ] Disposable live-room/assessment walkthrough: session 20eedb6f-6639-46c6-a951-f0a9a56abbd8 needs Lee's explicit allowlist approval; retained without activity/evaluation or access changes.
 
 ## Evaluation Evidence Integration and Validation
 - [x] Assemble bounded public live-room evidence with owner authorization, bound Scope and validated revision lineage.
