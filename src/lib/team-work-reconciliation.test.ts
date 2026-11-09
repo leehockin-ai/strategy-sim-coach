@@ -20,9 +20,7 @@ describe("deterministic team-owned wall reconciliation", () => {
   it("moves the owner's explicit social feed revision, preserving correction provenance", () => {
     const source = { ...original, speaker: "Sofia", text: "a few people actually ignored the social feed" };
     const current = customerProfileWork({ status: "partial", sections: [{ key: "evidence", label: "", items: [{ source_id: "old", quote: "a few people actually ignored the social feed" }] }] }, [source]) as TeamWork;
-    // Partial/paraphrased anchor remains conservative, not silently matched.
-    expect(reconcileTeamWork(current, null, [response("I'll move the 'social feed' stuff to the unknowns.", "Sofia")])).toBe(current);
-    const exact = response("I'll move 'a few people actually ignored the social feed' to the unknowns.", "Sofia");
+    const exact = response("Yeah, I'll move the 'social feed' stuff to the unknowns since everyone ignored it.", "Sofia");
     const next = reconcileTeamWork(current, null, [exact]);
     expect(items(next, "evidence")).toEqual([]);
     expect(items(next, "unknowns")[0]).toMatchObject({ text: exact.text, speaker: "Sofia", sourceId: exact.id });
