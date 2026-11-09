@@ -67,7 +67,7 @@ export function LiveClientTeam({ runId, sessionId, runActive }: { runId: string;
   const shownWork = selectedRevision === null ? data.work : data.workHistory.find(h => h.revision === selectedRevision)?.work;
 
   return <section className="border-t border-border pt-6 space-y-6">
-    {config.poc && <p className="text-xs font-semibold text-destructive">POC simulation configuration · Not approved certification content</p>}
+    {config.poc && <p className="text-xs font-semibold text-muted-foreground">Practice simulation</p>}
     <ol aria-label="Working session progress" className="flex flex-wrap gap-2 text-xs uppercase">{STAGES.map(([k, label], i) => { const idx = STAGES.findIndex(([x]) => x === stage); const done = i < idx || stage === "concluded"; const on = k === stage; return <li key={k} aria-current={on ? "step" : undefined} className={`border px-3 py-1.5 ${on ? "border-primary bg-primary text-primary-foreground" : done ? "border-border text-foreground" : "border-border text-muted-foreground"}`}>{i + 1}. {label}{done && !on ? " ✓" : ""}</li>; })}</ol>
     <p className="text-sm text-muted-foreground">{STAGE_HINT[stage]}</p>
     {phase === "not_started" ? <WorkingSessionInstructions /> : <details className="text-sm"><summary className="cursor-pointer font-medium">Working session instructions</summary><div className="pt-4"><WorkingSessionInstructions /></div></details>}
