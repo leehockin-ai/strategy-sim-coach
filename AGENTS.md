@@ -1,5 +1,7 @@
 # Architecture rules
 
+- Live assessment uses bounded public evidence via owner/reviewer RLS and run-bound Scope, never private simulator tables; first-assessment inserts preserve prior AI and human evidence.
+
 - Session status is durable progress, not navigation; a database trigger guards monotonic progress atomically while preserving historical aliases and explicit human re-decisions.
 - Seed hidden stakeholder state transactionally only for new sessions; never synthesize trajectories for historical sessions.
 - Hidden state is reviewer-readable under role-scoped RLS and server-managed for simulation/evaluation; candidate payloads exclude it and privileged reviewer endpoints verify roles first.
