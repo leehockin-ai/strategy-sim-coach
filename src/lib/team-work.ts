@@ -72,7 +72,9 @@ export function reconcileTeamWork(current: TeamWork, proposed: TeamWork | null, 
         const clause = normalized(quote);
         // A literal quoted short reference is accepted only if it identifies
         // exactly one existing item, never fuzzy similarity or a pronoun.
-        const references = [...clause.matchAll(/(?:^|[\s(])['"]([^'"]{5,})['"]/g)].map(m => m[1]).filter(ref => anchor.includes(ref) && originals.filter(x => normalized(x.item.text).includes(ref)).length === 1);
+        const quoted = [...clause.matchAll(/(?:^|[\s(])['"]([^'"]{5,})['"]/g)].map(m => m[1]);
+        if (quoted.some(ref => anchor.includes(ref) && originals.filter(x => normalized(x.item.text).includes(ref)).length > 1)) continue;
+        const references = quoted.filter(ref => anchor.includes(ref) && originals.filter(x => normalized(x.item.text).includes(ref)).length === 1);
         const reference = clause.includes(anchor) ? anchor : references[0];
         if (!reference) continue;
         const at = clause.indexOf(reference);
