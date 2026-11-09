@@ -68,7 +68,10 @@ export function useAssessmentJob(sessionId: string, opts: { autoResume?: boolean
     if (statusQuery.data?.state === "running" && !driving.current) void drive();
   }, [opts.autoResume, statusQuery.data?.state, drive]);
 
-  useEffect(() => () => { cancelled.current = true; }, []);
+  useEffect(() => {
+    cancelled.current = false;
+    return () => { cancelled.current = true; };
+  }, []);
 
   const current: AssessmentUiState | null = live ?? (statusQuery.data as AssessmentStatus | undefined) ?? null;
   return { status: current, isLoading: statusQuery.isLoading, starting, startError, generate, isDriving: driving.current };
