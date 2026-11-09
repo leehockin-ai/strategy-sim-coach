@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
 import { PUBLIC_EVENT_COLUMNS } from "./activity-runtime";
-import { initialRoom, publicTeamConfig, roomPhase, sanitizeTurn, type RawTurn, type RoomState, type TeamConfig } from "./live-team";
+import { initialRoom, publicTeamConfig, roomPhase, conclusionModeFor, sanitizeTurn, type ConclusionMode, type RawTurn, type RoomState, type TeamConfig } from "./live-team";
 import { customerProfileWork, readTeamWork, workIntents, type WorkIntent, type WorkSource } from "./team-work";
 import { FOUNDATIONAL_CONCEPTS } from "./strategyzer-methodology";
 import { disclosedConfig, validDisclosures } from "./team-disclosure";
