@@ -3,10 +3,10 @@
 // ~70s+ generation, and progress survives refreshes, double clicks and closed tabs.
 
 export const SECTION_KEYS = [
-  "situation_framing", "readiness_diagnosis", "intervention_fit", "intervention_execution",
-  "working_session_facilitation", "methodological_soundness", "evidence_discipline",
-  "reflection_judgment", "engagement_pathway",
-] as const;
+  "situation_framing", "coaching_strategy", "stakeholder_navigation", "working_session_facilitation",
+  "methodological_soundness", "intervention_discipline", "engagement_pathway",
+  "intervention_fit", "intervention_execution",
+] as const; // must mirror SECTION_RUBRIC keys (asserted in tests)
 
 export const SKILL_STEPS = ["skills:soft", "skills:methodology"] as const;
 export const SYNTHESIS_STEP = "synthesis";
