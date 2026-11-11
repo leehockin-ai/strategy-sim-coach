@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CUSTOMER_PROFILE_REFERENCE as ref, customerProfileTeamContext, referenceChoice } from "./customer-profile-reference";
+import { CUSTOMER_PROFILE_REFERENCE as ref, customerProfileTeamContext } from "./customer-profile-reference";
 import { buildSectionInput } from "./evaluation.io";
+import { SELECTION_PHASE } from "./playbook-selection";
 import { SECTION_KEYS } from "./assessment-job";
 
 const mocks = vi.hoisted(() => ({ session: {} as any, messages: [] as any[], requests: [] as any[] }));
@@ -37,8 +38,8 @@ for (const client of clients) it(`${client.title}: normal reference uses its own
   const prompt = mocks.requests[0].messages[0].content;
   for (const name of client.names) expect(prompt).toContain(name);
   expect(prompt).toContain(client.context); expect(prompt).toContain("Decide whose evidence matters"); expect(prompt).toContain("Agree the decision"); expect(prompt).toContain("not yet done"); expect(prompt).not.toContain("ShiftNest");
-  expect(mocks.messages.at(-1).phase).toBe(ref.phase);
-  expect(mocks.messages.at(-2).content).toContain(`[${ref.id}]`);
+  expect(mocks.messages.at(-1).phase).toBe(SELECTION_PHASE);
+  expect(mocks.messages.at(-2).content).toContain("[playbook_selection_v1]");
   const input: any = { s: { ...mocks.session, candidate_name: "Mock coach", scope_revisions: [] }, turns: mocks.messages, inputQualitySignals: {} };
   for (const key of SECTION_KEYS) {
     const result: any = await executeEvaluationStep("mock-test-key", `section:${key}`, input, { runs: [] });
@@ -52,8 +53,6 @@ it("no reference/defer/other preserve ordinary prompts and do not imply playbook
   for (const plan of [null, {}, { customer_profile_reference: { choice: "defer" } }, { customer_profile_reference: { choice: "other" } }]) {
     expect(customerProfileTeamContext({ playbook_facilitation_plan: plan }, [])).toBe("");
   }
-  expect(referenceChoice({ customer_profile_reference: { choice: "use" } })).toBe("use");
-  expect(referenceChoice({ customer_profile_reference: { choice: "invented" } })).toBe("other");
 });
 it("rejects reference use without explicit saved opt-in before recording a coaching turn", async () => {
   mocks.session = { owner_id: "owner", playbook_facilitation_plan: {} };

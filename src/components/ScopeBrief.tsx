@@ -5,6 +5,8 @@ import { Save, Plus, Trash2, ArrowUp, ArrowDown, History } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { updateSession, listInterventions } from "@/lib/simulator.functions";
+import { PlaybookChoice } from "@/components/PlaybookChoice";
+import { resolveSelection } from "@/lib/playbook-selection";
 import { BRIEF_FIELDS, readEngagementBrief, legacyFraming, type EngagementBrief } from "@/lib/scope-brief";
 
 const BRIEF_GROUPS = [
@@ -112,6 +114,7 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
         </details>}
       </details>;
     })}
+    <PlaybookChoice brief={brief} onCommit={selection => { const next = { ...latest.current, playbook_selection: selection }; edit(next); saving.mutate(next); }} />
     <section className="mb-5 border-t border-ink pt-4"><h3 className="text-sm mb-2">Intervention / Playbook reasoning</h3>
       <p className="text-xs mb-2"><strong>Primary intervention:</strong> {options.find(o => o.slug === session.chosen_intervention_slug)?.label ?? session.chosen_intervention_slug ?? "Not selected"}</p>
       {session.intervention_rationale && <p className="text-xs text-muted-foreground mb-3 whitespace-pre-wrap">{session.intervention_rationale}</p>}
@@ -129,7 +132,7 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
     {showHistory && <div className="mt-3 space-y-3 max-h-96 overflow-y-auto">{[...revisions].reverse().map(r => {
       const snapshot = r.snapshot as { engagement_brief?: unknown; framing_notes?: string; chosen_intervention_slug?: string; intervention_rationale?: string; dialogue_commitments?: string };
       const previous = readEngagementBrief(snapshot.engagement_brief);
-      return <details key={r.id} className="border-t border-input pt-2"><summary className="text-xs cursor-pointer">Revision {r.revision} · {new Date(r.created_at).toLocaleString()}</summary><p className="text-xs my-2 whitespace-pre-wrap">{previous.revision_note}</p><dl className="text-xs space-y-2">{BRIEF_FIELDS.filter(f => previous[f.key]).map(f => <div key={f.key}><dt className="font-medium">{f.label}</dt><dd className="whitespace-pre-wrap">{previous[f.key]}</dd></div>)}<div><dt className="font-medium">Intervention</dt><dd>{snapshot.chosen_intervention_slug ?? "Not selected"} · {snapshot.intervention_rationale}</dd></div><div><dt className="font-medium">Proposed sequence</dt><dd>{previous.intervention_sequence.map(s => `${s.slug}: ${s.rationale}`).join(" → ") || "None"}</dd></div><div><dt className="font-medium">Framing / commitments</dt><dd className="whitespace-pre-wrap">{snapshot.framing_notes}<br />{snapshot.dialogue_commitments}</dd></div></dl><div className="text-xs mt-2">{r.evidence_message_ids.length} conversation messages preserved at this revision</div></details>;
+      return <details key={r.id} className="border-t border-input pt-2"><summary className="text-xs cursor-pointer">Revision {r.revision} · {new Date(r.created_at).toLocaleString()}</summary><p className="text-xs my-2 whitespace-pre-wrap">{previous.revision_note}</p><dl className="text-xs space-y-2">{BRIEF_FIELDS.filter(f => previous[f.key]).map(f => <div key={f.key}><dt className="font-medium">{f.label}</dt><dd className="whitespace-pre-wrap">{previous[f.key]}</dd></div>)}<div><dt className="font-medium">Intervention</dt><dd>{snapshot.chosen_intervention_slug ?? "Not selected"} · {snapshot.intervention_rationale}</dd></div><div><dt className="font-medium">Playbook choice</dt><dd>{(() => { const p = resolveSelection(snapshot.engagement_brief); return p.kind === "selected" ? `${p.title} · ${p.url}` : p.source === "none" ? "Not recorded" : p.kind; })()}</dd></div><div><dt className="font-medium">Proposed sequence</dt><dd>{previous.intervention_sequence.map(s => `${s.slug}: ${s.rationale}`).join(" → ") || "None"}</dd></div><div><dt className="font-medium">Framing / commitments</dt><dd className="whitespace-pre-wrap">{snapshot.framing_notes}<br />{snapshot.dialogue_commitments}</dd></div></dl><div className="text-xs mt-2">{r.evidence_message_ids.length} conversation messages preserved at this revision</div></details>;
     })}</div>}
   </aside>;
 }

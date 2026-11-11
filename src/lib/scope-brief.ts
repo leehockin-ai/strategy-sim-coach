@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { playbookSelectionSchema } from "./playbook-selection";
 
 export const BRIEF_FIELDS = [
   { key: "client_situation", label: "Client situation", group: "understand" },
@@ -23,6 +24,8 @@ export const engagementBriefSchema = z.object({
   participants: text, dependencies: text,
   revision_note: z.string().max(2000).default(""),
   evidence_message_ids: z.array(z.string().uuid()).max(200).default([]),
+  // Optional: absent in historical briefs; never back-filled.
+  playbook_selection: playbookSelectionSchema.optional(),
   intervention_sequence: z.array(z.object({ slug: z.string().min(1).max(120), rationale: z.string().max(2000).default("") })).max(12).default([]),
 });
 export type EngagementBrief = z.infer<typeof engagementBriefSchema>;

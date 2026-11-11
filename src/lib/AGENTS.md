@@ -1,2 +1,2 @@
 # Normal facilitation reference
-- Optional methodology references use existing session plan JSON and attributed messages; they neither unlock external runtime gates nor create parallel assessment stores, preserving normal ownership and evidence paths.
+- Playbook choice lives in the versioned Engagement Brief (`playbook_selection`) and Chapter 2 only reads it; any real Library listing is referenced by validated canonical URL with labelled provenance (verified metadata, coach working brief, or link only), so Scope revisions freeze the decision without schema changes or a duplicated catalog.

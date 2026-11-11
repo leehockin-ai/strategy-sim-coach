@@ -229,7 +229,7 @@ ${["situation_summary", "immediate_intervention", "pathway", "risks", "success_c
 ${renderLiveEvidence(s.live_evidence, kind)}
 ${s.live_evidence?.runs.length ? "Assess actual live-room coaching, not obsolete canvas completion. Separate coach assertions from team speech; cite supplied public IDs/timestamps. Soft skills: observable invitations, resistance and ownership. Methodology: applied evidence reasoning, assumptions, customer specificity and revisions. State uncertainty, never infer hidden state or verified external work." : ""}
 ${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITMENT_EVIDENCE_RULE : ""}
-${customerProfileAssessmentContext([], kind, transcriptText)}`;
+${customerProfileAssessmentContext([], kind, s.engagement_brief, transcriptText)}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",

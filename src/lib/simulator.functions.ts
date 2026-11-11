@@ -8,7 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import { notify } from "@/lib/notifications.functions";
-import { CUSTOMER_PROFILE_REFERENCE, customerProfileTeamContext, referenceChoice } from "./customer-profile-reference";
+import { SELECTION_PHASE, resolveSelection, selectedPlaybookTeamContext } from "./playbook-selection";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -681,7 +681,7 @@ What you CAN do:
 
 Hard rules:
 - Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.
-${data.phase?.startsWith("alignment:") ? customerProfileTeamContext(session as any, transcript) : ""}`;
+${data.phase?.startsWith("alignment:") ? selectedPlaybookTeamContext(session as any, transcript) : ""}`;
 
 
 
@@ -973,7 +973,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
 ${STRATEGYZER_INTELLIGENCE}
 
 Your job is NOT to draft polished cell content. Your job is to give the coach the messy, realistic raw material of a live working session so they can practice facilitation.
-${customerProfileTeamContext(session as any, transcript)}
+${selectedPlaybookTeamContext(session as any, transcript)}
 
 Return STRICT JSON with this exact shape:
 {
@@ -1085,7 +1085,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
 ${STRATEGYZER_INTELLIGENCE}
 
 Reply AS ONE TEAM MEMBER reacting to the coach's last move. Prefix with "[Name]". Stay in character — busy, slightly defensive, half-formed, sometimes solution-jumping, sometimes confused, sometimes pushing back. NOT polished. NOT consultant-speak.
-${customerProfileTeamContext(session as any, data.history)}
+${selectedPlaybookTeamContext(session as any, data.history)}
 
 Then return STRICT JSON with this exact shape:
 {
@@ -1182,18 +1182,19 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
     const activity = BUILTIN_PLAYBOOK.activities.find((a) => a.key === data.activityKey);
-    if (!activity) throw new Error("Unknown activity");
+    if (!activity && !data.reference) throw new Error("Unknown activity");
 
-    const phase = data.reference ? CUSTOMER_PROFILE_REFERENCE.phase : `playbook:${data.activityKey}`;
+    const phase = data.reference ? SELECTION_PHASE : `playbook:${data.activityKey}`;
 
-    const { data: referenceSession } = data.reference ? await supabaseAdmin.from("sessions").select("playbook_facilitation_plan").eq("id", data.sessionId).single() : { data: null };
-    if (data.reference && (data.activityKey !== "customer_profile" || referenceChoice(referenceSession?.playbook_facilitation_plan) !== "use")) throw new Error("Choose the Customer Profile reference before using it.");
+    // Chapter 2 inherits the exact playbook decision saved in Scope; no reselection here.
+    const { data: referenceSession } = data.reference ? await supabaseAdmin.from("sessions").select("engagement_brief, playbook_facilitation_plan").eq("id", data.sessionId).single() : { data: null };
+    if (data.reference && resolveSelection(referenceSession?.engagement_brief, referenceSession?.playbook_facilitation_plan).kind !== "selected") throw new Error("Choose a playbook in Scope before using it with the team.");
 
     await supabaseAdmin.from("messages").insert({
       session_id: data.sessionId,
       role: "candidate",
       stakeholder_name: "(team)",
-      content: data.reference ? `[${CUSTOMER_PROFILE_REFERENCE.id}] ${data.coachMessage}` : data.coachMessage,
+      content: data.reference ? `[playbook_selection_v1] ${data.coachMessage}` : data.coachMessage,
       phase,
     });
 
@@ -1223,9 +1224,9 @@ ${scenario.context}
 TEAM MEMBERS in this working session:
 ${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture}`).join("\n")}
 
-ACTIVITY THE COACH IS RUNNING:
+${activity && !data.reference ? `ACTIVITY THE COACH IS RUNNING:
 "${activity.title}" — ${activity.objective}
-Why it matters: ${activity.whyItMatters}
+Why it matters: ${activity.whyItMatters}` : "The coach is facilitating with the playbook they chose in Scope (below)."}
 
 RULES:
 - Respond as ONE team member at a time (pick whichever member would most naturally respond to what the coach just said). Prefix the reply with the speaker's name in brackets, e.g. "[Maya] ...".
@@ -1234,7 +1235,7 @@ RULES:
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
 - Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
 - 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
-${data.reference ? customerProfileTeamContext(session as any, activityTranscript) : ""}`;
+${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript) : ""}`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },

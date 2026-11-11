@@ -177,9 +177,9 @@ export function buildSectionInput(
   // Scope/fit retain their time boundary. Chapter 3 plans are later candidate
   // interpretations, never retrospectively treated as stakeholder agreement.
   const context = modern && key === "stakeholder_navigation" ? `\n── CHAPTER 3 CANDIDATE-AUTHORED NEXT STEPS (not proof of client agreement; context only, do not rescore the pathway) ──\n${JSON.stringify({ decision: s.decision, recommendation: s.intervention_recommendation, pathway: s.playbook_application })}` : "";
-  const legacy = `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, s, turns)}${context}${customerProfileAssessmentContext(turns, key)}`;
+  const legacy = `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, s, turns)}${context}${customerProfileAssessmentContext(turns, key, s.engagement_brief)}`;
   const live = renderLiveEvidence(s.live_evidence, key);
-  const reference = customerProfileAssessmentContext(turns, key);
+  const reference = customerProfileAssessmentContext(turns, key, s.engagement_brief);
   if (!live) return legacy;
   if (key === "working_session_facilitation") return `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}\n${live}${reference}\nAssess ONLY observed facilitation: open probing vs leading/prescription, specificity, ownership transfer, participation and responses to uncertainty. Examine coaching and revision causality, not wall completeness. Legacy canvas is not required for this live room.`;
   if (key === "intervention_execution") return `SCENARIO: ${s.scenarios.title}\n${live}${reference}\nAssess ONLY execution of each run's ORIGINAL committed intervention relative to its BOUND Scope/outcome, not today's mutable session choice. Evaluate actual work assignments, team ownership, evidence reasoning, revisions, honest progress and stopping rationale. No-work or incomplete work is not automatically poor execution. Current Chapter 3 plans are not proof of Chapter 2 execution.`;
