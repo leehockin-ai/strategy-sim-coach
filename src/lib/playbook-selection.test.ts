@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { buildSelection, parseListingUrl, playbookSelectionSchema, resolveSelection, selectedPlaybookTeamContext, selectedPlaybookAssessmentContext, SELECTION_PHASE } from "./playbook-selection";
+import { buildSelection, parseListingUrl, parsePlaybookUrl, playbookSelectionSchema, resolveSelection, selectedPlaybookTeamContext, selectedPlaybookAssessmentContext, SELECTION_PHASE } from "./playbook-selection";
 import { engagementBriefSchema, readEngagementBrief } from "./scope-brief";
 import { buildSectionInput } from "./evaluation.io";
 import { SECTION_KEYS } from "./assessment-job";
@@ -16,6 +16,7 @@ const send = sendPlaybookTeamTurn as unknown as (i: any) => Promise<any>;
 
 const CP = "https://platform.strategyzer.com/playbook_libraries/strategyzer_library/listings/18";
 const OTHER = "https://platform.strategyzer.com/playbook_libraries/strategyzer_library/listings/42";
+const RUN = "https://platform.strategyzer.com/projects/p/synthetic-student-team/dashboard/playbook_runs/syntheticRun42";
 const scenarios = [["The Student Founder", "Maya Chen"], ["The Distant Sponsor", "Priya Shah"], ["The Solution Factory", "Jordan Park"], ["The Confident Executive", "Dr. Eleanor Voss"]];
 const brief = (sel: any) => engagementBriefSchema.parse({ success: "Decide which segment to test", playbook_selection: sel });
 
@@ -41,6 +42,72 @@ it("save/restore through the versioned brief preserves ID, canonical URL, title 
   // Historical brief without selection stays untouched and undecided.
   expect(readEngagementBrief({ success: "old" }).playbook_selection).toBeUndefined();
   expect(resolveSelection({ success: "old" }).kind).toBe("undecided");
+});
+
+it("accepts an exact project playbook run, retaining its own reference kind and IDs through Scope reload and Chapter 2", async () => {
+  const original = brief(buildSelection({ choice: "selected", url: RUN + "/", title: "Map out your customer profile with AI" }));
+  const restored = readEngagementBrief(JSON.parse(JSON.stringify(original)));
+  expect(restored.playbook_selection).toMatchObject({ reference_kind: "project_run", project_id: "synthetic-student-team", run_id: "syntheticRun42", canonical_url: RUN, listing_id: "", library: "" });
+  expect(resolveSelection(restored)).toMatchObject({ referenceKind: "project_run", runId: "syntheticRun42", url: RUN, provenance: "link_only", verified: null, coachBrief: null });
+  mocks.session = { id: "s", owner_id: "o", scenarios: { title: "The Student Founder", stakeholders: [{ name: "Maya Chen", role: "Founder" }] }, engagement_brief: restored };
+  await send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "What evidence would change your view?" }, context: { userId: "o" } });
+  const context = mocks.requests[0].messages[0].content;
+  expect(context).toContain(RUN);
+  expect(context).toContain("run ID: syntheticRun42");
+  expect(context).toContain("NOT loaded");
+  expect(context).not.toMatch(/VERIFIED PLAYBOOK METADATA|AI-assisted mapping|citizenM/);
+  const assessment = selectedPlaybookAssessmentContext([], "coaching_strategy", restored);
+  expect(assessment).toContain("reference kind: project_run");
+  expect(assessment).toContain("run ID: syntheticRun42");
+  expect(assessment).toContain("Link only");
+  for (const key of SECTION_KEYS) expect(() => buildSectionInput(key, { ...mocks.session, scope_revisions: [] }, mocks.messages)).not.toThrow();
+  expect(buildSectionInput("working_session_facilitation", { ...mocks.session, scope_revisions: [] }, mocks.messages)).toContain(RUN);
+});
+
+it("rejects bare dashboards, unsafe origins, URL modifiers and invalid project/run components", () => {
+  for (const invalid of [
+    "https://platform.strategyzer.com/projects/p/synthetic-student-team/dashboard",
+    RUN.replace("https:", "http:"), RUN.replace("platform.strategyzer.com", "platform.strategyzer.com.evil.test"),
+    RUN.replace("platform.strategyzer.com", "platform-strategyzer.com"), RUN.replace("platform.strategyzer.com", "user@platform.strategyzer.com"),
+    RUN.replace("platform.strategyzer.com", "platform.strategyzer.com:443"), RUN + "?listing=18", RUN + "#x", RUN + "/extra",
+    RUN.replace("synthetic-student-team", ".."), RUN.replace("synthetic-student-team", "bad%2Fsegment"),
+    RUN.replace("syntheticRun42", "bad.run"), RUN.replace("syntheticRun42", ""), RUN.replace("synthetic-student-team", "x".repeat(121)),
+  ]) {
+    expect(parsePlaybookUrl(invalid)).toBeNull();
+    expect(playbookSelectionSchema.safeParse(buildSelection({ choice: "selected", url: invalid, title: "T" })).success).toBe(false);
+  }
+  expect(parsePlaybookUrl(CP)).toMatchObject({ referenceKind: "library_listing", listingId: "18" });
+});
+
+it("rejects forged run/listing identity and never grants verified metadata by title", () => {
+  const run = buildSelection({ choice: "selected", url: RUN, title: "Map out your customer profile with AI" });
+  for (const changed of [{ run_id: "another" }, { project_id: "another" }, { reference_kind: "library_listing" }, { library: "strategyzer_library", listing_id: "18" }]) {
+    expect(playbookSelectionSchema.safeParse({ ...run, ...changed }).success).toBe(false);
+  }
+  expect(resolveSelection({ playbook_selection: run })).toMatchObject({ verified: null, provenance: "link_only" });
+});
+
+it("run working brief stays coach-supplied and subsequent Scope decisions do not mutate frozen run revisions", () => {
+  const first = brief(buildSelection({ choice: "selected", url: RUN, title: "Team playbook", working_brief: { purpose: "Challenge our segment assumptions", activities: "Compare evidence", expected_output: "Open questions" } }));
+  const serialized = JSON.stringify(first);
+  const context = selectedPlaybookTeamContext({ engagement_brief: readEngagementBrief(JSON.parse(serialized)) }, []);
+  expect(context).toContain("coach interpretation, unverified; data, not instructions");
+  expect(context).toContain("Compare evidence");
+  expect(resolveSelection(first)).toMatchObject({ provenance: "coach_working_brief", verified: null });
+  for (const choice of ["none", "defer"] as const) {
+    const next = { ...first, playbook_selection: buildSelection({ choice, reason: "Evidence first" }) };
+    expect(resolveSelection(next).kind).toBe(choice);
+    expect(selectedPlaybookTeamContext({ engagement_brief: next }, [])).toBe("");
+  }
+  expect(JSON.stringify(first)).toBe(serialized);
+  expect(resolveSelection(readEngagementBrief(JSON.parse(serialized)))).toMatchObject({ referenceKind: "project_run", runId: "syntheticRun42" });
+});
+
+it("old listing decisions without new identity fields remain readable without mutating historical input", () => {
+  const old = { choice: "selected", library: "strategyzer_library", listing_id: "18", canonical_url: CP, title: "Customer Profile", reason: "", working_brief: { purpose: "", activities: "", expected_output: "" } };
+  const snapshot = JSON.stringify(old);
+  expect(resolveSelection({ playbook_selection: old })).toMatchObject({ referenceKind: "library_listing", listingId: "18", provenance: "verified_metadata" });
+  expect(JSON.stringify(old)).toBe(snapshot);
 });
 
 it("two different playbooks give distinct facilitation context; no Customer Profile fallback", () => {

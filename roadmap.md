@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Stage 1 project playbook run links
+- [x] Accept strict canonical Library listings and project playbook runs in versioned Scope; preserve distinct IDs, provenance, historical listings and speaker attribution.
+- [x] 192 regression tests passed; actual Scope/Chapter 2 browser components passed synthetic local save/reload and mobile checks. Preview build OK; no shared writes, private project access or publishing. Hosted persistence and real AI scoring not exercised.
+
 ## Four-scenario playbook correction
 - [x] Removed active standalone pilot, dependency-only helpers and pilot assessment branches; preserved browser data and historical records.
 - [x] Optional Customer Profile reference in normal Chapter 2 for all four existing scenarios; reuse session-plan JSON, attributed team messages and ordinary nine-dimension assessment.

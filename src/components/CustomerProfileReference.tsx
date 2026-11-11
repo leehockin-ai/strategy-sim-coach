@@ -29,7 +29,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="text-xl">Playbook from your Scope</h2>
         <p className="text-sm text-muted-foreground mt-2">{sel.kind === "selected" ? sel.title : sel.kind === "none" ? "You chose to coach without a playbook." : sel.kind === "defer" ? "You deferred the playbook decision." : "No playbook decision saved in Scope."}{sel.reason ? ` Reason: ${sel.reason}` : ""}</p></div>
-      {sel.kind === "selected" && <Button asChild variant="outline"><a href={sel.url} target="_blank" rel="noopener noreferrer">Open in Strategyzer Library<ExternalLink /></a></Button>}
+      {sel.kind === "selected" && <Button asChild variant="outline"><a href={sel.url} target="_blank" rel="noopener noreferrer">{sel.referenceKind === "project_run" ? "Open Strategyzer playbook run" : "Open in Strategyzer Library"}<ExternalLink /></a></Button>}
     </div>
     {sel.kind === "selected" && <>
       <p className="text-xs text-muted-foreground">{PROVENANCE_LABEL[sel.provenance]}{sel.source === "legacy_customer_profile_opt_in" ? " · earlier session choice" : ""}. Not connected to your Strategyzer account. To change it, revise your Scope.</p>
