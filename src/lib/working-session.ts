@@ -22,10 +22,10 @@ export function boundScopeOutcome(revision: { revision: number; snapshot: unknow
  * Chapter 2 renders exactly one working-session surface.
  * A playbook saved in Scope always means the normal in-app session, whatever
  * stale external setup runs or allowlist flags exist. The gated external test
- * room appears only for allowlisted sessions without a Scope playbook.
+ * room appears only for allowlisted legacy sessions with no Scope playbook decision.
  */
 export type Chapter2Surface = "in_app" | "external_test_room";
-export function chapter2Surface(input: { scopeSelected: boolean; testAllowed: boolean }): Chapter2Surface {
-  if (input.scopeSelected) return "in_app";
-  return input.testAllowed ? "external_test_room" : "in_app";
+export function chapter2Surface(input: { scopeChoice: "selected" | "none" | "defer" | "undecided"; testAllowed: boolean }): Chapter2Surface {
+  // None/defer are deliberate coaching decisions; an external Playbook room would contradict them.
+  return input.scopeChoice === "undecided" && input.testAllowed ? "external_test_room" : "in_app";
 }

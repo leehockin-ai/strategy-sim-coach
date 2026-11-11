@@ -22,12 +22,16 @@ describe("restricted working session", () => {
 });
 import { chapter2Surface } from "./working-session";
 describe("chapter2Surface", () => {
-  it("a Scope playbook always uses the in-app session, even with allowlist and stale external runs", () => {
-    expect(chapter2Surface({ scopeSelected: true, testAllowed: true })).toBe("in_app");
-    expect(chapter2Surface({ scopeSelected: true, testAllowed: false })).toBe("in_app");
+  it("a saved Scope playbook always uses the in-app session, even with allowlist and stale external runs", () => {
+    expect(chapter2Surface({ scopeChoice: "selected", testAllowed: true })).toBe("in_app");
+    expect(chapter2Surface({ scopeChoice: "selected", testAllowed: false })).toBe("in_app");
   });
-  it("external test room only for allowlisted sessions without a Scope playbook", () => {
-    expect(chapter2Surface({ scopeSelected: false, testAllowed: true })).toBe("external_test_room");
-    expect(chapter2Surface({ scopeSelected: false, testAllowed: false })).toBe("in_app");
+  it("none and defer stay in-app even for allowlisted sessions", () => {
+    expect(chapter2Surface({ scopeChoice: "none", testAllowed: true })).toBe("in_app");
+    expect(chapter2Surface({ scopeChoice: "defer", testAllowed: true })).toBe("in_app");
+  });
+  it("external test room only for allowlisted sessions with no Scope decision", () => {
+    expect(chapter2Surface({ scopeChoice: "undecided", testAllowed: true })).toBe("external_test_room");
+    expect(chapter2Surface({ scopeChoice: "undecided", testAllowed: false })).toBe("in_app");
   });
 });

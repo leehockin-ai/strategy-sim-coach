@@ -296,7 +296,7 @@ function Chapter2Exit({ session, label, onContinue }: { session: any; label: str
     <p className="text-sm text-muted-foreground">{readiness.basis === "concluded" ? "Working session concluded." : readiness.basis === "skipped" ? "You recorded why you moved on without concluding the working session." : ""}</p>
     {continueButton}
   </div>;
-  const inApp = chapter2Surface({ scopeSelected: resolveSelection(session.engagement_brief, session.playbook_facilitation_plan).kind === "selected", testAllowed: !!rt?.testAllowed }) === "in_app";
+  const inApp = chapter2Surface({ scopeChoice: resolveSelection(session.engagement_brief, session.playbook_facilitation_plan).kind, testAllowed: !!rt?.testAllowed }) === "in_app";
   const unavailable = !inApp && rt?.roomUnavailableReason;
   return <section className="mt-12 border-t border-ink pt-8 space-y-4" aria-labelledby="chapter2-exit">
     <h3 id="chapter2-exit" className="text-lg">Ready for Chapter 3?</h3>
@@ -1430,13 +1430,13 @@ function Chapter2Container({
 
 
 // Exactly one surface: the in-app session (Scope playbook, none or defer) or,
-// for allowlisted sessions without a Scope playbook, the external test room.
+// for allowlisted sessions with no Scope playbook decision, the external test room.
 function PlaybookWorkingSurface({ session, messages, onSaved }: { session: any; messages: any[]; onSaved: () => void }) {
   const fetchRuntime = useServerFn(getActivityRuntime);
   const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
-  const { data: rt, isPending } = useQuery({ queryKey: ["activity-runtime", session.id], queryFn: () => fetchRuntime({ data: { sessionId: session.id } }), enabled: sel.kind !== "selected" });
-  if (sel.kind !== "selected" && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
-  const surface = chapter2Surface({ scopeSelected: sel.kind === "selected", testAllowed: !!rt?.testAllowed });
+  const { data: rt, isPending } = useQuery({ queryKey: ["activity-runtime", session.id], queryFn: () => fetchRuntime({ data: { sessionId: session.id } }), enabled: sel.kind === "undecided" });
+  if (sel.kind === "undecided" && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
+  const surface = chapter2Surface({ scopeChoice: sel.kind, testAllowed: !!rt?.testAllowed });
   if (surface === "in_app") return <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />;
   return <ActivityRuntimeEntry sessionId={session.id} embedded />;
 }
@@ -3998,4 +3998,3 @@ function CustomerProfileArtifact({
 }
 
 
-export { Chapter2Container as __FixtureChapter2, Chapter2Exit as __FixtureChapter2Exit };

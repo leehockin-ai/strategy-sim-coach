@@ -11,7 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as FixtureCh2RouteImport } from './routes/fixture-ch2'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedReviewerRouteImport } from './routes/_authenticated.reviewer'
 import { Route as AuthenticatedScenariosRouteImport } from './routes/_authenticated.scenarios'
@@ -27,11 +26,6 @@ const IndexRoute = IndexRouteImport.update({
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FixtureCh2Route = FixtureCh2RouteImport.update({
-  id: '/fixture-ch2',
-  path: '/fixture-ch2',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -76,7 +70,6 @@ const AuthenticatedSessionsSessionIdReportRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/fixture-ch2': typeof FixtureCh2Route
   '/login': typeof LoginRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
@@ -87,7 +80,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/fixture-ch2': typeof FixtureCh2Route
   '/login': typeof LoginRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
@@ -100,7 +92,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/fixture-ch2': typeof FixtureCh2Route
   '/login': typeof LoginRoute
   '/_authenticated/reviewer': typeof AuthenticatedReviewerRoute
   '/_authenticated/scenarios': typeof AuthenticatedScenariosRoute
@@ -113,7 +104,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/fixture-ch2'
     | '/login'
     | '/reviewer'
     | '/scenarios'
@@ -124,7 +114,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/fixture-ch2'
     | '/login'
     | '/reviewer'
     | '/scenarios'
@@ -136,7 +125,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
-    | '/fixture-ch2'
     | '/login'
     | '/_authenticated/reviewer'
     | '/_authenticated/scenarios'
@@ -149,7 +137,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  FixtureCh2Route: typeof FixtureCh2Route
   LoginRoute: typeof LoginRoute
 }
 
@@ -167,13 +154,6 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fixture-ch2': {
-      id: '/fixture-ch2'
-      path: '/fixture-ch2'
-      fullPath: '/fixture-ch2'
-      preLoaderRoute: typeof FixtureCh2RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -255,7 +235,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  FixtureCh2Route: FixtureCh2Route,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
