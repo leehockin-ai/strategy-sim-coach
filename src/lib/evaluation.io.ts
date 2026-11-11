@@ -4,8 +4,10 @@
 import { scopeEvidenceForSection, DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { renderLiveEvidence, type LiveEvidence } from "./evaluation-live-evidence";
 import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY } from "./assessment-evidence-policy";
+import { pilotAssessmentContext, type PilotState } from "./beginner-pilot";
 
 export type SessionForEval = {
+  pilot_preview?: PilotState;
   live_evidence?: LiveEvidence;
   candidate_name: string;
   framing_notes: string | null;
@@ -172,6 +174,7 @@ export function buildSectionInput(
   s: SessionForEval,
   turns: TranscriptTurn[] | null | undefined
 ): string {
+  if (s.pilot_preview) return `SCENARIO: ${s.scenarios.title}\n${pilotAssessmentContext(s.pilot_preview, key)}\nAssess ONLY ${key}; do not rescore another section.`;
   const modern = s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY;
   // Scope/fit retain their time boundary. Chapter 3 plans are later candidate
   // interpretations, never retrospectively treated as stakeholder agreement.

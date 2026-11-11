@@ -5,6 +5,7 @@ import { assertEvidenceOwner, renderLiveEvidence, validateLiveFeedback } from "@
 import { DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
+import { PILOT_ASSESSMENT_RULES } from "./beginner-pilot";
 import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY, freezeAssessmentEvidence } from "./assessment-evidence-policy";
 import {
   buildSectionInput,
@@ -235,8 +236,8 @@ ${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITME
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}` },
-        { role: "user", content: userPrompt },
+        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}${s.pilot_preview ? `\n${PILOT_ASSESSMENT_RULES}` : ""}` },
+        { role: "user", content: s.pilot_preview ? buildSectionInput("stakeholder_navigation", s, []) : userPrompt },
       ],
       response_format: { type: "json_object" },
     }),

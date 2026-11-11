@@ -1,10 +1,10 @@
 # Stabilization roadmap
 
 ## Opt-in beginner two-session pilot
-- [ ] Approve preview-only persistence and practice-only pilot scope; retain existing test gates and historic data.
-- [ ] Add fictional Customer Profile case and two-meeting journey reusing coaching, event and assessment paths.
-- [ ] Generate and freeze a grounded team update once per handoff with durable recovery and candidate-seen provenance.
-- [ ] Verify both meetings, reload/retry, nine-dimension assessment, privacy and existing scenario compatibility; no publishing.
+- [x] Approved isolated-preview implementation only; current surface has no isolated hosted database. Use owner-scoped local preview storage/mocks, stage migrations without applying; no shared writes.
+- [x] Added opt-in ShiftNest local-preview two-meeting journey; reused Scope schema, work reconciliation and existing rubric execution. No existing session writes.
+- [x] Frozen handoff/update and candidate-seen binding, browser locks and local failure recovery; hosted checkpoint SQL staged unapplied.
+- [x] Real signed-in local two-meeting run/report, exact update reload, mock failure → real retry, mobile/ordinary scenario checks; 173 tests passed. Hosted persistence/reviewer verification blocked by no isolated hosted storage.
 
 ## Approved read-only investigation and desktop inspection plan
 - [x] Investigated disposable revision 3: full blank brief replacement preceded correct run binding; originating action remains unconfirmed, no write reproduction or fixes. Separate remedy/fixture-recovery approval needed.

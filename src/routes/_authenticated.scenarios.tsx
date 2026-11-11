@@ -37,6 +37,7 @@ function ScenariosPage() {
             Each brief is a realistic, ambiguous client situation with a stakeholder cast.
             There is no single correct path — your coaching judgment is what gets assessed.
           </p>
+          <Link to="/pilot" className="mt-6 inline-flex border border-ink px-4 py-2 text-sm">Try the opt-in ShiftNest two-meeting practice →</Link>
         </div>
       </section>
 

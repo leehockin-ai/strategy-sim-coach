@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedPilotRouteImport } from './routes/_authenticated.pilot'
 import { Route as AuthenticatedReviewerRouteImport } from './routes/_authenticated.reviewer'
 import { Route as AuthenticatedScenariosRouteImport } from './routes/_authenticated.scenarios'
 import { Route as AuthenticatedSessionsIndexRouteImport } from './routes/_authenticated.sessions.index'
@@ -32,6 +33,11 @@ const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPilotRoute = AuthenticatedPilotRouteImport.update({
+  id: '/pilot',
+  path: '/pilot',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedReviewerRoute = AuthenticatedReviewerRouteImport.update({
   id: '/reviewer',
@@ -71,6 +77,7 @@ const AuthenticatedSessionsSessionIdReportRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/pilot': typeof AuthenticatedPilotRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/pilot': typeof AuthenticatedPilotRoute
   '/reviewer': typeof AuthenticatedReviewerRoute
   '/scenarios': typeof AuthenticatedScenariosRoute
   '/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/pilot': typeof AuthenticatedPilotRoute
   '/_authenticated/reviewer': typeof AuthenticatedReviewerRoute
   '/_authenticated/scenarios': typeof AuthenticatedScenariosRoute
   '/_authenticated/sessions/$sessionId': typeof AuthenticatedSessionsSessionIdRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/pilot'
     | '/reviewer'
     | '/scenarios'
     | '/sessions/$sessionId'
@@ -115,6 +125,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/pilot'
     | '/reviewer'
     | '/scenarios'
     | '/sessions/$sessionId'
@@ -126,6 +137,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/pilot'
     | '/_authenticated/reviewer'
     | '/_authenticated/scenarios'
     | '/_authenticated/sessions/$sessionId'
@@ -162,6 +174,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/pilot': {
+      id: '/_authenticated/pilot'
+      path: '/pilot'
+      fullPath: '/pilot'
+      preLoaderRoute: typeof AuthenticatedPilotRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/reviewer': {
       id: '/_authenticated/reviewer'
@@ -209,6 +228,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedPilotRoute: typeof AuthenticatedPilotRoute
   AuthenticatedReviewerRoute: typeof AuthenticatedReviewerRoute
   AuthenticatedScenariosRoute: typeof AuthenticatedScenariosRoute
   AuthenticatedSessionsSessionIdRoute: typeof AuthenticatedSessionsSessionIdRoute
@@ -218,6 +238,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedPilotRoute: AuthenticatedPilotRoute,
   AuthenticatedReviewerRoute: AuthenticatedReviewerRoute,
   AuthenticatedScenariosRoute: AuthenticatedScenariosRoute,
   AuthenticatedSessionsSessionIdRoute: AuthenticatedSessionsSessionIdRoute,
