@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Four-scenario playbook correction
+- [x] Removed active standalone pilot, dependency-only helpers and pilot assessment branches; preserved browser data and historical records.
+- [x] Optional Customer Profile reference in normal Chapter 2 for all four existing scenarios; reuse session-plan JSON, attributed team messages and ordinary nine-dimension assessment.
+- [x] 169 regression/mock tests, actual four-scenario AI context checks and signed-in read-only desktop/mobile preview passed. Shared save/reload/full assessment E2E not exercised; no shared writes or publishing.
+
 ## Opt-in beginner two-session pilot
 - [x] Approved isolated-preview implementation only; current surface has no isolated hosted database. Use owner-scoped local preview storage/mocks, stage migrations without applying; no shared writes.
 - [x] Added opt-in ShiftNest local-preview two-meeting journey; reused Scope schema, work reconciliation and existing rubric execution. No existing session writes.

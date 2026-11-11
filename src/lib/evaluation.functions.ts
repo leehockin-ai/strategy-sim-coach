@@ -5,7 +5,7 @@ import { assertEvidenceOwner, renderLiveEvidence, validateLiveFeedback } from "@
 import { DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
-import { PILOT_ASSESSMENT_RULES } from "./beginner-pilot";
+import { customerProfileAssessmentContext } from "./customer-profile-reference";
 import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY, freezeAssessmentEvidence } from "./assessment-evidence-policy";
 import {
   buildSectionInput,
@@ -228,7 +228,8 @@ ${["situation_summary", "immediate_intervention", "pathway", "risks", "success_c
   .join("\n")}
 ${renderLiveEvidence(s.live_evidence, kind)}
 ${s.live_evidence?.runs.length ? "Assess actual live-room coaching, not obsolete canvas completion. Separate coach assertions from team speech; cite supplied public IDs/timestamps. Soft skills: observable invitations, resistance and ownership. Methodology: applied evidence reasoning, assumptions, customer specificity and revisions. State uncertainty, never infer hidden state or verified external work." : ""}
-${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITMENT_EVIDENCE_RULE : ""}`;
+${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITMENT_EVIDENCE_RULE : ""}
+${customerProfileAssessmentContext([], kind, transcriptText)}`;
 
   const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -236,8 +237,8 @@ ${s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY ? COMMITME
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}${s.pilot_preview ? `\n${PILOT_ASSESSMENT_RULES}` : ""}` },
-        { role: "user", content: s.pilot_preview ? buildSectionInput("stakeholder_navigation", s, []) : userPrompt },
+        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}` },
+        { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
     }),

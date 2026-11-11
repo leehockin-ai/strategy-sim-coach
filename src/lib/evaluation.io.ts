@@ -4,10 +4,9 @@
 import { scopeEvidenceForSection, DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { renderLiveEvidence, type LiveEvidence } from "./evaluation-live-evidence";
 import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY } from "./assessment-evidence-policy";
-import { pilotAssessmentContext, type PilotState } from "./beginner-pilot";
+import { customerProfileAssessmentContext } from "./customer-profile-reference";
 
 export type SessionForEval = {
-  pilot_preview?: PilotState;
   live_evidence?: LiveEvidence;
   candidate_name: string;
   framing_notes: string | null;
@@ -174,16 +173,16 @@ export function buildSectionInput(
   s: SessionForEval,
   turns: TranscriptTurn[] | null | undefined
 ): string {
-  if (s.pilot_preview) return `SCENARIO: ${s.scenarios.title}\n${pilotAssessmentContext(s.pilot_preview, key)}\nAssess ONLY ${key}; do not rescore another section.`;
   const modern = s.live_evidence?.assessmentPolicy === THREE_CHAPTER_EVIDENCE_POLICY;
   // Scope/fit retain their time boundary. Chapter 3 plans are later candidate
   // interpretations, never retrospectively treated as stakeholder agreement.
   const context = modern && key === "stakeholder_navigation" ? `\n── CHAPTER 3 CANDIDATE-AUTHORED NEXT STEPS (not proof of client agreement; context only, do not rescore the pathway) ──\n${JSON.stringify({ decision: s.decision, recommendation: s.intervention_recommendation, pathway: s.playbook_application })}` : "";
-  const legacy = `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, s, turns)}${context}`;
+  const legacy = `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, s, turns)}${context}${customerProfileAssessmentContext(turns, key)}`;
   const live = renderLiveEvidence(s.live_evidence, key);
+  const reference = customerProfileAssessmentContext(turns, key);
   if (!live) return legacy;
-  if (key === "working_session_facilitation") return `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}\n${live}\nAssess ONLY observed facilitation: open probing vs leading/prescription, specificity, ownership transfer, participation and responses to uncertainty. Examine coaching and revision causality, not wall completeness. Legacy canvas is not required for this live room.`;
-  if (key === "intervention_execution") return `SCENARIO: ${s.scenarios.title}\n${live}\nAssess ONLY execution of each run's ORIGINAL committed intervention relative to its BOUND Scope/outcome, not today's mutable session choice. Evaluate actual work assignments, team ownership, evidence reasoning, revisions, honest progress and stopping rationale. No-work or incomplete work is not automatically poor execution. Current Chapter 3 plans are not proof of Chapter 2 execution.`;
+  if (key === "working_session_facilitation") return `SCENARIO: ${s.scenarios.title}\n${s.scenarios.summary}\n${live}${reference}\nAssess ONLY observed facilitation: open probing vs leading/prescription, specificity, ownership transfer, participation and responses to uncertainty. Examine coaching and revision causality, not wall completeness. Legacy canvas is not required for this live room.`;
+  if (key === "intervention_execution") return `SCENARIO: ${s.scenarios.title}\n${live}${reference}\nAssess ONLY execution of each run's ORIGINAL committed intervention relative to its BOUND Scope/outcome, not today's mutable session choice. Evaluate actual work assignments, team ownership, evidence reasoning, revisions, honest progress and stopping rationale. No-work or incomplete work is not automatically poor execution. Current Chapter 3 plans are not proof of Chapter 2 execution.`;
   if (key === "stakeholder_navigation") {
     // Live assessment uses public behavior, never simulator's hidden state explanations.
     return `${modern ? `${COMMITMENT_EVIDENCE_RULE}\n` : ""}${buildLegacySectionInput(key, { ...s, stakeholder_state_trajectory: [] }, turns)}${context}\n${live}\nAssess observed participation, invitations, resistance and ownership without inferring hidden trust or motivations.`;

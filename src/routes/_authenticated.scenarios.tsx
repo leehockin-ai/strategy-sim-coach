@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
@@ -37,7 +37,6 @@ function ScenariosPage() {
             Each brief is a realistic, ambiguous client situation with a stakeholder cast.
             There is no single correct path — your coaching judgment is what gets assessed.
           </p>
-          <Link to="/pilot" className="mt-6 inline-flex border border-ink px-4 py-2 text-sm">Try the opt-in ShiftNest two-meeting practice →</Link>
         </div>
       </section>
 

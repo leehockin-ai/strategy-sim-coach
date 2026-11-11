@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
+import { CustomerProfileReference } from "@/components/CustomerProfileReference";
 import { recordWorkingSessionSkip, getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
@@ -176,6 +177,7 @@ function SessionPage() {
         {renderKey === "application" && (
           <Chapter2Container
             session={session}
+            messages={data.messages}
             onSaved={onStepSaved}
             onChangeIntervention={() => setActiveStep("coaching_approach")}
             onAdvanceToChapter3={() => goToChapter("progress")}
@@ -1227,11 +1229,13 @@ const PATHWAY_PLAIN: Record<string, string> = {
 
 function Chapter2Container({
   session,
+  messages,
   onSaved,
   onChangeIntervention,
   onAdvanceToChapter3,
 }: {
   session: any;
+  messages: any[];
   onSaved: () => void;
   onChangeIntervention: () => void;
   onAdvanceToChapter3: () => void | Promise<void>;
@@ -1374,6 +1378,7 @@ function Chapter2Container({
 
   return (
     <div>
+      <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />
       {pathwayType === "playbook" && session.chosen_intervention_slug ? <>
         <ActivityRuntimeEntry sessionId={session.id} embedded />
         {session.application_canvas && Object.keys(session.application_canvas).length > 0 && <details className="border-t border-border mt-8 py-4 text-sm"><summary className="cursor-pointer font-medium">Earlier working-session evidence · read-only</summary><pre className="whitespace-pre-wrap break-words mt-4 text-xs">{JSON.stringify(canvasForEditing(session.application_canvas).cells, null, 2)}</pre></details>}

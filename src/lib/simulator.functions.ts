@@ -8,6 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import { notify } from "@/lib/notifications.functions";
+import { CUSTOMER_PROFILE_REFERENCE, customerProfileTeamContext, referenceChoice } from "./customer-profile-reference";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -679,7 +680,8 @@ What you CAN do:
 - When the coach asks for something concrete (a meeting, an intro, time with your team, a pilot slot), make a realistic small commitment if it fits your posture and the moment — e.g. "I could give you 15 minutes next week". Don't offer these unprompted.
 
 Hard rules:
-- Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.`;
+- Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.
+${data.phase?.startsWith("alignment:") ? customerProfileTeamContext(session as any, transcript) : ""}`;
 
 
 
@@ -940,7 +942,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, methodology_choice, methodology_rationale, application_canvas, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
+      .select("framing_notes, engagement_brief, chosen_intervention_slug, intervention_rationale, playbook_facilitation_plan, playbook_activity_run, methodology_choice, methodology_rationale, application_canvas, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
@@ -971,6 +973,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
 ${STRATEGYZER_INTELLIGENCE}
 
 Your job is NOT to draft polished cell content. Your job is to give the coach the messy, realistic raw material of a live working session so they can practice facilitation.
+${customerProfileTeamContext(session as any, transcript)}
 
 Return STRICT JSON with this exact shape:
 {
@@ -1059,7 +1062,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, methodology_choice, application_canvas, scenarios(title, context, stakeholders)")
+      .select("framing_notes, engagement_brief, chosen_intervention_slug, intervention_rationale, playbook_facilitation_plan, playbook_activity_run, methodology_choice, application_canvas, scenarios(title, context, stakeholders)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
@@ -1082,6 +1085,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
 ${STRATEGYZER_INTELLIGENCE}
 
 Reply AS ONE TEAM MEMBER reacting to the coach's last move. Prefix with "[Name]". Stay in character — busy, slightly defensive, half-formed, sometimes solution-jumping, sometimes confused, sometimes pushing back. NOT polished. NOT consultant-speak.
+${customerProfileTeamContext(session as any, data.history)}
 
 Then return STRICT JSON with this exact shape:
 {
@@ -1163,11 +1167,12 @@ import { BUILTIN_PLAYBOOK } from "@/lib/playbooks";
 
 export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; activityKey: string; coachMessage: string }) =>
+  .inputValidator((d: { sessionId: string; activityKey: string; coachMessage: string; reference?: boolean }) =>
     z.object({
       sessionId: z.string().uuid(),
       activityKey: z.string().min(1).max(64),
       coachMessage: z.string().min(1).max(4000),
+      reference: z.boolean().optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
@@ -1179,13 +1184,16 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     const activity = BUILTIN_PLAYBOOK.activities.find((a) => a.key === data.activityKey);
     if (!activity) throw new Error("Unknown activity");
 
-    const phase = `playbook:${data.activityKey}`;
+    const phase = data.reference ? CUSTOMER_PROFILE_REFERENCE.phase : `playbook:${data.activityKey}`;
+
+    const { data: referenceSession } = data.reference ? await supabaseAdmin.from("sessions").select("playbook_facilitation_plan").eq("id", data.sessionId).single() : { data: null };
+    if (data.reference && (data.activityKey !== "customer_profile" || referenceChoice(referenceSession?.playbook_facilitation_plan) !== "use")) throw new Error("Choose the Customer Profile reference before using it.");
 
     await supabaseAdmin.from("messages").insert({
       session_id: data.sessionId,
       role: "candidate",
       stakeholder_name: "(team)",
-      content: data.coachMessage,
+      content: data.reference ? `[${CUSTOMER_PROFILE_REFERENCE.id}] ${data.coachMessage}` : data.coachMessage,
       phase,
     });
 
@@ -1201,10 +1209,11 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
 
     const { data: transcript } = await supabaseAdmin
       .from("messages")
-      .select("role, stakeholder_name, content")
+      .select("role, stakeholder_name, content, phase")
       .eq("session_id", data.sessionId)
-      .eq("phase", phase)
       .order("created_at", { ascending: true });
+
+    const activityTranscript = data.reference ? transcript : (transcript ?? []).filter(m => m.phase === phase);
 
     const systemPrompt = `You are simulating the project team in a paper-and-pen working session with a Strategyzer coach.
 
@@ -1224,11 +1233,12 @@ RULES:
 - This is a working session, not an interview. Speak naturally: half-formed ideas, "I think...", "actually that's a good question for ${'$'}{otherName}", pushback, examples from real work.
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
 - Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
-- 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.`;
+- 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
+${data.reference ? customerProfileTeamContext(session as any, activityTranscript) : ""}`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
-      ...(transcript ?? []).map((m: any) => ({
+      ...(activityTranscript ?? []).map((m: any) => ({
         role: m.role === "candidate" ? "user" : "assistant",
         content: m.role === "candidate" ? `[Coach]: ${m.content}` : m.content,
       })),
@@ -1254,6 +1264,8 @@ RULES:
     const match = reply.match(/^\s*\[([^\]]+)\]\s*(.*)$/s);
     const speaker = match?.[1]?.trim() || "Team";
     const body = match?.[2]?.trim() || reply;
+
+    if (data.reference && !stakeholders.some(s => s.name === speaker)) throw new Error("The team response had no valid scenario speaker. Your coaching turn is saved.");
 
     const { data: saved } = await supabaseAdmin
       .from("messages")

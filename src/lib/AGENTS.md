@@ -1,0 +1,2 @@
+# Normal facilitation reference
+- Optional methodology references use existing session plan JSON and attributed messages; they neither unlock external runtime gates nor create parallel assessment stores, preserving normal ownership and evidence paths.
