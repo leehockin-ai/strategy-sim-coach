@@ -1164,6 +1164,7 @@ export const saveCanvas = createServerFn({ method: "POST" })
 // ---------- Playbook working session: simulate the team doing an activity with the coach ----------
 
 import { BUILTIN_PLAYBOOK } from "@/lib/playbooks";
+import { parseTeamReply } from "@/lib/team-speakers";
 
 export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1190,13 +1191,15 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     const { data: referenceSession } = data.reference ? await supabaseAdmin.from("sessions").select("engagement_brief, playbook_facilitation_plan").eq("id", data.sessionId).single() : { data: null };
     if (data.reference && resolveSelection(referenceSession?.engagement_brief, referenceSession?.playbook_facilitation_plan).kind !== "selected") throw new Error("Choose a playbook in Scope before using it with the team.");
 
-    await supabaseAdmin.from("messages").insert({
+    // The coach turn is persisted together with the validated team reply, so a failed or
+    // rejected reply saves nothing and a retry cannot duplicate the coach turn.
+    const coachRow = {
       session_id: data.sessionId,
       role: "candidate",
       stakeholder_name: "(team)",
       content: data.reference ? `[playbook_selection_v1] ${data.coachMessage}` : data.coachMessage,
       phase,
-    });
+    };
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
@@ -1214,7 +1217,10 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
-    const activityTranscript = data.reference ? transcript : (transcript ?? []).filter(m => m.phase === phase);
+    const priorTranscript = data.reference ? (transcript ?? []) : (transcript ?? []).filter(m => m.phase === phase);
+    const activityTranscript = [...priorTranscript, { role: "candidate", stakeholder_name: "(team)", content: coachRow.content, phase }];
+    const exampleA = stakeholders[0]?.name ?? "Team member";
+    const exampleB = stakeholders[1]?.name ?? exampleA;
 
     const systemPrompt = `You are simulating the project team in a paper-and-pen working session with a Strategyzer coach.
 
@@ -1229,7 +1235,8 @@ ${activity && !data.reference ? `ACTIVITY THE COACH IS RUNNING:
 Why it matters: ${activity.whyItMatters}` : "The coach is facilitating with the playbook they chose in Scope (below)."}
 
 RULES:
-- Respond as ONE team member at a time (pick whichever member would most naturally respond to what the coach just said). Prefix the reply with the speaker's name in brackets, e.g. "[Maya] ...".
+- Respond as ONE team member at a time (pick whichever member would most naturally respond to what the coach just said). Start the reply with that member's exact full name from TEAM MEMBERS in brackets, e.g. "[${exampleA}] ...". Use only those names.
+- If two members genuinely trade lines, start each person's line on a new line with their own bracketed full name, e.g. "[${exampleA}] ...\n[${exampleB}] ...". Never put two people's words under one name.
 - Stay in character. Bring their actual job context, examples, and (where appropriate) disagreements with each other.
 - This is a working session, not an interview. Speak naturally: half-formed ideas, "I think...", "actually that's a good question for ${'$'}{otherName}", pushback, examples from real work.
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
@@ -1261,27 +1268,26 @@ ${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscrip
     const json = await res.json();
     const reply: string = json.choices?.[0]?.message?.content ?? "...";
 
-    // Try to extract speaker name from "[Name] ..." prefix
-    const match = reply.match(/^\s*\[([^\]]+)\]\s*(.*)$/s);
-    const speaker = match?.[1]?.trim() || "Team";
-    const body = match?.[2]?.trim() || reply;
+    const parsed = parseTeamReply(reply, stakeholders.map((s) => s.name));
+    if (data.reference && !parsed.ok) {
+      console.warn("[sendPlaybookTeamTurn] rejected team reply:", parsed.reason);
+      throw new Error("The team reply could not be attributed to a scenario team member, so nothing was saved. Your message is still in the box — send it again.");
+    }
+    // Legacy activity rooms keep their previous lenient fallback when a reply is untagged.
+    const segments = parsed.ok ? parsed.segments : [{ speaker: "Team", content: reply.replace(/^\s*\[[^\]]+\]\s*/, "").trim() || reply }];
 
-    if (data.reference && !stakeholders.some(s => s.name === speaker)) throw new Error("The team response had no valid scenario speaker. Your coaching turn is saved.");
+    // Explicit, strictly increasing timestamps keep coach → speaker order stable on reload.
+    const base = Date.now();
+    const rows = [coachRow, ...segments.map((seg) => ({
+      session_id: data.sessionId,
+      role: "stakeholder",
+      stakeholder_name: seg.speaker,
+      content: seg.content,
+      phase,
+    }))].map((r, i) => ({ ...r, created_at: new Date(base + i).toISOString() }));
+    const { data: inserted, error: insertError } = await supabaseAdmin.from("messages").insert(rows).select();
+    if (insertError) throw new Error("The team reply could not be saved. Your message is still in the box — send it again.");
+    const saved = (inserted ?? []).filter((m: any) => m.role === "stakeholder");
 
-    const { data: saved } = await supabaseAdmin
-      .from("messages")
-      .insert({
-        session_id: data.sessionId,
-        role: "stakeholder",
-        stakeholder_name: speaker,
-        content: body,
-        phase,
-      })
-      .select()
-      .single();
-
-    return { message: saved };
+    return { message: saved[0], messages: saved };
   });
-
-
-

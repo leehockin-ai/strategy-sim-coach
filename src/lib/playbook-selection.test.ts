@@ -9,7 +9,7 @@ vi.mock("@tanstack/react-start", () => ({ createServerFn: () => { const c: any =
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
 vi.mock("@/lib/notifications.functions", () => ({ notify: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: (table: string) => {
-  const q: any = { select: () => q, eq: () => q, order: async () => ({ data: mocks.messages }), maybeSingle: async () => ({ data: mocks.session }), single: async () => ({ data: table === "sessions" ? mocks.session : mocks.messages.at(-1) }), insert: (m: any) => { mocks.messages.push({ ...m, created_at: "2026-11-11T14:00:00Z" }); return q; } }; return q;
+  const q: any = { select: () => q, eq: () => q, order: async () => ({ data: mocks.messages }), maybeSingle: async () => ({ data: mocks.session }), single: async () => ({ data: table === "sessions" ? mocks.session : mocks.messages.at(-1) }), insert: (m: any) => { const rows = (Array.isArray(m) ? m : [m]).map((r: any) => ({ created_at: "2026-11-11T14:00:00Z", ...r, id: `m${mocks.messages.length}` })); rows.forEach((r: any, i: number) => { r.id = `m${mocks.messages.length + i}`; }); mocks.messages.push(...rows); return { select: async () => ({ data: rows }), single: async () => ({ data: rows.at(-1) }), then: (f: any) => f({ data: rows }) }; } }; return q;
 } } }));
 import { sendPlaybookTeamTurn } from "./simulator.functions";
 const send = sendPlaybookTeamTurn as unknown as (i: any) => Promise<any>;
@@ -88,4 +88,20 @@ it("refuses team turn when Scope has none/defer, without recording a coach messa
 it("historical Chapter 2 Customer Profile opt-in stays readable as legacy verified context", () => {
   const r = resolveSelection({}, { customer_profile_reference: { choice: "use" } });
   expect(r.kind === "selected" && r.source).toBe("legacy_customer_profile_opt_in");
+});
+
+it("multi-speaker team reply saves one row per speaker and a rejected reply saves nothing (no duplicate coach turn on retry)", async () => {
+  const { buildSelection } = await import("./playbook-selection");
+  mocks.session = { id: "s", owner_id: "owner", scenarios: { title: "The Student Founder", context: "x", stakeholders: [{ name: "Maya Chen", role: "Founder" }, { name: "Jordan Patel", role: "CTO" }, { name: "Sofia Ramirez", role: "Ops" }] }, engagement_brief: { playbook_selection: buildSelection({ choice: "selected", url: "https://platform.strategyzer.com/playbook_libraries/strategyzer_library/listings/18", title: "Map out your customer profile with AI" }) } };
+  mocks.messages = [];
+  let content = "[Sofia] Hi.\n[Bob] Me too.";
+  vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content } }] }) })));
+  await expect(send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "Who said it?" }, context: { userId: "owner" } })).rejects.toThrow("nothing was saved");
+  expect(mocks.messages).toHaveLength(0);
+  content = "[Maya] It's a guess.\n[Jordan] Nobody said it.";
+  const r = await send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "Who said it?" }, context: { userId: "owner" } });
+  expect(mocks.messages.map((m: any) => [m.role, m.stakeholder_name])).toEqual([["candidate", "(team)"], ["stakeholder", "Maya Chen"], ["stakeholder", "Jordan Patel"]]);
+  expect(mocks.messages.map((m: any) => m.content)).toEqual(["[playbook_selection_v1] Who said it?", "It's a guess.", "Nobody said it."]);
+  expect(new Set(mocks.messages.map((m: any) => m.created_at)).size).toBe(3);
+  expect(r.messages).toHaveLength(2);
 });

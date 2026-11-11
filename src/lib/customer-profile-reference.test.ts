@@ -11,7 +11,7 @@ vi.mock("@tanstack/react-start", () => ({ createServerFn: () => {
 vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
 vi.mock("@/lib/notifications.functions", () => ({ notify: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: (table: string) => {
-  const query: any = { select: () => query, eq: () => query, order: async () => ({ data: mocks.messages }), maybeSingle: async () => ({ data: mocks.session }), single: async () => ({ data: table === "sessions" ? mocks.session : mocks.messages.at(-1) }), insert: (m: any) => { mocks.messages.push({ ...m, id: `m${mocks.messages.length}`, created_at: "2026-11-11T13:30:00Z" }); return query; } }; return query;
+  const query: any = { select: () => query, eq: () => query, order: async () => ({ data: mocks.messages }), maybeSingle: async () => ({ data: mocks.session }), single: async () => ({ data: table === "sessions" ? mocks.session : mocks.messages.at(-1) }), insert: (m: any) => { const rows = (Array.isArray(m) ? m : [m]).map((r: any) => ({ created_at: "2026-11-11T13:30:00Z", ...r, id: `m${mocks.messages.length}` })); rows.forEach((r: any, i: number) => { r.id = `m${mocks.messages.length + i}`; }); mocks.messages.push(...rows); return { select: async () => ({ data: rows }), single: async () => ({ data: rows.at(-1) }), then: (f: any) => f({ data: rows }) }; } }; return query;
 } } }));
 import { sendPlaybookTeamTurn } from "./simulator.functions";
 import { executeEvaluationStep } from "./evaluation.functions";
