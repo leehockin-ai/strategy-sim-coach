@@ -54,10 +54,12 @@ it("no reference/defer/other preserve ordinary prompts and do not imply playbook
     expect(customerProfileTeamContext({ playbook_facilitation_plan: plan }, [])).toBe("");
   }
 });
-it("rejects reference use without explicit saved opt-in before recording a coaching turn", async () => {
-  mocks.session = { owner_id: "owner", playbook_facilitation_plan: {} };
-  await expect(send({ data: { sessionId: "s", activityKey: "customer_profile", reference: true, coachMessage: "Map it" }, context: { userId: "owner" } })).rejects.toThrow("Choose");
-  expect(mocks.messages).toHaveLength(1); expect(mocks.requests).toHaveLength(0);
+it("unspecified historical Scope can converse without claiming a playbook was selected", async () => {
+  mocks.session = { owner_id: "owner", scenarios: { ...clients[0], stakeholders: clients[0].names.map(name => ({ name, role: "Client" })) }, playbook_facilitation_plan: {} };
+  const reply = await send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "What should we explore?" }, context: { userId: "owner" } });
+  expect(reply.message.stakeholder_name).toBe("Maya Chen");
+  expect(mocks.requests[0].messages[0].content).toContain("without a selected playbook");
+  expect(mocks.requests[0].messages[0].content).not.toContain("VERIFIED PLAYBOOK METADATA");
 });
 it("normal unmarked assessment never receives new reference requirements", () => {
   const s: any = { scenarios: { title: "Legacy", summary: "Existing" }, scope_revisions: [] };

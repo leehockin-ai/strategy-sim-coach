@@ -136,7 +136,7 @@ export function selectedPlaybookAssessmentContext(turns: Turn[] | null | undefin
   }
   if (section === "situation_framing") return "";
   if (!selected.length && !marked) return "";
-  const title = sel.kind === "selected" ? `${sel.title} · ${sel.url} · ${sel.referenceKind} · ${PROVENANCE_LABEL[sel.provenance]}` : "selected playbook";
+  const title = sel.kind === "selected" ? `${sel.title} · ${sel.url} · ${sel.referenceKind} · ${PROVENANCE_LABEL[sel.provenance]}` : `Working session without a selected playbook (${sel.kind})`;
   return `\n── SELECTED PLAYBOOK CONTEXT · ${title} ──\n${rules}\n${selected.map(t => `${t.created_at} · ${t.role === "candidate" ? "COACH" : t.stakeholder_name ?? "TEAM"}: ${t.content}`).join("\n")}`;
 }
 

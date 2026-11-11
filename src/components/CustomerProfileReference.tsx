@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { sendPlaybookTeamTurn } from "@/lib/simulator.functions";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
+import { conversationWork, teamOpening } from "@/lib/conversation-work";
+import { TeamWorkingWall } from "@/components/TeamWorkingWall";
 
 const strip = (c: string) => c.replace(/^\[(playbook_selection_v1|customer_profile_ai_reference_v1)\] /, "");
 
@@ -16,8 +18,20 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
 }) {
   const send = useServerFn(sendPlaybookTeamTurn);
   const [busy, setBusy] = useState(false), [draft, setDraft] = useState("");
+  const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
+  const [sourceId, setSourceId] = useState<string | null>(null);
   const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
   const turns = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE);
+  const roster = (session.scenarios?.stakeholders ?? []).map((s: { name: string }) => s.name);
+  const wall = conversationWork(turns, roster);
+  const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;
+  const opening = teamOpening(session.scenarios ?? {}, session.engagement_brief?.success);
+  function showSource(id: string) {
+    setSourceId(id);
+    const node = document.getElementById(`team-turn-${id}`);
+    node?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
+    node?.focus({ preventScroll: true });
+  }
   async function say() {
     if (!draft.trim() || busy) return;
     setBusy(true);
@@ -27,7 +41,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   }
   const first = turns.length === 0;
   const outcome = session.engagement_brief?.success;
-  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{turns.map(m => <li key={m.id} className="py-3 text-sm"><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
+  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{opening && <li className="py-3 text-sm"><p className="font-medium">{opening.speaker} <span className="text-xs font-normal text-muted-foreground">· Opening scene</span></p><p className="whitespace-pre-wrap mt-1">{opening.text}</p></li>}{turns.map(m => <li id={`team-turn-${m.id}`} tabIndex={-1} key={m.id} className={`py-3 text-sm break-words ${sourceId === m.id ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
   return <section className="border border-ink p-5 mb-6 space-y-4 bg-paper" aria-labelledby="ws-heading">
     <h2 id="ws-heading" className="text-xl">Working session with the client team</h2>
     {sel.kind === "selected" && <>
@@ -43,16 +57,20 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
           <p className="text-xs text-muted-foreground">{PROVENANCE_LABEL[sel.provenance]}. Coach Compass doesn't read the linked playbook. To change it, revise your Scope.</p>
         </div>
       </details>}
-      {first && <p className="text-sm" aria-label="Where to start">Review the playbook, then tell the team where to start and what to bring back. <span className="text-muted-foreground">For example, its intro e-learning if it has one.</span></p>}
-      {transcript}
-      <label className="block text-sm font-medium">{first ? "Open the session with the team" : "Your coaching turn"}<textarea aria-label="Coach the client team" placeholder={first ? "Where should the team start, and what should they bring back?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onChange={e => setDraft(e.target.value)} /></label>
-      <Button disabled={busy || !draft.trim()} onClick={say}><Send />{busy ? "Team responding…" : "Send to team"}</Button>
     </>}
     {sel.kind !== "selected" && <div className="border-l-2 border-ink pl-3 text-sm space-y-1" aria-label="Where to start">
       <p className="font-medium">Start without a playbook</p>
-      <p>{sel.kind === "none" ? "You chose to coach without a playbook." : sel.kind === "defer" ? "You deferred the playbook decision." : "No playbook decision saved in Scope."}{sel.reason ? ` Reason: ${sel.reason}` : ""} Open with questions: what has the team done, what do they need to decide, what's still unclear?</p>
+      <p>{sel.kind === "none" ? "You chose to coach without a playbook." : sel.kind === "defer" ? "You deferred the playbook decision." : "No playbook decision saved in Scope."}{sel.reason ? ` Reason: ${sel.reason}` : ""}</p>
       {sel.kind === "undecided" && <p className="text-xs text-muted-foreground">To use a playbook, choose it in your Scope brief.</p>}
     </div>}
-    {sel.kind !== "selected" && turns.length > 0 && <details><summary className="text-sm cursor-pointer">Earlier playbook conversation</summary>{transcript}</details>}
+    <p className="text-sm" aria-label="Where to start">{sel.kind === "selected" ? "Open the playbook beside this conversation. Ask the team where they are, guide them through the next activity, and challenge what is still an assumption." : "Ask the team where they are, agree what to explore next, and challenge what is still an assumption."}</p>
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
+      <div className="min-w-0 space-y-4">
+        {transcript}
+        <label className="block text-sm font-medium">Your coaching turn<textarea aria-label="Coach the client team" placeholder={first ? "Where are you with the work, and what remains uncertain?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onChange={e => setDraft(e.target.value)} /></label>
+        <Button disabled={busy || !draft.trim()} onClick={say}><Send />{busy ? "Team responding…" : "Send to team"}</Button>
+      </div>
+      <aside className="min-w-0 lg:sticky lg:top-4 self-start"><TeamWorkingWall compact work={shownWork} revision={wall.revision} history={wall.history} selectedRevision={selectedRevision} onRevision={setSelectedRevision} onSource={showSource} /></aside>
+    </div>
   </section>;
 }

@@ -146,10 +146,15 @@ for (const [title, lead] of scenarios) it(`${title}: Chapter 2 inherits the save
   for (const key of SECTION_KEYS) expect(() => buildSectionInput(key, s, mocks.messages)).not.toThrow();
 });
 
-it("refuses team turn when Scope has none/defer, without recording a coach message", async () => {
-  mocks.session = { id: "s", owner_id: "o", engagement_brief: brief(buildSelection({ choice: "none" })) };
-  await expect(send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "go" }, context: { userId: "o" } })).rejects.toThrow("Choose a playbook in Scope");
-  expect(mocks.messages).toHaveLength(0);
+it("none/defer use the same attributed team conversation without inventing playbook context", async () => {
+  for (const choice of ["none", "defer", "undecided"] as const) {
+    mocks.session = { id: "s", owner_id: "o", scenarios: { title: "The Student Founder", stakeholders: [{ name: "Maya Chen", role: "Founder" }] }, engagement_brief: brief(buildSelection({ choice })) };
+    const reply = await send({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "What is still an assumption?" }, context: { userId: "o" } });
+    expect(reply.message.stakeholder_name).toBe("Maya Chen");
+    expect(mocks.requests.at(-1).messages[0].content).toContain("without a selected playbook");
+    expect(mocks.requests.at(-1).messages[0].content).not.toContain("VERIFIED PLAYBOOK METADATA");
+    expect(selectedPlaybookAssessmentContext(mocks.messages, "working_session_facilitation", mocks.session.engagement_brief)).toContain(`without a selected playbook (${choice})`);
+  }
 });
 
 it("historical Chapter 2 Customer Profile opt-in stays readable as legacy verified context", () => {

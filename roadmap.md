@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Chapter 2 live coaching and source-linked sticky notes
+- [x] Added one selected/none/defer conversation, stable view-only scene-setting opening, and compact exact-quote work projection from attributed persisted messages; no new store or shared writes.
+- [x] 206 regressions and isolated desktop/mobile components passed; six actual AI turns produced 13 attributed team messages, rendered locally with source notes. Hosted persistence/full route assessment not exercised; coverage and retry limits in docs/chapter2-live-notes-verification.md.
+
 ## Stage 1 project playbook run links
 - [x] Accept strict canonical Library listings and project playbook runs in versioned Scope; preserve distinct IDs, provenance, historical listings and speaker attribution.
 - [x] 192 regression tests passed; actual Scope/Chapter 2 browser components passed synthetic local save/reload and mobile checks. Preview build OK; no shared writes, private project access or publishing. Hosted persistence and real AI scoring not exercised.
