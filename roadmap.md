@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Approved read-only investigation and desktop inspection plan
+- [x] Investigated disposable revision 3: full blank brief replacement preceded correct run binding; originating action remains unconfirmed, no write reproduction or fixes. Separate remedy/fixture-recovery approval needed.
+- [x] Delivered Lee-led Library/ChatGPT Work inspection protocol and later disposable-project experiment scope; no external account access or integration. Walkthrough needs Lee's redacted evidence; experiment needs separate approval.
+
 ## Sequenced verification and engagement audit
 - [x] Renamed only approved corrections session; stopped signed-in verification at empty bound Scope revision 3 (older populated revisions retained). No team turns/report generated; continuation requires separate approval, all data preserved.
 - [x] Read-only multi-session engagement audit and staged next-work specification delivered; no product implementation or external-access claims.
