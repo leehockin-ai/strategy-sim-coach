@@ -20,3 +20,14 @@ describe("restricted working session", () => {
     expect(boundScopeOutcome(null)).toEqual({ revision: null, success: "", decision_to_enable: "", decision_maker: "" });
   });
 });
+import { chapter2Surface } from "./working-session";
+describe("chapter2Surface", () => {
+  it("a Scope playbook always uses the in-app session, even with allowlist and stale external runs", () => {
+    expect(chapter2Surface({ scopeSelected: true, testAllowed: true })).toBe("in_app");
+    expect(chapter2Surface({ scopeSelected: true, testAllowed: false })).toBe("in_app");
+  });
+  it("external test room only for allowlisted sessions without a Scope playbook", () => {
+    expect(chapter2Surface({ scopeSelected: false, testAllowed: true })).toBe("external_test_room");
+    expect(chapter2Surface({ scopeSelected: false, testAllowed: false })).toBe("in_app");
+  });
+});

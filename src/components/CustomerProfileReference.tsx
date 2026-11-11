@@ -26,31 +26,33 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     finally { setBusy(false); }
   }
   const first = turns.length === 0;
-  return <section className="border border-ink p-5 mb-6 space-y-4 bg-paper" aria-label="Playbook from Scope">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">From your Scope · revision {session.scope_revision ?? 0}</div><h2 className="text-xl mt-1" data-testid="scope-playbook-title">{sel.kind === "selected" ? sel.title : "Working session"}</h2>
-        <p className="text-sm text-muted-foreground mt-2">{sel.kind === "selected" ? <span className="break-all" data-testid="scope-playbook-url">{sel.url}</span> : sel.kind === "none" ? "You chose to coach without a playbook." : sel.kind === "defer" ? "You deferred the playbook decision." : "No playbook decision saved in Scope."}{sel.reason ? ` Reason: ${sel.reason}` : ""}</p></div>
-      {sel.kind === "selected" && <Button asChild variant="outline"><a href={sel.url} target="_blank" rel="noopener noreferrer">{sel.referenceKind === "project_run" ? "Open Strategyzer playbook run" : "Open in Strategyzer Library"}<ExternalLink /></a></Button>}
-    </div>
+  const outcome = session.engagement_brief?.success;
+  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{turns.map(m => <li key={m.id} className="py-3 text-sm"><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
+  return <section className="border border-ink p-5 mb-6 space-y-4 bg-paper" aria-labelledby="ws-heading">
+    <h2 id="ws-heading" className="text-xl">Working session with the client team</h2>
     {sel.kind === "selected" && <>
-      <p className="text-xs text-muted-foreground">{PROVENANCE_LABEL[sel.provenance]}{sel.source === "legacy_customer_profile_opt_in" ? " · earlier session choice" : ""}. Not connected to your Strategyzer account. To change it, revise your Scope.</p>
-      {sel.verified && <div className="text-sm space-y-1"><p><strong>Goal:</strong> {sel.verified.goal}</p><p><strong>Sequence:</strong> {sel.verified.sequence.join(" → ")}</p><p><strong>Output:</strong> {sel.verified.outputs.join("; ")}</p></div>}
-      {!sel.verified && sel.coachBrief && <div className="text-sm space-y-1"><p><strong>Purpose:</strong> {sel.coachBrief.purpose || "—"}</p><p><strong>Activities:</strong> {sel.coachBrief.activities || "—"}</p><p><strong>Expected output:</strong> {sel.coachBrief.expected_output || "—"}</p></div>}
-      {first && <div className="border-l-2 border-ink pl-3 text-sm space-y-1" aria-label="Where to start">
-        <p className="font-medium">Where to start</p>
-        <ol className="list-decimal pl-4 space-y-0.5"><li>Get familiar with the playbook via the link above.</li><li>Decide what the team should do first.</li><li>Tell the team where to start and what to bring back.</li></ol>
-        <p className="text-xs text-muted-foreground">For example: ask them to do the playbook's intro e-learning, if it has one; start the first activity together; or ask what they've already done.</p>
-      </div>}
-      <p className="text-sm text-muted-foreground">{session.scenarios?.title} · fictional client team. Their ideas and reported evidence remain simulated.</p>
-      <ol className="divide-y divide-border">{turns.map(m => <li key={m.id} className="py-3 text-sm"><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border py-2">
+        <p className="text-sm font-medium min-w-0 break-words" data-testid="scope-playbook-title">{sel.title}</p>
+        <a data-testid="scope-playbook-link" href={sel.url} target="_blank" rel="noopener noreferrer" className="text-sm underline inline-flex items-center gap-1">{sel.referenceKind === "project_run" ? "Open playbook run" : "Open in Library"}<ExternalLink className="h-3.5 w-3.5" /></a>
+      </div>
+      {(outcome || sel.verified || sel.coachBrief) && <details className="text-sm" open={false}><summary className="cursor-pointer text-muted-foreground">Context from your Scope</summary>
+        <div className="pt-2 space-y-1">
+          {outcome && <p><strong>Outcome:</strong> {String(outcome)}</p>}
+          {sel.verified && <><p><strong>Playbook goal:</strong> {sel.verified.goal}</p><p><strong>Output:</strong> {sel.verified.outputs.join("; ")}</p></>}
+          {!sel.verified && sel.coachBrief && <><p><strong>Purpose:</strong> {sel.coachBrief.purpose || "—"}</p><p><strong>Expected output:</strong> {sel.coachBrief.expected_output || "—"}</p></>}
+          <p className="text-xs text-muted-foreground">{PROVENANCE_LABEL[sel.provenance]}. Coach Compass doesn't read the linked playbook. To change it, revise your Scope.</p>
+        </div>
+      </details>}
+      {first && <p className="text-sm" aria-label="Where to start">Review the playbook, then tell the team where to start and what to bring back. <span className="text-muted-foreground">For example, its intro e-learning if it has one.</span></p>}
+      {transcript}
       <label className="block text-sm font-medium">{first ? "Open the session with the team" : "Your coaching turn"}<textarea aria-label="Coach the client team" placeholder={first ? "Where should the team start, and what should they bring back?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onChange={e => setDraft(e.target.value)} /></label>
       <Button disabled={busy || !draft.trim()} onClick={say}><Send />{busy ? "Team responding…" : "Send to team"}</Button>
     </>}
     {sel.kind !== "selected" && <div className="border-l-2 border-ink pl-3 text-sm space-y-1" aria-label="Where to start">
       <p className="font-medium">Start without a playbook</p>
-      <p>Open with questions: what has the team done, what do they need to decide, what's still unclear? Agree where to start and what to bring back.</p>
+      <p>{sel.kind === "none" ? "You chose to coach without a playbook." : sel.kind === "defer" ? "You deferred the playbook decision." : "No playbook decision saved in Scope."}{sel.reason ? ` Reason: ${sel.reason}` : ""} Open with questions: what has the team done, what do they need to decide, what's still unclear?</p>
       {sel.kind === "undecided" && <p className="text-xs text-muted-foreground">To use a playbook, choose it in your Scope brief.</p>}
     </div>}
-    {sel.kind !== "selected" && turns.length > 0 && <details><summary className="text-sm cursor-pointer">Earlier playbook conversation</summary>{turns.map(m => <p key={m.id} className="text-sm py-2">{m.stakeholder_name ?? "Coach"}: {strip(m.content)}</p>)}</details>}
+    {sel.kind !== "selected" && turns.length > 0 && <details><summary className="text-sm cursor-pointer">Earlier playbook conversation</summary>{transcript}</details>}
   </section>;
 }

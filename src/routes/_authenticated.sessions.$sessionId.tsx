@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
+import { chapter2Surface } from "@/lib/working-session";
 import { CustomerProfileReference } from "@/components/CustomerProfileReference";
 import { PROVENANCE_LABEL, resolveSelection } from "@/lib/playbook-selection";
 import { readEngagementBrief } from "@/lib/scope-brief";
@@ -295,11 +296,12 @@ function Chapter2Exit({ session, label, onContinue }: { session: any; label: str
     <p className="text-sm text-muted-foreground">{readiness.basis === "concluded" ? "Working session concluded." : readiness.basis === "skipped" ? "You recorded why you moved on without concluding the working session." : ""}</p>
     {continueButton}
   </div>;
-  const unavailable = rt?.roomUnavailableReason;
+  const inApp = chapter2Surface({ scopeSelected: resolveSelection(session.engagement_brief, session.playbook_facilitation_plan).kind === "selected", testAllowed: !!rt?.testAllowed }) === "in_app";
+  const unavailable = !inApp && rt?.roomUnavailableReason;
   return <section className="mt-12 border-t border-ink pt-8 space-y-4" aria-labelledby="chapter2-exit">
     <h3 id="chapter2-exit" className="text-lg">Ready for Chapter 3?</h3>
-    <p className="text-sm text-muted-foreground">{unavailable ? "The client working session isn't available in this session. To continue, record why you are moving on — it stays with your evidence." : "Conclude the working session above to continue. If you decide not to run or finish it, you can move on by recording why."}</p>
-    {!skipping ? <Button variant="outline" onClick={() => setSkipping(true)}>{unavailable ? "Continue without the working session" : "Move on without concluding"}</Button> : <div className="border border-border p-4 space-y-3">
+    <p className="text-sm text-muted-foreground">{unavailable ? "The client working session isn't available in this session. To continue, record why you are moving on — it stays with your evidence." : inApp ? "When you're ready to move on, record where you stopped with the team and why — it stays with your evidence." : "Conclude the working session above to continue. If you decide not to run or finish it, you can move on by recording why."}</p>
+    {!skipping ? <Button variant="outline" onClick={() => setSkipping(true)}>{unavailable ? "Continue without the working session" : inApp ? "Move on to Chapter 3" : "Move on without concluding"}</Button> : <div className="border border-border p-4 space-y-3">
       <label className="text-sm block">Why are you moving on without concluding the working session?<textarea className="mt-1 w-full border border-border bg-background p-2 text-sm" rows={3} maxLength={4000} value={reason} onChange={(e) => setReason(e.target.value)} /></label>
       <p className="text-xs text-muted-foreground">Recorded once and kept with your evidence. At least 10 characters.</p>
       <div className="flex gap-3"><Button disabled={reason.trim().length < 10 || skipMut.isPending} onClick={() => skipMut.mutate()}>Record reason and continue to Chapter 3</Button><Button variant="ghost" onClick={() => setSkipping(false)}>Cancel</Button></div>
@@ -1413,11 +1415,11 @@ function Chapter2Container({
 
   return (
     <div>
-      <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />
       {pathwayType === "playbook" && session.chosen_intervention_slug ? <>
-        <ActivityRuntimeEntry sessionId={session.id} embedded scopeUrl={(() => { const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan); return sel.kind === "selected" ? sel.url : undefined; })()} />
+        <PlaybookWorkingSurface session={session} messages={messages} onSaved={onSaved} />
         {session.application_canvas && Object.keys(session.application_canvas).length > 0 && <details className="border-t border-border mt-8 py-4 text-sm"><summary className="cursor-pointer font-medium">Earlier working-session evidence · read-only</summary><pre className="whitespace-pre-wrap break-words mt-4 text-xs">{JSON.stringify(canvasForEditing(session.application_canvas).cells, null, 2)}</pre></details>}
       </> : <>
+        <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />
         {!suppressBanner && banner}
         <ActivityRuntimeEntry sessionId={session.id} />
         {body}
@@ -1426,6 +1428,18 @@ function Chapter2Container({
   );
 }
 
+
+// Exactly one surface: the in-app session (Scope playbook, none or defer) or,
+// for allowlisted sessions without a Scope playbook, the external test room.
+function PlaybookWorkingSurface({ session, messages, onSaved }: { session: any; messages: any[]; onSaved: () => void }) {
+  const fetchRuntime = useServerFn(getActivityRuntime);
+  const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
+  const { data: rt, isPending } = useQuery({ queryKey: ["activity-runtime", session.id], queryFn: () => fetchRuntime({ data: { sessionId: session.id } }), enabled: sel.kind !== "selected" });
+  if (sel.kind !== "selected" && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
+  const surface = chapter2Surface({ scopeSelected: sel.kind === "selected", testAllowed: !!rt?.testAllowed });
+  if (surface === "in_app") return <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />;
+  return <ActivityRuntimeEntry sessionId={session.id} embedded />;
+}
 
 function Chapter2Placeholder({ title, note, interventionLabel }: { title: string; note: string; interventionLabel: string }) {
   return (
@@ -3984,3 +3998,4 @@ function CustomerProfileArtifact({
 }
 
 
+export { Chapter2Container as __FixtureChapter2, Chapter2Exit as __FixtureChapter2Exit };
