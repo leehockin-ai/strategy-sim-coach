@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { buildSelection, LIBRARY_BROWSE_URL, parsePlaybookUrl, PLAYBOOK_LINK_GUIDANCE, PROVENANCE_LABEL, resolveSelection, verifiedFor, type PlaybookSelection } from "@/lib/playbook-selection";
+import { buildSelection, choiceDraftState, LIBRARY_BROWSE_URL, parsePlaybookUrl, PLAYBOOK_LINK_GUIDANCE, PROVENANCE_LABEL, resolveSelection, verifiedFor, type PlaybookSelection } from "@/lib/playbook-selection";
 
 /** Scope-time playbook decision. Saved inside the versioned Engagement Brief only when valid. */
-export function PlaybookChoice({ brief, onCommit }: { brief: { playbook_selection?: PlaybookSelection }; onCommit: (s: PlaybookSelection) => void }) {
+export function PlaybookChoice({ brief, onCommit, onInvalidChange }: { brief: { playbook_selection?: PlaybookSelection }; onCommit: (s: PlaybookSelection) => void; onInvalidChange?: (invalid: boolean) => void }) {
   const saved = brief.playbook_selection;
   const [choice, setChoice] = useState<PlaybookSelection["choice"]>(saved?.choice ?? "undecided");
   const [url, setUrl] = useState(saved?.canonical_url ?? ""), [title, setTitle] = useState(saved?.title ?? ""), [reason, setReason] = useState(saved?.reason ?? "");
@@ -16,6 +16,10 @@ export function PlaybookChoice({ brief, onCommit }: { brief: { playbook_selectio
   const valid = choice !== "selected" || (!!parsed && !!title.trim());
   const current = resolveSelection(brief);
   const commit = () => onCommit(buildSelection({ choice, url, title, reason, working_brief: wb }));
+  // Valid edits flow into the brief (and its normal autosave) so nothing the coach
+  // typed is held only on screen; an incomplete link/title blocks leaving Scope.
+  const state = choiceDraftState(saved, { choice, url, title, reason, working_brief: wb });
+  useEffect(() => { onInvalidChange?.(state === "invalid"); if (state === "unsaved") commit(); }, [state, choice, url, title, reason, JSON.stringify(wb)]);
   return <section className="mb-5 border-t border-ink pt-4" aria-label="Playbook choice">
     <h3 className="text-sm mb-1">Playbook choice</h3>
     <p className="text-xs text-muted-foreground mb-2">Pick any Strategyzer Library playbook, or deliberately choose none or defer. Your working session inherits this saved choice.</p>
@@ -36,6 +40,7 @@ export function PlaybookChoice({ brief, onCommit }: { brief: { playbook_selectio
       </div>}
     </div>}
     {choice !== "undecided" && <label className="text-xs block mt-2">Why this choice?<textarea aria-label="Playbook choice reason" rows={2} maxLength={1500} value={reason} onChange={e => setReason(e.target.value)} className="w-full border border-input bg-background p-2 text-xs mt-1" /></label>}
-    <Button type="button" size="sm" className="mt-2" disabled={!valid} onClick={commit}>Save playbook choice</Button>
+    {state === "invalid" && <p role="status" className="text-xs text-destructive mt-2">Add a valid playbook link and title, or change the decision, to save.</p>}
+    <Button type="button" size="sm" className="mt-2" disabled={!valid || state === "saved"} onClick={commit}>{state === "saved" ? "Playbook choice in brief" : "Save playbook choice"}</Button>
   </section>;
 }

@@ -15,7 +15,7 @@ type Event = RuntimeData["events"][number];
 
 // Level 0 "Linked": the candidate supplies and confirms a link. Coach Compass
 // never fetches it and never claims it was verified by Strategyzer.
-export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; events: Event[]; briefOutcome?: RuntimeData["briefOutcomes"][string] }) {
+export function StrategyzerWorkspace({ run, events, briefOutcome, scopeUrl }: { run: Run; events: Event[]; briefOutcome?: RuntimeData["briefOutcomes"][string]; scopeUrl?: string }) {
   const qc = useQueryClient();
   const fetchConn = useServerFn(getStrategyzerConnections);
   const connect = useServerFn(connectStrategyzerPlaybook);
@@ -24,7 +24,8 @@ export function StrategyzerWorkspace({ run, events, briefOutcome }: { run: Run; 
   const { data, isPending, error, refetch } = useQuery({ queryKey: key, queryFn: () => fetchConn({ data: { runId: run.id } }) });
   const current = data?.connections.find(c => c.status === "connected");
   const [editing, setEditing] = useState(false);
-  const [url, setUrl] = useState("");
+  // Prefill from the Scope choice; the test room still records its own confirmation.
+  const [url, setUrl] = useState(scopeUrl ?? "");
   const [confirmed, setConfirmed] = useState(false);
   const pending = useRef<string | null>(null);
   const snap = run.definition_snapshot as { intervention_label?: string };

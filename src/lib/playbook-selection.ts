@@ -139,3 +139,13 @@ export function selectedPlaybookAssessmentContext(turns: Turn[] | null | undefin
   const title = sel.kind === "selected" ? `${sel.title} · ${sel.url} · ${sel.referenceKind} · ${PROVENANCE_LABEL[sel.provenance]}` : "selected playbook";
   return `\n── SELECTED PLAYBOOK CONTEXT · ${title} ──\n${rules}\n${selected.map(t => `${t.created_at} · ${t.role === "candidate" ? "COACH" : t.stakeholder_name ?? "TEAM"}: ${t.content}`).join("\n")}`;
 }
+
+/** Compares an in-progress Scope playbook choice with what is saved.
+ * "invalid" = a Library/run choice without a valid link and title, which cannot be saved. */
+export function choiceDraftState(saved: PlaybookSelection | undefined, draft: { choice: PlaybookSelection["choice"]; url: string; title: string; reason: string; working_brief: PlaybookSelection["working_brief"] }): "saved" | "unsaved" | "invalid" {
+  if (draft.choice === "selected" && (!parsePlaybookUrl(draft.url) || !draft.title.trim())) return "invalid";
+  const built = buildSelection(draft);
+  if (!saved) return draft.choice === "undecided" && !draft.reason ? "saved" : "unsaved";
+  const prior = playbookSelectionSchema.safeParse(saved);
+  return prior.success && JSON.stringify(playbookSelectionSchema.parse(built)) === JSON.stringify(prior.data) ? "saved" : "unsaved";
+}

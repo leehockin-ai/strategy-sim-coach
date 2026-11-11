@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildSelection, parseListingUrl, parsePlaybookUrl, playbookSelectionSchema, resolveSelection, selectedPlaybookTeamContext, selectedPlaybookAssessmentContext, SELECTION_PHASE } from "./playbook-selection";
 import { engagementBriefSchema, readEngagementBrief } from "./scope-brief";
 import { buildSectionInput } from "./evaluation.io";
@@ -171,4 +171,28 @@ it("multi-speaker team reply saves one row per speaker and a rejected reply save
   expect(mocks.messages.map((m: any) => m.content)).toEqual(["[playbook_selection_v1] Who said it?", "It's a guess.", "Nobody said it."]);
   expect(new Set(mocks.messages.map((m: any) => m.created_at)).size).toBe(3);
   expect(r.messages).toHaveLength(2);
+});
+
+import { choiceDraftState as draftState, buildSelection as build } from "./playbook-selection";
+describe("Scope playbook choice is never held only on screen", () => {
+  const run = "https://platform.strategyzer.com/projects/p/ae279d0f-student-team/dashboard/playbook_runs/ezcuzq8szlmxjk";
+  const wb = { purpose: "", activities: "", expected_output: "" };
+  it("a typed run link + title not yet in the brief is unsaved (so it gets saved)", () => {
+    expect(draftState(undefined, { choice: "selected", url: run, title: "Student run", reason: "", working_brief: wb })).toBe("unsaved");
+  });
+  it("matches once that exact choice is in the brief", () => {
+    const saved = build({ choice: "selected", url: run, title: "Student run" });
+    expect(draftState(saved, { choice: "selected", url: run, title: "Student run", reason: "", working_brief: wb })).toBe("saved");
+  });
+  it("a link without a title, or a dashboard-only link, is invalid and blocks leaving Scope", () => {
+    expect(draftState(undefined, { choice: "selected", url: run, title: "", reason: "", working_brief: wb })).toBe("invalid");
+    expect(draftState(undefined, { choice: "selected", url: "https://platform.strategyzer.com/projects/p/ae279d0f-student-team/dashboard", title: "x", reason: "", working_brief: wb })).toBe("invalid");
+  });
+  it("none/defer changes count as unsaved until saved", () => {
+    expect(draftState(undefined, { choice: "none", url: "", title: "", reason: "", working_brief: wb })).toBe("unsaved");
+    expect(draftState(build({ choice: "defer", reason: "later" }), { choice: "defer", url: "", title: "", reason: "later", working_brief: wb })).toBe("saved");
+  });
+  it("an untouched historical brief with no choice is not flagged", () => {
+    expect(draftState(undefined, { choice: "undecided", url: "", title: "", reason: "", working_brief: wb })).toBe("saved");
+  });
 });

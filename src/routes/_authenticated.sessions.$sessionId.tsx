@@ -13,6 +13,8 @@ import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
 import { CustomerProfileReference } from "@/components/CustomerProfileReference";
+import { PROVENANCE_LABEL, resolveSelection } from "@/lib/playbook-selection";
+import { readEngagementBrief } from "@/lib/scope-brief";
 import { recordWorkingSessionSkip, getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { canvasForEditing } from "@/lib/session-compatibility";
@@ -119,6 +121,11 @@ function SessionPage() {
       }
     }
     setActiveStep(nextStep);
+    focusMain();
+  }
+
+  function focusMain() {
+    requestAnimationFrame(() => { const el = document.getElementById("step-main"); window.scrollTo({ top: 0, behavior: "smooth" }); el?.focus({ preventScroll: true }); });
   }
 
   const renderKey = RENDER_KEY[activeStep];
@@ -145,14 +152,14 @@ function SessionPage() {
           onChange={setActiveStep}
         />
       )}
-      <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
+      <div id="step-main" tabIndex={-1} className="mx-auto max-w-[1400px] px-6 md:px-10 py-10 focus:outline-none">
         {activeChapter !== "scope" && <ChapterBanner chapter={activeChapter} />}
         {activeChapter === "scope" && <div>
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Meet the client</span><span>→ Refine your view</span><span>→ Clarify the outcome</span><span>→ Choose how to help</span></div></div>
           <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-7 items-start">
             <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
-              <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>Client</Button>
-              <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>Your Approach</Button>
+              <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>1 · Client & brief</Button>
+              <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>2 · Your Approach</Button>
             </div>
         {(renderKey === "framing" || renderKey === "dialogue") && (
           <div className="flex flex-wrap gap-4 mb-5 text-xs uppercase tracking-[0.12em]">
@@ -164,12 +171,17 @@ function SessionPage() {
         {renderKey === "method" && (
           <MethodStep
             session={session}
+            scopeDirty={scopeDirty}
             onSaved={refreshOnly}
             onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined}
             nextChapterLabel={nextChapter ? `Chapter ${nextChapter.index} — ${nextChapter.label}` : undefined}
           />
         )}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
+        {renderKey !== "method" && <div className="mt-8 border-t border-ink pt-5 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">Brief and playbook choice saved? Plan how you'll facilitate.</p>
+          <Button onClick={() => { if (scopeDirty) { toast.error("Save your engagement brief first."); return; } setActiveStep("coaching_approach"); focusMain(); }}>Next: Your Approach →</Button>
+        </div>}
             </div>
             <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} />
           </div>
@@ -709,12 +721,30 @@ const PHASE_LABEL: Record<string, string> = {
   test: "Test",
 };
 
+function ScopeSummary({ session }: { session: any }) {
+  const b = readEngagementBrief(session.engagement_brief);
+  const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
+  const rows: Array<[string, string]> = [["Client situation", b.client_situation], ["Desired outcome", b.success], ["Decision to enable", b.decision_to_enable], ["Constraints / scope", [b.scope, b.out_of_scope && `Out: ${b.out_of_scope}`, b.dependencies].filter(Boolean).join(" · ")]];
+  return <section aria-label="From your Scope" className="mb-6 border border-ink p-4 bg-paper">
+    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">From your saved Scope · revision {session.scope_revision ?? 0}</div>
+    <dl className="grid md:grid-cols-2 gap-x-6 gap-y-2 text-sm">{rows.map(([k, v]) => <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="line-clamp-3">{v?.trim() || "—"}</dd></div>)}</dl>
+    <div className="mt-3 pt-3 border-t border-input text-sm" data-testid="approach-playbook">
+      <span className="text-xs text-muted-foreground block">Playbook</span>
+      {sel.kind === "selected" ? <><a className="underline font-medium" href={sel.url} target="_blank" rel="noopener noreferrer">{sel.title}</a> <span className="text-xs text-muted-foreground">· {sel.referenceKind === "project_run" ? "project playbook run" : "Library listing"} · {PROVENANCE_LABEL[sel.provenance]}</span></>
+        : <span>{sel.kind === "none" ? "None — coach without a playbook" : sel.kind === "defer" ? "Deferred" : "Not decided — choose in the brief"}{sel.reason ? ` · ${sel.reason}` : ""}</span>}
+    </div>
+    <p className="text-[11px] text-muted-foreground mt-2">Edit these in the Engagement Brief.</p>
+  </section>;
+}
+
 function MethodStep({
   session,
+  scopeDirty = false,
   onSaved,
   onCommitAndAdvance,
 }: {
   session: any;
+  scopeDirty?: boolean;
   onSaved: () => void;
   onCommitAndAdvance?: () => void | Promise<void>;
   nextChapterLabel?: string;
@@ -831,10 +861,13 @@ function MethodStep({
     onError: (e: any) => toast.error(e.message ?? "Save failed"),
   });
 
+  const qcMethod = useQueryClient();
   const commitMut = useMutation({
     mutationFn: () => save({ data: buildSaveData(true) as any }),
     onSuccess: async () => {
-      toast.success("Approach committed");
+      // Refresh before advancing so Chapter 2 renders the committed approach and saved brief.
+      await qcMethod.invalidateQueries({ queryKey: ["session", session.id] });
+      toast.success("Approach submitted");
       if (onCommitAndAdvance) await onCommitAndAdvance();
     },
     onError: (e: any) => toast.error(e.message ?? "Commit failed"),
@@ -852,8 +885,9 @@ function MethodStep({
   return (
     <StepShell
       title="Your approach"
-      hint="Given the customer outcome, the current situation and what you've learned — how should you help this client make progress?"
+      hint="Builds on your saved Scope. Choose how you'll facilitate and why, then submit to open the working session."
     >
+      <ScopeSummary session={session} />
       {/* Pathway cards */}
       <div className="grid md:grid-cols-2 gap-3 mb-6">
         {PATHWAY_CARDS.map((c) => {
@@ -961,7 +995,8 @@ function MethodStep({
 
       {pathway === "playbook" && (
         <div className="mb-6 space-y-4">
-          <label className="text-xs uppercase tracking-[0.12em] block">Pick a Strategyzer Playbook</label>
+          <label className="text-xs uppercase tracking-[0.12em] block">Facilitation format</label>
+          <p className="text-[11px] text-muted-foreground -mt-2">The Library playbook comes from your Scope. Pick the closest format for the session.</p>
           {(["discovery", "design", "test"] as const).map((phase) => {
             const rows = byPhase[phase] ?? [];
             if (rows.length === 0) return null;
@@ -1009,7 +1044,7 @@ function MethodStep({
 
       {/* Rationale */}
       <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
-        Why is this the right way to help? <span className="text-red-600">*</span>
+        Your facilitation plan and rationale <span className="text-red-600">*</span>
       </label>
       <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
         Ground your reasoning in your conversations and your Engagement Brief — the outcome, the evidence, the sequencing, and what would change your mind.
@@ -1040,11 +1075,11 @@ function MethodStep({
           <button
             type="button"
             onClick={() => commitMut.mutate()}
-            disabled={commitMut.isPending || !canCommit}
+            disabled={commitMut.isPending || !canCommit || scopeDirty}
             className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
-            title={!canCommit ? "Choose an approach and write your reasoning first." : undefined}
+            title={scopeDirty ? "Save your engagement brief first." : !canCommit ? "Choose an approach and write your reasoning first." : undefined}
           >
-            {commitMut.isPending ? "Committing…" : "Commit approach →"}
+            {commitMut.isPending ? "Submitting…" : "Submit approach & start working session →"}
           </button>
         )}
       </div>
@@ -1380,7 +1415,7 @@ function Chapter2Container({
     <div>
       <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />
       {pathwayType === "playbook" && session.chosen_intervention_slug ? <>
-        <ActivityRuntimeEntry sessionId={session.id} embedded />
+        <ActivityRuntimeEntry sessionId={session.id} embedded scopeUrl={(() => { const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan); return sel.kind === "selected" ? sel.url : undefined; })()} />
         {session.application_canvas && Object.keys(session.application_canvas).length > 0 && <details className="border-t border-border mt-8 py-4 text-sm"><summary className="cursor-pointer font-medium">Earlier working-session evidence · read-only</summary><pre className="whitespace-pre-wrap break-words mt-4 text-xs">{JSON.stringify(canvasForEditing(session.application_canvas).cells, null, 2)}</pre></details>}
       </> : <>
         {!suppressBanner && banner}

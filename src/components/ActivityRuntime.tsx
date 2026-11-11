@@ -15,18 +15,21 @@ type RuntimeData = Awaited<ReturnType<typeof getActivityRuntime>>;
 type Run = RuntimeData["runs"][number];
 type Definition = RuntimeData["definitions"][number];
 
-export function ActivityRuntimeEntry({ sessionId, embedded = false }: { sessionId: string; embedded?: boolean }) {
+export function ActivityRuntimeEntry({ sessionId, embedded = false, scopeUrl }: { sessionId: string; embedded?: boolean; scopeUrl?: string }) {
   const fetchRuntime = useServerFn(getActivityRuntime);
   const { data, isPending, error, refetch } = useQuery({ queryKey: ["activity-runtime", sessionId], queryFn: () => fetchRuntime({ data: { sessionId } }) });
   if (embedded && isPending) return <p className="py-6 text-sm text-muted-foreground" role="status">Loading working session…</p>;
   if (embedded && error) return <div className="py-6 space-y-3" role="alert"><p>The working session could not be loaded.</p><Button variant="outline" onClick={() => refetch()}>Try again</Button></div>;
-  if (embedded && data) return <ActivityRuntime data={data} embedded />;
+  // Normal sessions: the gated external test room is unavailable, so there is no
+  // second "link your playbook" request — the Scope playbook above is the start.
+  if (embedded && data && data.roomUnavailableReason && !data.runs.length && !data.definitions.length) return null;
+  if (embedded && data) return <ActivityRuntime data={data} embedded scopeUrl={scopeUrl} />;
   // The separate /activities page remains reachable for older links, but
   // Chapter 2 is the only candidate entry point (no duplicate button).
   return null;
 }
 
-export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData; embedded?: boolean }) {
+export function ActivityRuntime({ data, embedded = false, scopeUrl }: { data: RuntimeData; embedded?: boolean; scopeUrl?: string }) {
   const qc = useQueryClient();
   const start = useServerFn(startActivityRun);
   const [selected, setSelected] = useState<string | null>(null);
@@ -56,11 +59,11 @@ export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData;
       <p className="text-xs uppercase text-muted-foreground mb-2">Facilitate the Work · {data.intervention?.label ?? "Activity runs"}</p>
       <h1 className="text-3xl md:text-4xl">Working session workspace</h1>
     </div>}
-    {!run && unavailable && <section className="border-y border-border py-6 mb-6 space-y-2"><h2 className="text-xl">Client working session unavailable</h2><p className="text-sm text-muted-foreground">{unavailableRoomCopy[unavailable]}</p><p className="text-sm text-muted-foreground">Your saved Scope work is kept. You can still link your Playbook, and you can move on to Chapter 3 below by recording why.</p></section>}
+    {!run && unavailable && <section className="border-y border-border py-6 mb-6 space-y-2"><h2 className="text-xl">Client working session unavailable</h2><p className="text-sm text-muted-foreground">{unavailableRoomCopy[unavailable]}</p><p className="text-sm text-muted-foreground">Your saved Scope work is kept. You can move on to Chapter 3 below by recording why.</p></section>}
     <div className="space-y-6">
       <aside className="min-w-0">
-        {data.intervention?.pathway_type === "playbook" && !hasActiveExternal && <div className="border-b border-border pb-5 mb-5">
-          <p className="font-medium">Step 1 · Link your Strategyzer Playbook</p>
+        {data.intervention?.pathway_type === "playbook" && !hasActiveExternal && !unavailable && <div className="border-b border-border pb-5 mb-5">
+          <p className="font-medium">Test room · Link your Strategyzer Playbook</p>
           <p className="text-sm text-muted-foreground mt-1">You'll work in the {data.intervention.label} Playbook in your own Strategyzer account, then facilitate the client team here.</p>
           <Button className="mt-3" disabled={extMut.isPending} onClick={() => extMut.mutate()}><Play />Get started</Button>
         </div>}
@@ -74,7 +77,7 @@ export function ActivityRuntime({ data, embedded = false }: { data: RuntimeData;
         </div>)}
         {data.runs.length > 1 && <details className="text-sm border-b border-border pb-3"><summary className="cursor-pointer font-medium">Saved working sessions</summary><div className="flex flex-wrap gap-2 mt-3">{data.runs.map((r, i) => <Button key={r.id} variant={run?.id === r.id ? "secondary" : "ghost"} onClick={() => setSelected(r.id)}>Working session {i + 1} · {r.status === "active" ? "open" : r.status}</Button>)}</div></details>}
       </aside>
-      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcomes[run.id]} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : null}</main>
+      <main className="min-w-0">{run?.runtime_type === "strategyzer_external" ? <StrategyzerWorkspace key={run.id} run={run} scopeUrl={scopeUrl} events={data.events.filter(e => e.run_id === run.id)} briefOutcome={data.briefOutcomes[run.id]} /> : run ? <RunWorkspace key={run.id} run={run} data={data} /> : null}</main>
     </div>
   </div>;
 }

@@ -36,6 +36,7 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
 }) {
   const [brief, setBrief] = useState(() => readEngagementBrief(session.engagement_brief));
   const [dirty, setDirty] = useState(false);
+  const [choiceInvalid, setChoiceInvalid] = useState(false);
   const latest = useRef(brief);
   const dirtyRef = useRef(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -62,8 +63,8 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
     return () => clearTimeout(timer);
   }, [brief, dirty, saving.isPending, saving.isError]);
   useEffect(() => {
-    onDirtyChange(dirty || saving.isPending);
-  }, [dirty, saving.isPending, onDirtyChange]);
+    onDirtyChange(dirty || saving.isPending || choiceInvalid);
+  }, [dirty, saving.isPending, choiceInvalid, onDirtyChange]);
   useEffect(() => {
     const preventLoss = (e: BeforeUnloadEvent) => { if (dirtyRef.current) { e.preventDefault(); e.returnValue = ""; } };
     const preventLinkLoss = (e: MouseEvent) => {
@@ -88,7 +89,7 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
         <li><strong className="text-foreground">Listen</strong> first — ask the team questions on the left.</li>
         <li><strong className="text-foreground">Draft</strong> a line or two as things become clear. Blank is fine.</li>
         <li><strong className="text-foreground">Refine</strong> when something changes your mind, and say what changed.</li>
-        <li><strong className="text-foreground">Commit</strong> your approach under "Your Approach" when you're ready.</li>
+        <li><strong className="text-foreground">Choose</strong> a playbook, none or defer below, then plan and submit under "Your Approach".</li>
       </ol>
       <p className="text-muted-foreground">Write in your own words — this is your hypothesis, not the client's statement. To show what the client actually said, tick their lines under "Conversation evidence" below. Nothing here is filled in for you.</p>
     </div>
@@ -114,7 +115,7 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
         </details>}
       </details>;
     })}
-    <PlaybookChoice brief={brief} onCommit={selection => { const next = { ...latest.current, playbook_selection: selection }; edit(next); saving.mutate(next); }} />
+    <PlaybookChoice brief={brief} onInvalidChange={setChoiceInvalid} onCommit={selection => { if (JSON.stringify(latest.current.playbook_selection) === JSON.stringify(selection)) return; edit({ ...latest.current, playbook_selection: selection }); }} />
     <section className="mb-5 border-t border-ink pt-4"><h3 className="text-sm mb-2">Intervention / Playbook reasoning</h3>
       <p className="text-xs mb-2"><strong>Primary intervention:</strong> {options.find(o => o.slug === session.chosen_intervention_slug)?.label ?? session.chosen_intervention_slug ?? "Not selected"}</p>
       {session.intervention_rationale && <p className="text-xs text-muted-foreground mb-3 whitespace-pre-wrap">{session.intervention_rationale}</p>}
