@@ -1,10 +1,14 @@
 # Stabilization roadmap
 
+## Sequenced verification and engagement audit
+- [x] Renamed only approved corrections session; stopped signed-in verification at empty bound Scope revision 3 (older populated revisions retained). No team turns/report generated; continuation requires separate approval, all data preserved.
+- [x] Read-only multi-session engagement audit and staged next-work specification delivered; no product implementation or external-access claims.
+
 ## Bounded post-Phase-4 corrections
 - [x] Trace and correct obsolete commitments input for new three-chapter assessments without changing rubric or prior reports.
 - [x] Reconcile explicit team-owned wall corrections conservatively with public provenance and append-only history.
 - [x] Replace candidate internal POC label and run regression tests.
-- [ ] Disposable live-room/assessment walkthrough: session 20eedb6f-6639-46c6-a951-f0a9a56abbd8 needs Lee's explicit allowlist approval; retained without activity/evaluation or access changes.
+- [ ] Disposable live-room/assessment walkthrough: approved session 20eedb6f-6639-46c6-a951-f0a9a56abbd8 now passes existing gate; blocked by empty bound brief, pending authorized reproduction/setup decision; retained without further evidence changes.
 
 ## Evaluation Evidence Integration and Validation
 - [x] Assemble bounded public live-room evidence with owner authorization, bound Scope and validated revision lineage.
