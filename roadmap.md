@@ -1,5 +1,11 @@
 # Stabilization roadmap
 
+## Opt-in beginner two-session pilot
+- [ ] Approve preview-only persistence and practice-only pilot scope; retain existing test gates and historic data.
+- [ ] Add fictional Customer Profile case and two-meeting journey reusing coaching, event and assessment paths.
+- [ ] Generate and freeze a grounded team update once per handoff with durable recovery and candidate-seen provenance.
+- [ ] Verify both meetings, reload/retry, nine-dimension assessment, privacy and existing scenario compatibility; no publishing.
+
 ## Approved read-only investigation and desktop inspection plan
 - [x] Investigated disposable revision 3: full blank brief replacement preceded correct run binding; originating action remains unconfirmed, no write reproduction or fixes. Separate remedy/fixture-recovery approval needed.
 - [x] Delivered Lee-led Library/ChatGPT Work inspection protocol and later disposable-project experiment scope; no external account access or integration. Walkthrough needs Lee's redacted evidence; experiment needs separate approval.
