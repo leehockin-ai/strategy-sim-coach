@@ -7,6 +7,7 @@ import { SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { toast } from "sonner";
 import { AssessmentGenerator } from "@/components/AssessmentGenerator";
 import React from "react";
+import { NOTICE_UNCONFIGURED } from "@/lib/assessment-notice";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/report")({
   head: () => ({ meta: [
@@ -118,6 +119,7 @@ function AssessmentPage() {
       <section className="hairline-b">
         <div className="mx-auto max-w-[1200px] px-6 md:px-10 py-14">
           <div className="flex flex-wrap items-center gap-3 mb-4">
+            <p role="status" className="w-full text-sm text-muted-foreground">{NOTICE_UNCONFIGURED}</p>
             <span className="chip">Your assessment</span>
             <span className="chip">{scenario.title}</span>
             {hasReviewerDecision && (

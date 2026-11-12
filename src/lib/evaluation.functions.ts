@@ -643,7 +643,10 @@ export const advanceAssessmentJob = createServerFn({ method: "POST" })
           return id;
         }
         await supabaseAdmin.from("sessions").update({ status: "evaluated", completed_at: new Date().toISOString() }).eq("id", data.sessionId);
-        return id!;
+        if (!id) throw new Error("Assessment could not be saved");
+        const { persistedAssessmentCompletion } = await import("./assessment-completion.server");
+        await persistedAssessmentCompletion(id);
+        return id;
       },
     };
     return advanceAssessment(store, runner, { sessionId: data.sessionId, token: crypto.randomUUID() });

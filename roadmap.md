@@ -1,5 +1,12 @@
 # Stabilization roadmap
 
+## Assessment notices and private custom practice
+- [x] Central completion notice contract, unapplied outbox design, mock retries and truthful unconfigured status.
+- [x] Private in-memory intake/extraction and editable AI review; hosted Start fails closed.
+- [x] 248 regressions; separate real AI draft and generated-roster team turn on isolated storage; actual-screen fixture intake/edit/sample desktop/mobile; build OK. Prerequisites in docs/assessment-notices-custom-practice-verification.md.
+- [ ] Enable durable assessment mail: blocked by approved domain/infrastructure setup, outbox migration and dispatcher verification; none applied or sent.
+- [ ] Enable full custom practice journey: blocked by approval to apply owner-private storage and implement/verify session adapters in isolated backend; hosted Start remains disabled.
+
 ## Chapter 2 simple visual workspace
 - [x] One active reference and collapsed Playbooks used; four read-only views share note IDs, history and source-derived origins without changing chat, Scope or storage.
 - [x] 223 regressions passed (two opt-in live tests skipped); isolated actual-screen desktop/mobile checks passed collapse/add/back/reload, cross-view note IDs, original/revision origins, source focus, unmapped notes, draft/screenshot preservation and keyboard tabs. Build OK. Hosted persistence, real AI and physical voice not retested; no shared writes. Details in docs/chapter2-visual-workspace-verification.md.

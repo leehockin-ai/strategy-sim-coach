@@ -1,4 +1,6 @@
 # Normal facilitation reference
+- Assessment notice capture is centralized at new persisted completion, with a staged unique-assessment transactional outbox; report reads never backfill and current unconfigured status never claims delivery.
+- Custom practice source and public editable drafts remain transient and authenticated; hosted Start fails closed until private durable session adapters and practice-only eligibility are approved, never insert custom content into broadly readable standardized scenarios.
 - Workspace content scroll is presentation-only and bounded independently of its heading/tabs/revision selector; only new note IDs while following latest reveal their actual DOM note, never grid-bottom scrolling, view changes, revision edits or historical snapshots.
 - Chapter 2 transcript scroll is presentation-only: initial/session open, near-bottom new turns and successful coach sends follow latest; source navigation focuses and scrolls within the labelled native pane without moving the composer or altering stored messages.
 - Chapter 2 visual workspace adapters reuse the same notes and revisions; source origins follow ordered validated reference switches, starters retain Scope origin, legacy rows fall back to unknown, and assumption placement requires both explicitly stated axes rather than inferred certainty.

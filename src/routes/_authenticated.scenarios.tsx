@@ -7,6 +7,7 @@ import { Shell } from "@/components/Shell";
 import { listScenarios } from "@/lib/scenarios.functions";
 import { createSession } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
+import { CustomScenarioIntake } from "@/components/CustomScenarioIntake";
 
 export const Route = createFileRoute("/_authenticated/scenarios")({
   head: () => ({ meta: [
@@ -41,6 +42,7 @@ function ScenariosPage() {
       </section>
 
       <section className="mx-auto max-w-[1400px] px-6 md:px-10 py-12">
+        <CustomScenarioIntake />
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading scenarios…</div>
         ) : (
@@ -156,7 +158,7 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
               className="w-full border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
             <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-              We'll send your assessment report here once your session has been reviewed. This is your email — not the reviewer's.
+              Your report is available after assessment generation. Email notices are not configured; no email will be sent.
             </p>
           </div>
           <div className="flex gap-2 pt-2">
