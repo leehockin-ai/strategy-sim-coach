@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Chapter 2 simple visual workspace
+- [x] One active reference and collapsed Playbooks used; four read-only views share note IDs, history and source-derived origins without changing chat, Scope or storage.
+- [x] 223 regressions passed (two opt-in live tests skipped); isolated actual-screen desktop/mobile checks passed collapse/add/back/reload, cross-view note IDs, original/revision origins, source focus, unmapped notes, draft/screenshot preservation and keyboard tabs. Build OK. Hosted persistence, real AI and physical voice not retested; no shared writes. Details in docs/chapter2-visual-workspace-verification.md.
+
 ## Chapter 2 screenshot and spoken turns
 - [x] Added in-memory screenshot attach/paste, preview/remove and owner-authorized image-aware team replies; only reference notice and attributed speech persist, never pixels.
 - [x] Reused opt-in single-turn dictation and stakeholder read-aloud with editable text/browser fallback in one composer; no ambient recording or automatic submission.

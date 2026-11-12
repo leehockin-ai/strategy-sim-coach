@@ -8,7 +8,8 @@ import { PlaybookSwitcher } from "@/components/PlaybookSwitcher";
 import { SWITCH_PHASE, activeReference, describeSwitch } from "@/lib/playbook-switch";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
 import { OPENING_ID, conversationWork, starterBoard, stripOps } from "@/lib/conversation-work";
-import { TeamWorkingWall } from "@/components/TeamWorkingWall";
+import { TeamWorkspace } from "@/components/TeamWorkspace";
+import { sourceOrigins } from "@/lib/workspace-view";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { TeamReplyAudio } from "@/components/TeamReplyAudio";
 import { MAX_SCREENSHOT_BYTES, validateScreenshot } from "@/lib/team-attachment";
@@ -59,6 +60,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const roster = (session.scenarios?.stakeholders ?? []).map((s: { name: string }) => s.name);
   const opening = starterBoard(session.scenarios ?? {}, scopeSel);
   const wall = conversationWork(turns, roster, opening);
+  const origins = sourceOrigins(scopeSel, messages);
   const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;
   function showSource(id: string) {
     setSourceId(id);
@@ -75,7 +77,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   }
   const first = turns.length === 0;
   const outcome = session.engagement_brief?.success;
-  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{opening && <li id={`team-turn-${OPENING_ID}`} tabIndex={-1} className={`py-3 text-sm ${sourceId === OPENING_ID ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{opening.speaker} <span className="text-xs font-normal text-muted-foreground">· Opening update · simulated, not scored</span></p><p className="whitespace-pre-wrap mt-1">{opening.text}</p></li>}{shown.map(m => m.phase === SWITCH_PHASE ? <li key={m.id} data-testid="playbook-switch-event" className="py-2 text-xs text-muted-foreground border-l-2 border-ink pl-3 my-2">Playbook change · coach decision, not team speech — {describeSwitch(m.content, active.history)}</li> : <li id={`team-turn-${m.id}`} tabIndex={-1} key={m.id} className={`py-3 text-sm break-words ${sourceId === m.id ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
+  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{opening && <li id={`team-turn-${OPENING_ID}`} tabIndex={-1} className={`py-3 text-sm ${sourceId === OPENING_ID ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{opening.speaker} <span className="text-xs font-normal text-muted-foreground">· Opening update · simulated, not scored</span></p><p className="whitespace-pre-wrap mt-1">{opening.text}</p></li>}{shown.map(m => m.phase === SWITCH_PHASE ? <li key={m.id} data-testid="playbook-switch-event" className="break-words py-2 text-xs text-muted-foreground border-l-2 border-ink pl-3 my-2">Playbook change · coach decision, not team speech — {describeSwitch(m.content, active.history)}</li> : <li id={`team-turn-${m.id}`} tabIndex={-1} key={m.id} className={`py-3 text-sm break-words ${sourceId === m.id ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
   return <section className="border border-ink p-5 mb-6 space-y-4 bg-paper" aria-labelledby="ws-heading">
     <h2 id="ws-heading" className="text-xl">Working session with the client team</h2>
     {sel.kind === "selected" && <>
@@ -100,8 +102,8 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     </div>}
     <PlaybookSwitcher activeId={active.id} history={active.history} disabled={busy || switching} onChange={changeReference} />
     <p className="text-sm" aria-label="Where to start">{sel.kind === "selected" ? "Open the playbook beside this conversation. Ask the team where they are, guide them through the next activity, and challenge what is still an assumption." : "Ask the team where they are, agree what to explore next, and challenge what is still an assumption."}</p>
-    <p className="text-sm text-muted-foreground" aria-label="Working with the board">The team has put its starting drafts on the board. Ask them to explain, test or revise any note — when they change their minds, the note updates with who said it.</p>
-    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
+    <p className="text-sm text-muted-foreground" aria-label="Working with the board">Ask the team to explain, test or revise a note.</p>
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div className="min-w-0 space-y-4">
         {transcript}
         <label className="block text-sm font-medium">Your coaching turn<textarea aria-label="Coach the client team" maxLength={4000} placeholder={first ? "Where are you with the work, and what remains uncertain?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onPaste={e => { const image = Array.from(e.clipboardData.files).find(f => f.type.startsWith("image/")); if (image) { e.preventDefault(); void attach(image); } }} onChange={e => setDraft(e.target.value)} /></label>
@@ -112,7 +114,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
         <TeamReplyAudio messages={turns} roster={roster} busy={busy || listening} />
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
-      <aside className="min-w-0 lg:sticky lg:top-4 self-start"><TeamWorkingWall compact work={shownWork} revision={wall.revision} history={wall.history} selectedRevision={selectedRevision} onRevision={setSelectedRevision} onSource={showSource} /></aside>
+      <TeamWorkspace work={shownWork} revision={wall.revision} history={wall.history} selectedRevision={selectedRevision} onRevision={setSelectedRevision} onSource={showSource} origins={origins} />
     </div>
   </section>;
 }
