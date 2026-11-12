@@ -26,6 +26,7 @@ import { startAssessmentJob } from "@/lib/evaluation.functions";
 import { savePlaybookApplication } from "@/lib/playbook.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
+import { stakeholderPlayback, type DictationController } from "@/lib/dictation";
 import { PLAYBOOKS, STRATEGYZER_LIBRARY_URL, ENGAGEMENT_MODELS, canvasForPlaybook, BUILTIN_PLAYBOOK } from "@/lib/playbooks";
 import canvasVPC from "@/assets/canvas-value-proposition.png";
 import canvasBMC from "@/assets/canvas-business-model.png";
@@ -531,6 +532,9 @@ function FramingStep({
   const [gaps, setGaps] = useState<string[]>([]);
   const [reviewing, setReviewing] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const dictation = useRef<DictationController | null>(null);
+  const playbackEnd = useRef<(() => void) | null>(null);
+  const playbackGeneration = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const sendTurn = useServerFn(sendScopingTurn);
@@ -542,36 +546,49 @@ function FramingStep({
   }, [scopingMessages.length]);
 
   async function playReply(name: string, content: string) {
+    playbackGeneration.current++;
+    const token = playbackGeneration.current;
+    audioRef.current?.pause();
+    window.speechSynthesis?.cancel();
+    playbackEnd.current?.();
+    const release = stakeholderPlayback.begin();
+    playbackEnd.current = release;
+    const finish = () => { release(); if (token === playbackGeneration.current) setSpeakingName(null); };
     const voiceId = voiceForStakeholder(stakeholders, name);
     setSpeakingName(name);
     try {
       const res = await tts({ data: { text: content, voiceId } });
+      if (token !== playbackGeneration.current) { release(); return; }
       if (res.audio && !res.fallback) {
         const a = new Audio(`data:audio/mpeg;base64,${res.audio}`);
         audioRef.current?.pause();
         audioRef.current = a;
-        a.onended = () => setSpeakingName(null);
-        a.onerror = () => setSpeakingName(null);
+        a.onended = finish;
+        a.onerror = finish;
         await a.play();
         return;
       }
       // Fallback: browser SpeechSynthesis
-      speakWithBrowser(content, () => setSpeakingName(null));
+      speakWithBrowser(content, finish);
     } catch (e: any) {
       // Last-resort fallback so the call doesn't break
-      speakWithBrowser(content, () => setSpeakingName(null));
+      if (token !== playbackGeneration.current) { release(); return; }
+      speakWithBrowser(content, finish);
     }
   }
+
+  useEffect(() => () => { playbackGeneration.current++; audioRef.current?.pause(); window.speechSynthesis?.cancel(); playbackEnd.current?.(); }, []);
 
   const turnMut = useMutation({
     mutationFn: (msg: string) => sendTurn({ data: { sessionId: session.id, candidateMessage: msg } }),
     onSuccess: async (res) => {
       setText("");
+      dictation.current?.reset();
       onRefresh();
       const reply = res.stakeholderMessage;
       if (reply?.stakeholder_name) await playReply(reply.stakeholder_name, reply.content);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Turn failed"),
+    onError: (e: any, message: string) => { setText(message); toast.error(e?.message ?? "Turn failed"); },
   });
 
   const extractMut = useMutation({
@@ -596,6 +613,9 @@ function FramingStep({
     e.preventDefault();
     const t = text.trim();
     if (!t || turnMut.isPending) return;
+    dictation.current?.pause(true);
+    dictation.current?.reset();
+    setText("");
     turnMut.mutate(t);
   }
 
@@ -696,7 +716,7 @@ function FramingStep({
               className="min-w-0 w-full flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
               disabled={turnMut.isPending}
             />
-            <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
+            <VoiceInput controlRef={dictation} disabled={turnMut.isPending} onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
             <button type="submit" disabled={turnMut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">
               Send
             </button>
@@ -1118,6 +1138,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   const [text, setText] = useState("");
   const [commitments, setCommitments] = useState<string>(session.dialogue_commitments ?? "");
   const [savingCommit, setSavingCommit] = useState(false);
+  const dictation = useRef<DictationController | null>(null);
   const send = useServerFn(sendStakeholderMessage);
   const save = useServerFn(updateSession);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1132,9 +1153,9 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
   }, [filtered.length]);
 
   const mut = useMutation({
-    mutationFn: () => send({ data: { sessionId: session.id, stakeholderName: target, candidateMessage: text, phase: "intervention" } }),
-    onSuccess: () => { setText(""); onRefresh(); },
-    onError: (e: any) => toast.error(e.message),
+    mutationFn: (message: string) => send({ data: { sessionId: session.id, stakeholderName: target, candidateMessage: message, phase: "intervention" } }),
+    onSuccess: () => { setText(""); dictation.current?.reset(); onRefresh(); },
+    onError: (e: any, message: string) => { setText(message); toast.error(e.message); },
   });
 
   async function persistCommitments(next: string) {
@@ -1205,7 +1226,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
           </div>
 
           <form
-            onSubmit={(e) => { e.preventDefault(); if (text.trim() && !mut.isPending) mut.mutate(); }}
+            onSubmit={(e) => { e.preventDefault(); const message = text.trim(); if (!message || mut.isPending) return; dictation.current?.pause(true); dictation.current?.reset(); setText(""); mut.mutate(message); }}
             className="hairline border-t p-3 flex gap-2"
           >
             <input
@@ -1214,7 +1235,7 @@ function DialogueStep({ session, messages, onRefresh, onContinue }: { session: a
               placeholder={`Say something to ${target}…`}
               className="min-w-0 w-full flex-1 border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
-            <VoiceInput onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
+            <VoiceInput controlRef={dictation} disabled={mut.isPending} onTranscript={(c) => setText((p) => appendTranscript(p, c))} className="!h-auto self-stretch !w-9" />
             <button type="submit" disabled={mut.isPending || !text.trim()} className="bg-ink text-paper px-4 text-sm rounded-sm disabled:opacity-50">
               Send
             </button>

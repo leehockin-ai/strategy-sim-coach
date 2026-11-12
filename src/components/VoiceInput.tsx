@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DictationController, DICTATION_AUDIO_CONSTRAINTS, stakeholderPlayback, type Recognition } from "@/lib/dictation";
 
 type Props = {
   onTranscript: (chunk: string) => void;
@@ -10,19 +11,11 @@ type Props = {
   onListeningChange?: (listening: boolean) => void;
   singleTurn?: boolean;
   showFallback?: boolean;
+  controlRef?: { current: DictationController | null };
 };
 
 // Minimal typing for the Web Speech API
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start: () => void;
-  stop: () => void;
-  onresult: ((e: any) => void) | null;
-  onerror: ((e: any) => void) | null;
-  onend: (() => void) | null;
-};
+type SpeechRecognitionLike = Recognition;
 
 function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   if (typeof window === "undefined") return null;
@@ -30,52 +23,34 @@ function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export function VoiceInput({ onTranscript, className, title, disabled, onListeningChange, singleTurn = false, showFallback = false }: Props) {
+export function VoiceInput({ onTranscript, className, title, disabled, onListeningChange, singleTurn = false, showFallback = false, controlRef }: Props) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState("");
-  const recRef = useRef<SpeechRecognitionLike | null>(null);
-  const finalsRef = useRef<Set<number>>(new Set());
+  const controller = useRef<DictationController | null>(null);
+  const callback = useRef(onTranscript); callback.current = onTranscript;
+  const disabledRef = useRef(disabled); disabledRef.current = disabled;
 
   useEffect(() => {
-    setSupported(!!getRecognitionCtor());
-    return () => { const rec = recRef.current; if (rec) { rec.onresult = null; rec.onend = null; rec.onerror = null; rec.stop(); } };
-  }, []);
+    const Ctor = getRecognitionCtor(); setSupported(!!Ctor);
+    if (!Ctor) return;
+    const c = new DictationController(() => new Ctor(), async () => {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: DICTATION_AUDIO_CONSTRAINTS });
+        // Web Speech owns its input; do not leave a second recording stream open.
+        stream.getTracks().forEach(track => track.stop());
+      }
+    }, text => { if (!disabledRef.current && !stakeholderPlayback.playing) callback.current(text); }, setListening, () => setError("Dictation unavailable. You can type your question."), singleTurn);
+    controller.current = c; if (controlRef) controlRef.current = c;
+    const unsubscribe = stakeholderPlayback.subscribe(playing => c.pause(playing || !!disabledRef.current));
+    return () => { unsubscribe(); c.dispose(); controller.current = null; if (controlRef) controlRef.current = null; };
+  }, [singleTurn, controlRef]);
   useEffect(() => { onListeningChange?.(listening); }, [listening, onListeningChange]);
-  useEffect(() => { if (disabled) recRef.current?.stop(); }, [disabled]);
+  useEffect(() => { controller.current?.pause(!!disabled || stakeholderPlayback.playing); }, [disabled]);
 
   const toggle = () => {
-    if (listening) {
-      recRef.current?.stop();
-      return;
-    }
-    const Ctor = getRecognitionCtor();
-    if (!Ctor) return;
     setError("");
-    const rec = new Ctor();
-    rec.continuous = !singleTurn;
-    rec.interimResults = false;
-    rec.lang = navigator.language || "en-US";
-    finalsRef.current = new Set();
-    rec.onresult = (e: any) => {
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const res = e.results[i];
-        if (res.isFinal && !finalsRef.current.has(i)) {
-          finalsRef.current.add(i);
-          const text = res[0].transcript.trim();
-          if (text) onTranscript(text);
-        }
-      }
-    };
-    rec.onerror = () => { setListening(false); setError("Dictation unavailable. You can type your question."); };
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    try {
-      rec.start();
-      setListening(true);
-    } catch {
-      setListening(false);
-    }
+    controller.current?.toggle();
   };
 
   if (!supported) return showFallback ? <span className="text-xs text-muted-foreground">Dictation unavailable — type instead.</span> : null;

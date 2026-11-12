@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Scope dictation isolation
+- [x] Shared playback pause/resume and fresh recognition buffers at scoping/1:1 sends, stale-result rejection and microphone constraints; five lifecycle tests passed.
+- [x] Created exactly one approved Student Founder test session and persisted three typed questions; brief opened after third and remained open on reload. Actual-screen simulated microphone checks passed for both conversations; physical echo/audio unavailable. 356 regressions passed, preview build OK; no publish. See docs/scope-voice-verification.md.
+
 ## All-start confirmation parity
 - [x] Trace built-in/custom start order and show the shared preflight immediately on every built-in start; retain identity validation, guarded Continue, custom drafts and resume.
 - [x] All four built-in buttons and custom Start verified on desktop/mobile/keyboard with cancel-only signed-in checks; custom drafting used a browser-only fixture. 351 tests passed; preview build OK; no sessions created or publish. Details: docs/scenario-preflight-parity-verification.md.

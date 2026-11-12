@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { synthesizeVoice } from "@/lib/voice.functions";
 import { voiceForStakeholder } from "@/lib/voices";
 import { stripOps } from "@/lib/conversation-work";
+import { stakeholderPlayback } from "@/lib/dictation";
 
 export function TeamReplyAudio({ messages, roster, busy }: { messages: Array<{ id: string; role: string; stakeholder_name: string | null; content: string }>; roster: string[]; busy: boolean }) {
   const tts = useServerFn(synthesizeVoice);
@@ -13,9 +14,10 @@ export function TeamReplyAudio({ messages, roster, busy }: { messages: Array<{ i
   const seen = useRef(new Set(messages.map(m => m.id)));
   const generation = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
-  function stop() { generation.current++; audio.current?.pause(); window.speechSynthesis?.cancel(); }
-  useEffect(() => () => { generation.current++; audio.current?.pause(); window.speechSynthesis?.cancel(); }, []);
-  useEffect(() => { if (busy) { generation.current++; audio.current?.pause(); window.speechSynthesis?.cancel(); } }, [busy]);
+  const releasePlayback = useRef<(() => void) | null>(null);
+  function stop() { generation.current++; audio.current?.pause(); window.speechSynthesis?.cancel(); releasePlayback.current?.(); releasePlayback.current = null; }
+  useEffect(() => () => { stop(); }, []);
+  useEffect(() => { if (busy) stop(); }, [busy]);
   useEffect(() => {
     const fresh = messages.filter(m => !seen.current.has(m.id));
     if (enabled && busy) return;
@@ -29,6 +31,8 @@ export function TeamReplyAudio({ messages, roster, busy }: { messages: Array<{ i
         try { result = await tts({ data: { text, voiceId: voiceForStakeholder(roster.map(name => ({ name })), m.stakeholder_name ?? "") } }); }
         catch { result = { audio: null }; }
         if (generation.current !== token) return;
+        const release = stakeholderPlayback.begin(); releasePlayback.current = release;
+        try {
         if (result.audio) {
           const a = new Audio(`data:audio/mpeg;base64,${result.audio}`); audio.current = a;
           await new Promise<void>(resolve => { a.onended = () => resolve(); a.onerror = () => { setStatus("Audio unavailable — replies remain in the transcript."); resolve(); }; a.play().catch(() => { setStatus("Audio blocked — replies remain in the transcript."); resolve(); }); });
@@ -36,6 +40,7 @@ export function TeamReplyAudio({ messages, roster, busy }: { messages: Array<{ i
           setStatus("Using browser voice.");
           await new Promise<void>(resolve => { const u = new SpeechSynthesisUtterance(text); u.onend = () => resolve(); u.onerror = () => { setStatus("Audio unavailable — replies remain in the transcript."); resolve(); }; window.speechSynthesis.speak(u); });
         } else setStatus("Audio unavailable — replies remain in the transcript.");
+        } finally { release(); if (releasePlayback.current === release) releasePlayback.current = null; }
         if (generation.current !== token) return;
       }
     }

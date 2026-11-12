@@ -27,3 +27,4 @@
 
 - Private custom practice freezes approved client-visible scenario/roster on ordinary sessions, with restrictive owner policies across evidence and immutable identity; all shared handlers hydrate it so no private catalog or duplicate coaching engine exists.
 - Custom practice is excluded from certification submission, reviewer access and rollups in server handlers and schema guards; future launch, AI assessment and formal review have separate server entitlement hooks preserving current authenticated policy.
+- Dictation uses a shared stakeholder playback lock and generation-isolated recognition instances; Scope sends invalidate buffers synchronously, and playback resumes only previously enabled microphones so speaker audio cannot become coach evidence.
