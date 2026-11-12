@@ -1,4 +1,6 @@
 # Normal facilitation reference
+- Reviewer supplements freeze separately at explicit formal submission, never feed AI scoring; reserved private object paths are downloaded only after owner/session or submitted-session reviewer authorization, and absent staged capability fails closed without blocking empty submission.
+- Historical playbook dialogue stays visible with original source IDs but does not reindex normal board notes; saved Scope decisions ignore stale external conclusions while already-advanced/legacy evidence exemptions remain unchanged.
 - All committed Chapter 2 approaches use one shared conversation selector, including historical methodology-only sessions; alternative planning is supplementary and prior canvas evidence is read-only to prevent partial feature sets and duplicate rooms.
 - Formative compatibility guidance requires explicit practice identity in UI and server responses; unmarked historical sessions default to certification, while private scenario identity excludes title-matched curated starter facts and hydrates all prompt context.
 - Client-team interaction uses shared semantic prompt rules and actual transcript continuity, never profanity/sentiment scoring; explicit participant refusals remain speech but cannot source new work or disclosures, while other speakers retain independent agency.

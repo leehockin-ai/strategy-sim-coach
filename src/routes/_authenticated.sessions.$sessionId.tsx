@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
-import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed } from "@/lib/working-session";
+import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed, applicableExternalConclusion } from "@/lib/working-session";
 import { CustomerProfileReference } from "@/components/CustomerProfileReference";
 import { PROVENANCE_LABEL, resolveSelection } from "@/lib/playbook-selection";
 import { readEngagementBrief } from "@/lib/scope-brief";
@@ -283,7 +283,7 @@ function Chapter2Exit({ session, label, onContinue }: { session: any; label: str
   const gated = !!slug && pathwayType === "playbook";
   const { data: rt, isLoading: rtLoading } = useQuery({ queryKey: ["activity-runtime", session.id], queryFn: () => fetchRuntime({ data: { sessionId: session.id } }), enabled: gated });
   const externalIds = new Set((rt?.runs ?? []).filter((r) => r.runtime_type === "strategyzer_external").map((r) => r.id));
-  const readiness = chapter3Readiness({ pathwayType, chosenSlug: slug, currentStatus: session.status, concludedRun: hasConcludedEvent((rt?.events ?? []).filter((e) => externalIds.has(e.run_id))), skip: session.working_session_skip, legacyCanvas: session.application_canvas });
+  const readiness = chapter3Readiness({ pathwayType, chosenSlug: slug, currentStatus: session.status, concludedRun: applicableExternalConclusion(resolveSelection(session.engagement_brief, session.playbook_facilitation_plan).kind, hasConcludedEvent((rt?.events ?? []).filter((e) => externalIds.has(e.run_id)))), skip: session.working_session_skip, legacyCanvas: session.application_canvas });
   const [reason, setReason] = useState("");
   const [skipping, setSkipping] = useState(false);
   const skipMut = useMutation({

@@ -1,5 +1,11 @@
 # Stabilization roadmap
 
+## Reviewer materials and real-path parity
+- [x] Preview/published read-only checks and 64-case isolated entry matrix; historical transcript visibility and stale external conclusion parity corrected without history writes.
+- [x] Optional private reviewer note/files at explicit formal submit, staged schema only, scoring separation and ownership/role checks.
+- [x] 292 regressions plus separate real-AI isolated board test; disposable SQL policies/submit and actual report-screen mocked submit/retry/download verified. Details: docs/reviewer-materials-and-parity-verification.md.
+- [ ] Hosted reviewer-material enablement: blocked by approved isolated backend/schema installation, private storage lifecycle and signed-in owner/reviewer verification; current hosted intake fails closed.
+
 ## App-wide functionality coverage
 - [x] Unify modern/historical Chapter 2 entry, preserve alternative approaches and legacy evidence, suppress certification-only hints, validate seeded/custom scenario context and shared controls.
 - [x] 282 tests passed; 12 isolated ordinary-screen desktop/mobile cases passed send/reload and shared controls. Hosted custom-launch and email remain blocked by their documented setup prerequisites; no shared writes. See docs/app-wide-functionality-coverage.md.

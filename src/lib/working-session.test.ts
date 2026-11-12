@@ -20,7 +20,12 @@ describe("restricted working session", () => {
     expect(boundScopeOutcome(null)).toEqual({ revision: null, success: "", decision_to_enable: "", decision_maker: "" });
   });
 });
-import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed } from "./working-session";
+import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed, applicableExternalConclusion } from "./working-session";
+it("stale external conclusions never relabel a Scope-selected normal conversation as concluded", () => {
+  for (const choice of ["selected", "none", "defer"] as const) expect(applicableExternalConclusion(choice, true)).toBe(false);
+  expect(applicableExternalConclusion("undecided", true)).toBe(true);
+  expect(applicableExternalConclusion("undecided", false)).toBe(false);
+});
 describe("app-wide facilitation compatibility", () => {
   it("modern and historical playbook approaches use only the shared working surface", () => {
     expect(chapter2Layout("playbook")).toBe("shared_only");

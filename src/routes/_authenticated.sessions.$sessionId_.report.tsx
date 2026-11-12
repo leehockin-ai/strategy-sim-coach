@@ -8,6 +8,10 @@ import { toast } from "sonner";
 import { AssessmentGenerator } from "@/components/AssessmentGenerator";
 import React from "react";
 import { NOTICE_UNCONFIGURED } from "@/lib/assessment-notice";
+import { Button } from "@/components/ui/button";
+import { ReviewerMaterialsDraftEditor, SubmittedReviewerMaterials } from "@/components/ReviewerMaterials";
+import { getReviewerMaterials } from "@/lib/reviewer-materials.functions";
+import { hasReviewerMaterials, type ReviewerMaterialsDraft } from "@/lib/reviewer-materials";
 
 export const Route = createFileRoute("/_authenticated/sessions/$sessionId_/report")({
   head: () => ({ meta: [
@@ -56,14 +60,22 @@ function AssessmentPage() {
   const fetchSession = useServerFn(getSession);
   const requestSubmission = useServerFn(requestSubmissionForAssessment);
   const qc = useQueryClient();
+  const readMaterials = useServerFn(getReviewerMaterials);
+  const [materials, setMaterials] = React.useState<ReviewerMaterialsDraft>({ requestId: "", note: "", files: [] });
+  const [materialsBusy, setMaterialsBusy] = React.useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession({ data: { sessionId } }),
   });
+  const { data: materialsState } = useQuery({ queryKey: ["reviewer-materials",sessionId], queryFn: () => readMaterials({data:{sessionId}}), enabled: !!data?.evaluation && !(data.session as any)?.custom_practice_snapshot });
 
   const submitMut = useMutation({
-    mutationFn: () => requestSubmission({ data: { sessionId } } as any),
+    mutationFn: () => {
+      const draft = { ...materials, requestId: materials.requestId || crypto.randomUUID() };
+      setMaterials(draft);
+      return requestSubmission({ data: { sessionId, ...(hasReviewerMaterials(draft) ? { materials: draft } : {}) } });
+    },
     onSuccess: (res: any) => {
       if (res?.alreadySubmitted) {
         toast.message("Already submitted", { description: "This work is already in the Strategyzer reviewer queue." });
@@ -74,6 +86,7 @@ function AssessmentPage() {
       }
       qc.invalidateQueries({ queryKey: ["session", sessionId] });
       qc.invalidateQueries({ queryKey: ["my-sessions"] });
+      qc.invalidateQueries({ queryKey: ["reviewer-materials",sessionId] });
     },
     onError: (e: any) => toast.error(e.message ?? "Could not submit for assessment"),
   });
@@ -337,17 +350,20 @@ function AssessmentPage() {
                 </p>
               </div>
               <div className="md:col-span-4 md:text-right">
-                <button
+                <Button
                   onClick={() => submitMut.mutate()}
-                  disabled={submitMut.isPending}
+                  disabled={submitMut.isPending || materialsBusy}
                   className="bg-ink text-paper px-5 py-3 text-sm rounded-sm disabled:opacity-50"
                 >
                   {submitMut.isPending ? "Submitting…" : "Submit for Strategyzer assessment →"}
-                </button>
+                </Button>
               </div>
             </div>
+            <ReviewerMaterialsDraftEditor draft={materials} onChange={d => setMaterials({ ...d, requestId: "" })} disabled={submitMut.isPending} available={materialsState?.available === true} onBusyChange={setMaterialsBusy} />
           </div>
         )}
+
+        {!isCustomPractice && !isPracticeOnly && <SubmittedReviewerMaterials sessionId={sessionId} />}
 
         {isSubmittedForReview && (
           <div className="border border-ink p-6 mb-8" style={{ backgroundColor: "var(--brand-cyan)" }}>

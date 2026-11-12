@@ -7,7 +7,7 @@ import { sendPlaybookTeamTurn, switchPlaybookReference } from "@/lib/simulator.f
 import { PlaybookSwitcher } from "@/components/PlaybookSwitcher";
 import { SWITCH_PHASE, activeReference, describeSwitch } from "@/lib/playbook-switch";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
-import { OPENING_ID, conversationWork, starterBoard, stripOps } from "@/lib/conversation-work";
+import { OPENING_ID, conversationWork, starterBoard, stripOps, isWorkingConversation } from "@/lib/conversation-work";
 import { TeamWorkspace } from "@/components/TeamWorkspace";
 import { sourceOrigins } from "@/lib/workspace-view";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
@@ -50,8 +50,8 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const scopeSel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
-  const turns = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE);
-  const shown = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE || m.phase === SWITCH_PHASE);
+  const turns = messages.filter(isWorkingConversation);
+  const shown = messages.filter(m => isWorkingConversation(m) || m.phase === SWITCH_PHASE);
   const lastTurn = shown.at(-1)?.id;
   useEffect(() => {
     const pane = transcriptPane.current;
@@ -76,7 +76,9 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   }
   const roster = (session.scenarios?.stakeholders ?? []).map((s: { name: string }) => s.name);
   const opening = starterBoard(session.scenarios ?? {}, scopeSel, !!session.custom_practice_snapshot);
-  const wall = conversationWork(turns, roster, opening);
+  // Historical activity rows are visible, but not replayed into new numbered notes:
+  // doing so would shift existing N IDs and invalidate explicit revision targets.
+  const wall = conversationWork(turns.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE), roster, opening);
   const origins = sourceOrigins(scopeSel, messages);
   const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;
   function showSource(id: string) {

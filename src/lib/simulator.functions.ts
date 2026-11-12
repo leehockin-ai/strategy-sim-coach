@@ -1,4 +1,4 @@
-import { formativeGuidanceAllowed } from "./working-session";
+import { formativeGuidanceAllowed, applicableExternalConclusion } from "./working-session";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { canvasSchema, sessionStatusSchema } from "@/lib/session-compatibility";
@@ -15,6 +15,7 @@ import { boardPrompt, conversationSections, conversationWork, starterBoard, type
 import { screenshotSchema, screenshotContent, SCREENSHOT_NOTICE, SCREENSHOT_RULES, readImageReply } from "./team-attachment";
 import { TEAM_INTERACTION_RULES, withoutRefusalOps } from "./team-interaction";
 import { hydratePracticeSession, assertCertificationSession } from "./practice-access";
+import { hasReviewerMaterials, materialsSchema } from "./reviewer-materials";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -140,13 +141,14 @@ async function assertSessionOwner(sessionId: string, userId: string) {
 async function chapter3ReadinessFor(sessionId: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { chapter3Readiness, hasConcludedEvent } = await import("@/lib/chapter2-progress");
-  const { data: s, error } = await supabaseAdmin.from("sessions").select("status,chosen_intervention_slug,working_session_skip,application_canvas").eq("id", sessionId).single();
+  const { data: s, error } = await supabaseAdmin.from("sessions").select("status,chosen_intervention_slug,working_session_skip,application_canvas,engagement_brief,playbook_facilitation_plan").eq("id", sessionId).single();
   if (error) throw new Error(error.message);
   const { data: iv } = await supabaseAdmin.from("interventions").select("pathway_type").eq("slug", s.chosen_intervention_slug ?? "").maybeSingle();
   const { data: runs } = await supabaseAdmin.from("activity_runs").select("id").eq("session_id", sessionId).eq("runtime_type", "strategyzer_external");
   const ids = (runs ?? []).map(r => r.id);
   const { data: concluded } = ids.length ? await supabaseAdmin.from("activity_events").select("metadata").in("run_id", ids).eq("metadata->>team_kind", "concluded").limit(1) : { data: [] };
-  return { session: s, runIds: ids, readiness: chapter3Readiness({ pathwayType: iv?.pathway_type ?? "playbook", chosenSlug: s.chosen_intervention_slug, currentStatus: s.status, concludedRun: hasConcludedEvent(concluded ?? []), skip: s.working_session_skip, legacyCanvas: s.application_canvas }) };
+  const relevantConclusion = applicableExternalConclusion(resolveSelection(s.engagement_brief, s.playbook_facilitation_plan).kind, hasConcludedEvent(concluded ?? []));
+  return { session: s, runIds: ids, readiness: chapter3Readiness({ pathwayType: iv?.pathway_type ?? "playbook", chosenSlug: s.chosen_intervention_slug, currentStatus: s.status, concludedRun: relevantConclusion, skip: s.working_session_skip, legacyCanvas: s.application_canvas }) };
 }
 async function assertChapter3Ready(sessionId: string) {
   const { readiness } = await chapter3ReadinessFor(sessionId);
@@ -331,8 +333,8 @@ export const listMySessions = createServerFn({ method: "GET" })
 // ──────────────────────────────────────────────────────────────────
 export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string }) =>
-    z.object({ sessionId: z.string().uuid() }).parse(d)
+  .inputValidator((d: { sessionId: string; materials?: unknown }) =>
+    z.object({ sessionId: z.string().uuid(), materials: materialsSchema.optional() }).parse(d)
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -355,6 +357,11 @@ export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!ev) {
       throw new Error("Generate the AI rubric first before submitting for Strategyzer assessment.");
+    }
+
+    if (hasReviewerMaterials(data.materials)) {
+      const { submitReviewerMaterials } = await import("./reviewer-materials.server");
+      return await submitReviewerMaterials(supabaseAdmin, existing, context.userId, data.materials);
     }
 
     if ((existing as any).submission_requested_at) {

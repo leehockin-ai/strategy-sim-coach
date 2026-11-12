@@ -10,6 +10,7 @@ import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { useMyRoles } from "@/hooks/use-my-roles";
 import { ReviewLiveEvidence } from "@/components/ReviewLiveEvidence";
 import type { LiveEvidence } from "@/lib/evaluation-live-evidence";
+import { SubmittedReviewerMaterials } from "@/components/ReviewerMaterials";
 
 export const Route = createFileRoute("/_authenticated/reviewer")({
   head: () => ({ meta: [
@@ -338,7 +339,7 @@ function ReviewerDrawer({ sessionId, onClose }: { sessionId: string; onClose: ()
           )}
 
           {tab === "context" && <ContextTab scenario={scenario} session={session} evaluation={evaluation} stakeholderStates={stakeholderStates} />}
-          {tab === "inputs" && <><p className="text-xs text-muted-foreground">{recordedEvidence ? "Public live evidence saved with this AI assessment." : "Current public live evidence; older AI assessments did not consume this evidence."}</p><ReviewLiveEvidence evidence={recordedEvidence ?? data.liveEvidence} /><InputsTab session={session} messages={messages} /></>}
+          {tab === "inputs" && <><p className="text-xs text-muted-foreground">{recordedEvidence ? "Public live evidence saved with this AI assessment." : "Current public live evidence; older AI assessments did not consume this evidence."}</p><ReviewLiveEvidence evidence={recordedEvidence ?? data.liveEvidence} /><InputsTab session={session} messages={messages} />{session.submission_requested_at && <SubmittedReviewerMaterials sessionId={sessionId} />}</>}
           {tab === "rubric" && <RubricTab sections={sections} raw={raw} />}
           {tab === "soft" && <SkillsList items={evaluation?.soft_skills ?? raw.soft_skills ?? []} emptyHint="Soft-skill assessment not generated." />}
           {tab === "methodology" && <SkillsList items={evaluation?.methodology_skills ?? raw.methodology_skills ?? []} emptyHint="Methodology assessment not generated." />}

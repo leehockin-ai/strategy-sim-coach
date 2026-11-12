@@ -3,6 +3,11 @@ import type { ResolvedSelection } from "./playbook-selection";
 import { explicitWorkRefusal } from "./team-interaction";
 
 export type ConversationMessage = { id: string; phase: string | null; role: string; stakeholder_name: string | null; content: string };
+// Historical activity speech remains visible with its original phase and source IDs.
+// Composite replies still remain transcript-only under conversationWork's attribution guard.
+export function isWorkingConversation(m: { phase: string | null }) {
+  return !!m.phase?.startsWith("playbook:") && m.phase !== "playbook:switch:v1";
+}
 export const conversationSections = [
   ...customerProfileSections.filter(s => s.key !== "evidence"),
   { key: "resources", label: "Key resources / assets" },

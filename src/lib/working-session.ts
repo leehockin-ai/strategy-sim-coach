@@ -38,3 +38,7 @@ export function formativeGuidanceAllowed(session: { custom_practice_snapshot?: u
 export function chapter2Layout(pathwayType: string): "shared_only" | "shared_with_approach" {
   return pathwayType === "playbook" ? "shared_only" : "shared_with_approach";
 }
+
+export function applicableExternalConclusion(scopeChoice: "selected" | "none" | "defer" | "undecided", conclusionExists: boolean) {
+  return scopeChoice === "undecided" && conclusionExists;
+}

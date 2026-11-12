@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { conversationWork, starterBoard, parseOps, stripOps, OPENING_ID, type BoardNote, type ConversationMessage } from "./conversation-work";
+import { conversationWork, starterBoard, parseOps, stripOps, OPENING_ID, isWorkingConversation, type BoardNote, type ConversationMessage } from "./conversation-work";
+it("historical working phases are visible without relabelling scoping or switches as team work", () => {
+  expect(isWorkingConversation({phase:"playbook:old_activity"})).toBe(true);
+  expect(isWorkingConversation({phase:"playbook:selection:v1"})).toBe(true);
+  for(const phase of ["scoping", "playbook:switch:v1", null]) expect(isWorkingConversation({phase})).toBe(false);
+});
 import { resolveSelection } from "./playbook-selection";
 const roster = ["Maya Chen", "Jordan Patel", "Sofia Ramirez"];
 const turn = (id: string, content: string, speaker = "Maya Chen", role = "stakeholder"): ConversationMessage => ({ id, phase: "playbook:selection:v1", role, content, stakeholder_name: speaker });
