@@ -62,10 +62,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Strategyzer Coach Certification Simulator" },
+      { title: "Coach Compass" },
       { name: "description", content: "An AI-assisted simulator that assesses Strategyzer coaching judgment in realistic business scenarios." },
-      { property: "og:title", content: "Strategyzer Coach Certification Simulator" },
-      { name: "twitter:title", content: "Strategyzer Coach Certification Simulator" },
+      { property: "og:title", content: "Coach Compass" },
+      { name: "twitter:title", content: "Coach Compass" },
       { property: "og:description", content: "An AI-assisted simulator that assesses Strategyzer coaching judgment in realistic business scenarios." },
       { name: "twitter:description", content: "An AI-assisted simulator that assesses Strategyzer coaching judgment in realistic business scenarios." },
       { name: "twitter:card", content: "summary_large_image" },

@@ -7,7 +7,7 @@ import { DECISION_CLARITY_RULE } from "@/lib/scope-brief";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import { customerProfileAssessmentContext } from "./customer-profile-reference";
-import { COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY, freezeAssessmentEvidence } from "./assessment-evidence-policy";
+import { COACH_FACING_LANGUAGE_RULE, COMMITMENT_EVIDENCE_RULE, THREE_CHAPTER_EVIDENCE_POLICY, freezeAssessmentEvidence } from "./assessment-evidence-policy";
 import {
   buildSectionInput,
   extractInputQualitySignals,
@@ -158,7 +158,7 @@ async function scoreSection(
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: SECTION_SCORING_SYSTEM },
+        { role: "system", content: `${SECTION_SCORING_SYSTEM}\n\n${COACH_FACING_LANGUAGE_RULE}` },
         { role: "user", content: sectionFocus },
       ],
       response_format: { type: "json_object" },
@@ -238,7 +238,7 @@ ${customerProfileAssessmentContext([], kind, s.engagement_brief, transcriptText)
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
       messages: [
-        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}` },
+        { role: "system", content: `You are a Strategyzer certification reviewer.\n\n${STRATEGYZER_INTELLIGENCE}\n\n${prompt}\n\n${COACH_FACING_LANGUAGE_RULE}` },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
@@ -368,7 +368,7 @@ Return strict JSON:
     body: JSON.stringify({
       model: "google/gemini-2.5-pro",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: `${systemPrompt}\n\n${COACH_FACING_LANGUAGE_RULE}` },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },

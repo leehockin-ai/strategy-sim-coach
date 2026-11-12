@@ -43,7 +43,7 @@ function Hero() {
     <section>
       <div className="mx-auto max-w-[1400px] px-6 md:px-10 pt-20 md:pt-24 pb-16 md:pb-20">
         <div className="mb-10">
-          <span className="chip">Coach Compass · MVP</span>
+          <span className="chip">Coach Compass</span>
         </div>
         <div className="grid md:grid-cols-[1fr_400px] gap-16 md:gap-20 items-center">
           <div>

@@ -17,16 +17,16 @@ const BRIEF_GROUPS = [
 ] as const;
 const ADVANCED_FIELDS = new Set<string>(["out_of_scope", "dependencies"]);
 const FIELD_EXAMPLES: Record<string, string> = {
-  client_situation: "e.g. Three founders, six weeks to a pitch, no interviews yet",
-  stated_challenge: "e.g. 'Help us finish the feature list'",
-  coaching_challenge: "e.g. They haven't confirmed who has this problem",
-  evidence: "e.g. What the client actually reported, and how they know",
-  assumptions: "e.g. Students want a weekly plan (untested)",
-  decision_to_enable: "e.g. Which customer segment to pitch",
-  decision_maker: "e.g. Maya, with input from Jordan",
-  success: "e.g. Team can name one segment's jobs and pains from real evidence",
-  scope: "e.g. Customer profile for one segment",
-  participants: "e.g. All three founders",
+  client_situation: "What is the client's situation right now?",
+  stated_challenge: "What does the client say they want?",
+  coaching_challenge: "What do you think needs attention, and why?",
+  evidence: "What has the client actually reported, and how do they know?",
+  assumptions: "What is being assumed but not yet tested?",
+  decision_to_enable: "What decision should this engagement help them make?",
+  decision_maker: "Who decides?",
+  success: "What would show this engagement helped?",
+  scope: "What is in scope for this engagement?",
+  participants: "Who needs to take part?",
 };
 type Message = { id: string; phase: string; role: string; stakeholder_name: string | null; content: string };
 type Revision = { id: string; revision: number; snapshot: unknown; evidence_message_ids: string[]; created_at: string };

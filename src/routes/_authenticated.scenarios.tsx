@@ -165,7 +165,7 @@ export function StartDialog({ scenario, onClose }: { scenario: any; onClose: () 
               className="w-full border border-ink bg-paper px-3 py-2 text-sm focus:outline-none focus:bg-secondary"
             />
             <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-              Your report is available after assessment generation. Email notices are not configured; no email will be sent.
+              Your report is available after assessment generation.
             </p>
           </div>
           <div className="flex gap-2 pt-2">

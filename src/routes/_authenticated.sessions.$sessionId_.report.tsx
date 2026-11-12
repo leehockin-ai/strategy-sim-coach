@@ -7,7 +7,8 @@ import { SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { toast } from "sonner";
 import { AssessmentGenerator } from "@/components/AssessmentGenerator";
 import React from "react";
-import { NOTICE_UNCONFIGURED } from "@/lib/assessment-notice";
+import { coachText, coachList, coachDisplayTitle, COACH_SECTION_DESCRIPTION } from "@/lib/coach-report-text";
+import { SessionUnavailable } from "@/components/SessionUnavailable";
 import { AssessmentEmailMock } from "@/components/AssessmentEmailMock";
 import { Button } from "@/components/ui/button";
 import { ReviewerMaterialsDraftEditor, SubmittedReviewerMaterials } from "@/components/ReviewerMaterials";
@@ -65,9 +66,11 @@ function AssessmentPage() {
   const [materials, setMaterials] = React.useState<ReviewerMaterialsDraft>({ requestId: "", note: "", files: [] });
   const [materialsBusy, setMaterialsBusy] = React.useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession({ data: { sessionId } }),
+    retry: 1,
+    retryDelay: 800,
   });
   const { data: materialsState } = useQuery({ queryKey: ["reviewer-materials",sessionId], queryFn: () => readMaterials({data:{sessionId}}), enabled: !!data?.evaluation && !(data.session as any)?.custom_practice_snapshot });
 
@@ -92,6 +95,7 @@ function AssessmentPage() {
     onError: (e: any) => toast.error(e.message ?? "Could not submit for assessment"),
   });
 
+  if (isError || (!isLoading && !data?.session)) return <SessionUnavailable />;
   if (isLoading || !data) {
     return (
       <Shell>
@@ -135,11 +139,10 @@ function AssessmentPage() {
         <div className="mx-auto max-w-[1200px] px-6 md:px-10 py-14">
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="w-full flex flex-wrap items-center gap-3">
-              <p role="status" className="text-sm text-muted-foreground">{NOTICE_UNCONFIGURED}</p>
               {import.meta.env.DEV && <AssessmentEmailMock />}
             </div>
             <span className="chip">Your assessment</span>
-            <span className="chip">{scenario.title}</span>
+            <span className="chip">{scenario?.title ?? "Private practice"}</span>
             {hasReviewerDecision && (
               <span className="chip" style={{ backgroundColor: "var(--brand-lime)" }}>Strategyzer-reviewed</span>
             )}
@@ -155,7 +158,7 @@ function AssessmentPage() {
             <>
               <div className="grid md:grid-cols-12 gap-10 items-end">
                 <div className="md:col-span-8">
-                  <h1 className="text-4xl md:text-5xl tracking-tight mb-3">{session.candidate_name}</h1>
+                  <h1 className="text-4xl md:text-5xl tracking-tight mb-3">{coachDisplayTitle(session.candidate_name, scenario?.title)}</h1>
                   <p className="text-muted-foreground">{session.candidate_email}</p>
                   <p className="mt-6 text-lg leading-relaxed max-w-2xl">
                     {REVIEWER_DECISION_SUBTITLE[reviewerDecision] ?? "Your assessment has been reviewed."}
@@ -187,9 +190,9 @@ function AssessmentPage() {
             <>
               <div className="grid md:grid-cols-12 gap-10 items-end">
                 <div className="md:col-span-8">
-                  <h1 className="text-4xl md:text-5xl tracking-tight mb-3">{session.candidate_name}</h1>
+                  <h1 className="text-4xl md:text-5xl tracking-tight mb-3">{coachDisplayTitle(session.candidate_name, scenario?.title)}</h1>
                   <p className="text-muted-foreground">{session.candidate_email}</p>
-                  <p className="mt-6 text-lg leading-relaxed max-w-2xl">{evaluation.overall_summary}</p>
+                  <p className="mt-6 text-lg leading-relaxed max-w-2xl">{coachText(evaluation.overall_summary)}</p>
                 </div>
                 <div className="md:col-span-4">
                   <div className="border border-ink p-6" style={{ backgroundColor: "var(--secondary)" }}>
@@ -225,7 +228,7 @@ function AssessmentPage() {
           </div>
           <h2 className="text-2xl mb-6">What this means for your practice</h2>
           <div className="prose prose-sm max-w-3xl">
-            <MarkdownLight source={coachFeedback} />
+            <MarkdownLight source={coachText(coachFeedback)} />
           </div>
         </section>
       )}
@@ -254,7 +257,7 @@ function AssessmentPage() {
                   <div>
                     <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{sec.step}</div>
                     <h3 className="text-lg mt-0.5">{sec.label}</h3>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-2xl">{sec.focus}</p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-2xl">{COACH_SECTION_DESCRIPTION[sec.key] ?? ""}</p>
                   </div>
                   <div className="flex items-center gap-4">
                     {verdict && (
@@ -271,12 +274,12 @@ function AssessmentPage() {
                 <div className="p-5 grid md:grid-cols-3 gap-6">
                   <div className="md:col-span-1">
                     <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">Evidence</div>
-                    <p className="text-sm leading-relaxed">{sx.evidence ?? "—"}</p>
+                    <p className="text-sm leading-relaxed">{coachText(sx.evidence) || "—"}</p>
                   </div>
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "var(--brand-green, #1f7a4a)" }}>Strengths</div>
                     <ul className="space-y-1.5">
-                      {(sx.strengths ?? []).map((s: string, i: number) => (
+                      {coachList(sx.strengths).map((s: string, i: number) => (
                         <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">+</span><span>{s}</span></li>
                       ))}
                     </ul>
@@ -284,7 +287,7 @@ function AssessmentPage() {
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.14em] mb-2" style={{ color: "var(--brand-red)" }}>Gaps</div>
                     <ul className="space-y-1.5">
-                      {(sx.gaps ?? []).map((s: string, i: number) => (
+                      {coachList(sx.gaps).map((s: string, i: number) => (
                         <li key={i} className="text-sm flex gap-2"><span className="text-muted-foreground">−</span><span>{s}</span></li>
                       ))}
                     </ul>
@@ -319,7 +322,7 @@ function AssessmentPage() {
           <div className="bg-paper p-6">
             <h3 className="chip mb-4 inline-flex" style={{ backgroundColor: "var(--brand-lime)" }}>What you did well</h3>
             <ul className="space-y-2">
-              {(evaluation.strengths ?? []).map((s: string, i: number) => (
+              {coachList(evaluation.strengths).map((s: string, i: number) => (
                 <li key={i} className="flex gap-3 text-sm">
                   <span className="marker-num text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <span>{s}</span>
@@ -330,7 +333,7 @@ function AssessmentPage() {
           <div className="bg-paper p-6">
             <h3 className="chip mb-4 inline-flex" style={{ backgroundColor: "var(--brand-red)", color: "var(--paper)", borderColor: "var(--brand-red)" }}>Where to develop</h3>
             <ul className="space-y-2">
-              {(evaluation.gaps ?? []).map((s: string, i: number) => (
+              {coachList(evaluation.gaps).map((s: string, i: number) => (
                 <li key={i} className="flex gap-3 text-sm">
                   <span className="marker-num text-muted-foreground">{String(i + 1).padStart(2, "0")}</span>
                   <span>{s}</span>
@@ -418,7 +421,7 @@ function SkillsGrid({ skills }: { skills: any[] }) {
       {skills.map((sk: any, i: number) => (
         <div key={i} className="bg-paper p-5">
           <div className="flex items-start justify-between gap-3 mb-2">
-            <h4 className="text-base font-medium">{sk.label ?? sk.key}</h4>
+            <h4 className="text-base font-medium">{coachText(sk.label ?? sk.key)}</h4>
             <span
               className="text-[10px] uppercase tracking-[0.12em] border border-ink px-2 py-0.5"
               style={{ backgroundColor: ratingColor[sk.rating] ?? "transparent" }}
@@ -426,9 +429,9 @@ function SkillsGrid({ skills }: { skills: any[] }) {
               {ratingLabel[sk.rating] ?? sk.rating}
             </span>
           </div>
-          {sk.explanation && <p className="text-sm leading-relaxed">{sk.explanation}</p>}
+          {sk.explanation && <p className="text-sm leading-relaxed">{coachText(sk.explanation)}</p>}
           {sk.evidence && (
-            <p className="text-xs text-muted-foreground mt-2 italic leading-relaxed">"{sk.evidence}"</p>
+            <p className="text-xs text-muted-foreground mt-2 italic leading-relaxed">"{coachText(sk.evidence)}"</p>
           )}
         </div>
       ))}

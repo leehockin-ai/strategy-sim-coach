@@ -6,6 +6,7 @@ import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
+import { SessionUnavailable } from "@/components/SessionUnavailable";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
 import { Button } from "@/components/ui/button";
@@ -65,9 +66,11 @@ function SessionPage() {
   const fetchSession = useServerFn(getSession);
   const save = useServerFn(updateSession);
   const qc = useQueryClient();
-  const { data, refetch, isLoading } = useQuery({
+  const { data, refetch, isLoading, isError } = useQuery({
     queryKey: ["session", sessionId],
     queryFn: () => fetchSession({ data: { sessionId } }),
+    retry: 1,
+    retryDelay: 800,
   });
 
   const initialStep: StepKey = data ? stepFromStatus((data.session as any).status) : "framing";
@@ -81,6 +84,7 @@ function SessionPage() {
     }
   }, [data, initialized]);
 
+  if (isError || (!isLoading && !data?.session)) return <SessionUnavailable />;
   if (isLoading || !data) {
     return <Shell><div className="p-10 text-sm text-muted-foreground">Loading session…</div></Shell>;
   }

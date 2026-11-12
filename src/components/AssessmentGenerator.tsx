@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { useAssessmentJob } from "@/hooks/use-assessment-job";
-import { NOTICE_UNCONFIGURED } from "@/lib/assessment-notice";
 
 /** Report empty state: generate, show progress, resume after refresh, retry after failure. */
 export function AssessmentGenerator({ sessionId, canGenerate }: { sessionId: string; canGenerate: boolean }) {
@@ -18,7 +17,6 @@ export function AssessmentGenerator({ sessionId, canGenerate }: { sessionId: str
       {state === "completed" ? (
         <>
           <h1 className="text-3xl mb-3">Your assessment is ready</h1>
-          <p role="status" className="text-muted-foreground mb-6">{NOTICE_UNCONFIGURED}</p>
           <Link to="/sessions/$sessionId/report" params={{ sessionId }} className="underline">Open your signed-in report</Link>
         </>
       ) : working ? (
