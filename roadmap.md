@@ -2,7 +2,7 @@
 
 ## All-start confirmation parity
 - [x] Trace built-in/custom start order and show the shared preflight immediately on every built-in start; retain identity validation, guarded Continue, custom drafts and resume.
-- [ ] Verify all four built-in buttons and custom Start on desktop/mobile/keyboard with cancel-only signed-in checks; run regressions and check preview build, no shared writes or publish.
+- [x] All four built-in buttons and custom Start verified on desktop/mobile/keyboard with cancel-only signed-in checks; custom drafting used a browser-only fixture. 351 tests passed; preview build OK; no sessions created or publish. Details: docs/scenario-preflight-parity-verification.md.
 
 ## New-scenario preflight
 - [x] Shared accessible brief on seeded/custom explicit new starts; preserve draft/retry/resume and prevent creation before Continue.
