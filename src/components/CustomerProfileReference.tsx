@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { ExternalLink, Send, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
@@ -13,6 +13,7 @@ import { sourceOrigins } from "@/lib/workspace-view";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { TeamReplyAudio } from "@/components/TeamReplyAudio";
 import { MAX_SCREENSHOT_BYTES, validateScreenshot } from "@/lib/team-attachment";
+import { followTranscript, transcriptNearBottom } from "@/lib/transcript-scroll";
 
 const strip = (c: string) => stripOps(c.replace(/^\[(playbook_selection_v1|customer_profile_ai_reference_v1)\] /, ""));
 
@@ -29,6 +30,10 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const transcriptPane = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const coachSent = useRef(false);
+  const openedSession = useRef<string | null>(null);
   async function attach(file: File) {
     if (busy || attachmentBusy) return;
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || !file.size || file.size > MAX_SCREENSHOT_BYTES) { setError("Choose a PNG, JPEG or WebP screenshot, no larger than 4 MB."); return; }
@@ -47,6 +52,18 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const scopeSel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
   const turns = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE);
   const shown = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE || m.phase === SWITCH_PHASE);
+  const lastTurn = shown.at(-1)?.id;
+  useEffect(() => {
+    const pane = transcriptPane.current;
+    if (!pane) return;
+    const initial = openedSession.current !== session.id;
+    if (followTranscript(initial, nearBottom.current, coachSent.current)) {
+      pane.scrollTop = pane.scrollHeight;
+      nearBottom.current = true;
+    }
+    openedSession.current = session.id;
+    coachSent.current = false;
+  }, [session.id, lastTurn]);
   const active = activeReference(scopeSel, messages);
   const sel = active.selection;
   const switchRef = useServerFn(switchPlaybookReference);
@@ -64,14 +81,18 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;
   function showSource(id: string) {
     setSourceId(id);
+    const pane = transcriptPane.current;
     const node = document.getElementById(`team-turn-${id}`);
-    node?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center" });
+    if (!pane || !node || !pane.contains(node)) return;
+    nearBottom.current = false;
+    coachSent.current = false;
+    pane.scrollTo({ top: pane.scrollTop + node.getBoundingClientRect().top - pane.getBoundingClientRect().top - (pane.clientHeight - node.clientHeight) / 2, behavior: "instant" });
     node?.focus({ preventScroll: true });
   }
   async function say() {
     if (!draft.trim() || busy || attachmentBusy || listening || switching) return;
     setBusy(true); setError("");
-    try { await send({ data: { sessionId: session.id, activityKey: "selected_playbook", coachMessage: draft.trim(), reference: true, expectedReferenceId: active.id, ...(attachment ? { attachment } : {}) } }); setDraft(""); setAttachment(null); onSaved(); }
+    try { await send({ data: { sessionId: session.id, activityKey: "selected_playbook", coachMessage: draft.trim(), reference: true, expectedReferenceId: active.id, ...(attachment ? { attachment } : {}) } }); coachSent.current = true; setDraft(""); setAttachment(null); onSaved(); }
     catch (e) { const message = e instanceof Error ? e.message : "The team could not reply"; setError(message); toast.error(message); onSaved(); }
     finally { setBusy(false); }
   }
@@ -105,7 +126,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     <p className="text-sm text-muted-foreground" aria-label="Working with the board">Ask the team to explain, test or revise a note.</p>
     <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
       <div className="min-w-0 space-y-4">
-        {transcript}
+        <div ref={transcriptPane} role="region" aria-label="Coaching transcript" tabIndex={0} className="min-w-0 max-h-[min(25rem,55svh)] overflow-y-auto overflow-x-hidden overscroll-contain pr-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" onScroll={e => { const p = e.currentTarget; nearBottom.current = transcriptNearBottom(p.scrollTop, p.scrollHeight, p.clientHeight); }}>{transcript}</div>
         <label className="block text-sm font-medium">Your coaching turn<textarea aria-label="Coach the client team" maxLength={4000} placeholder={first ? "Where are you with the work, and what remains uncertain?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onPaste={e => { const image = Array.from(e.clipboardData.files).find(f => f.type.startsWith("image/")); if (image) { e.preventDefault(); void attach(image); } }} onChange={e => setDraft(e.target.value)} /></label>
         {attachment && <figure className="space-y-2"><img src={attachment.dataUrl} alt="Screenshot draft" className="max-h-60 max-w-full object-contain border border-border" /><figcaption className="text-xs text-muted-foreground">Coach-provided reference · not verified evidence. Pixels are used only for this turn, not saved; the image will be unavailable after refresh.</figcaption><Button type="button" variant="outline" disabled={busy} onClick={() => setAttachment(null)} aria-label="Remove screenshot"><X />Remove screenshot</Button></figure>}
         <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" aria-label="Attach screenshot" onChange={e => { const file = e.target.files?.[0]; if (file) void attach(file); e.target.value = ""; }} />
