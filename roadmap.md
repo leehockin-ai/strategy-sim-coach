@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## All-start confirmation parity
+- [x] Trace built-in/custom start order and show the shared preflight immediately on every built-in start; retain identity validation, guarded Continue, custom drafts and resume.
+- [ ] Verify all four built-in buttons and custom Start on desktop/mobile/keyboard with cancel-only signed-in checks; run regressions and check preview build, no shared writes or publish.
+
 ## New-scenario preflight
 - [x] Shared accessible brief on seeded/custom explicit new starts; preserve draft/retry/resume and prevent creation before Continue.
 - [x] Isolated desktop/mobile/keyboard and duplicate-start verification, regressions/build; no shared writes or publish. Details: docs/scenario-preflight-verification.md.

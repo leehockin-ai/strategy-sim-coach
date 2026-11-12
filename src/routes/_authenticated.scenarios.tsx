@@ -10,7 +10,6 @@ import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { CustomScenarioIntake } from "@/components/CustomScenarioIntake";
 import { ScenarioPreflight } from "@/components/ScenarioPreflight";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/scenarios")({
   head: () => ({ meta: [
@@ -101,7 +100,6 @@ export function StartDialog({ scenario, onClose }: { scenario: any; onClose: () 
   const create = useServerFn(createSession);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [preflight, setPreflight] = useState(false);
 
   useEffect(() => {
     import("@/integrations/supabase/client").then(({ supabase }) =>
@@ -127,17 +125,12 @@ export function StartDialog({ scenario, onClose }: { scenario: any; onClose: () 
   });
 
   return (
-    <>
-    {!preflight && <Dialog open onOpenChange={open => { if (!open && !mut.isPending) onClose(); }}>
-      <DialogContent className="bg-paper border-ink w-[calc(100%-2rem)] max-h-[90svh] overflow-y-auto rounded-sm">
-        <span className="chip mb-3 inline-flex">{scenario.industry}</span>
-        <DialogTitle className="text-2xl mb-2">{scenario.title}</DialogTitle>
-        <DialogDescription className="mb-6">{scenario.summary}</DialogDescription>
-
-        <form
-          onSubmit={(e) => { e.preventDefault(); if (!name || !email || mut.isPending) return; setPreflight(true); }}
-          className="space-y-4"
-        >
+    <ScenarioPreflight open onBack={onClose} onContinue={async () => {
+      if (!name.trim() || !email.trim() || mut.isPending) return false;
+      try { await mut.mutateAsync(); return true; } catch { return false; }
+    }}>
+        <div className="space-y-4">
+          <p className="text-sm font-medium">{scenario.title}</p>
           <div>
             <label htmlFor={`candidate-name-${scenario.id}`} className="text-xs uppercase tracking-[0.12em] mb-1 block">Candidate name</label>
             <div className="relative">
@@ -168,23 +161,7 @@ export function StartDialog({ scenario, onClose }: { scenario: any; onClose: () 
               Your report is available after assessment generation.
             </p>
           </div>
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button
-              type="submit"
-              disabled={mut.isPending}
-              className="px-4 py-2 bg-ink text-paper text-sm rounded-sm disabled:opacity-50"
-            >
-              {mut.isPending ? "Starting…" : "Enter scenario →"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>}
-    {preflight && <ScenarioPreflight open onBack={() => setPreflight(false)} onContinue={async () => {
-      if (mut.isPending) return false;
-      try { await mut.mutateAsync(); return true; } catch { return false; }
-    }} />}
-    </>
+        </div>
+    </ScenarioPreflight>
   );
 }
