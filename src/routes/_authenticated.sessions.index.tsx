@@ -39,18 +39,20 @@ function MySessionsPage() {
   const archive = useServerFn(archiveMySession);
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [showArchived, setShowArchived] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["my-sessions"],
     queryFn: () => fetchMine(),
   });
   const archiving = useMutation({
-    mutationFn: (id: string) => archive({ data: { sessionId: id, archived: true } }),
-    onSuccess: () => { toast.success("Attempt archived."); qc.invalidateQueries({ queryKey: ["my-sessions"] }); },
+    mutationFn: (v: { id: string; archived: boolean }) => archive({ data: { sessionId: v.id, archived: v.archived } }),
+    onSuccess: (_r, v) => { toast.success(v.archived ? "Attempt archived. Find it under Show archived." : "Attempt restored."); qc.invalidateQueries({ queryKey: ["my-sessions"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const rows = (data?.sessions ?? []).map((s: any) => ({ ...s, title: stripPracticeDraft(s.scenarios?.title) || "Scenario" }));
   const canArchive = rows.some((s: any) => "archived_at" in s);
   const groups = groupSessions(rows);
+  const archived = rows.filter((s: any) => s.archived_at).sort((a: any, b: any) => String(b.archived_at).localeCompare(String(a.archived_at)));
 
   return (
     <Shell>
@@ -127,7 +129,7 @@ function MySessionsPage() {
                     {stateLabel}
                   </span>
                   <span className="text-xs text-muted-foreground flex-1 min-w-[10rem]">Last activity {when(lastActivity(s))}</span>
-                  {archivable && <button type="button" className="text-xs underline text-muted-foreground" disabled={archiving.isPending} onClick={() => archiving.mutate(s.id)}>Archive</button>}
+                  {archivable && <button type="button" className="text-xs underline text-muted-foreground" disabled={archiving.isPending} onClick={() => archiving.mutate({ id: s.id, archived: true })}>Archive</button>}
                   <span className="text-sm">
                     {nextActionText ? (
                       <Link to="/sessions/$sessionId/report" params={{ sessionId: s.id }}>{linkLabel}</Link>
@@ -147,6 +149,25 @@ function MySessionsPage() {
                 </section>
               );
             })}
+          </div>
+        )}
+        {archived.length > 0 && (
+          <div className="mt-10">
+            <button type="button" aria-expanded={showArchived} className="text-xs underline" onClick={() => setShowArchived(!showArchived)}>
+              {showArchived ? "Hide archived" : `Show archived (${archived.length})`}
+            </button>
+            {showArchived && (
+              <div className="mt-3 border border-ink divide-y divide-ink">
+                {archived.map((s: any) => (
+                  <div key={s.id} className="flex flex-wrap gap-x-4 gap-y-2 px-5 py-4 items-center">
+                    <span className="text-sm font-medium">{s.title}</span>
+                    <span className="text-xs text-muted-foreground flex-1 min-w-[10rem]">Archived {when(s.archived_at)} · last activity {when(lastActivity(s))}</span>
+                    <button type="button" className="text-xs underline" disabled={archiving.isPending} onClick={() => archiving.mutate({ id: s.id, archived: false })}>Unarchive</button>
+                    <Link to="/sessions/$sessionId" params={{ sessionId: s.id }} className="text-sm">Open →</Link>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>

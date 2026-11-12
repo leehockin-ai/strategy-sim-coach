@@ -1137,6 +1137,7 @@ export type Database = {
         Row: {
           alignment_workspace: Json | null
           application_canvas: Json | null
+          archived_at: string | null
           assignment_id: string | null
           candidate_email: string
           candidate_name: string
@@ -1174,6 +1175,7 @@ export type Database = {
         Insert: {
           alignment_workspace?: Json | null
           application_canvas?: Json | null
+          archived_at?: string | null
           assignment_id?: string | null
           candidate_email: string
           candidate_name: string
@@ -1211,6 +1213,7 @@ export type Database = {
         Update: {
           alignment_workspace?: Json | null
           application_canvas?: Json | null
+          archived_at?: string | null
           assignment_id?: string | null
           candidate_email?: string
           candidate_name?: string
@@ -1496,6 +1499,10 @@ export type Database = {
       }
       reviewer_materials_capability: { Args: never; Returns: number }
       session_progress_rank: { Args: { _status: string }; Returns: number }
+      set_my_session_archived: {
+        Args: { _archived: boolean; _session_id: string }
+        Returns: undefined
+      }
       standardized_session: { Args: { _session: string }; Returns: boolean }
       start_activity_run: {
         Args: { _definition: string; _request: string; _session: string }

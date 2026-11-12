@@ -1,4 +1,4 @@
--- UNAPPLIED. Lets a coach archive (hide) their own abandoned attempt. Nothing is deleted.
+-- APPLIED to the shared database as drizzle/migrations/0016_session_archive.sql. Lets a coach archive (hide) their own abandoned attempt. Nothing is deleted.
 ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS archived_at timestamptz;
 
 CREATE OR REPLACE FUNCTION public.set_my_session_archived(_session_id uuid, _archived boolean)
