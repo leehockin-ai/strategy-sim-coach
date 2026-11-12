@@ -231,7 +231,8 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
           </span>
           <span className="text-xs uppercase tracking-[0.14em] opacity-70">{scenario.industry}</span>
         </div>
-        <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
+        {session.custom_practice_snapshot && <p className="text-sm text-muted-foreground">Private custom practice · not certification</p>}
+              <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
         <p className="max-w-3xl opacity-90 leading-relaxed">{scenario.context}</p>
 
         {(scenario.success_definition || scenario.success_pressure) && (

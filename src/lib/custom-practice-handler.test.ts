@@ -14,7 +14,7 @@ import { writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
 
 const draft = { title: "Fictional commuter meals", brief: "A fictional meal-planning team has wireframes but no segment interviews.", team: [{ name: "Alex Park", role: "Founder", description: "Provisional practice identity" }, { name: "Sam Lee", role: "Researcher", description: "Provisional practice identity" }], tensions: "Speed versus learning", scope: "One segment", outcome: "Choose an interview test", constraints: "Two weeks", challenge: "Surface uncertainty without forcing agreement" };
-function setup() { memory.messages = []; memory.session = { id: "11111111-1111-4111-8111-111111111111", owner_id: "owner", engagement_brief: { playbook_selection: { choice: "none", reason: "Learn first" } }, scenarios: practiceScenario(draft, "isolated") }; }
+function setup() { memory.messages = []; memory.session = { id: "11111111-1111-4111-8111-111111111111", owner_id: "owner", engagement_brief: { playbook_selection: { choice: "none", reason: "Learn first" } }, custom_practice_snapshot: draft, scenarios: null }; }
 const send = sendPlaybookTeamTurn as unknown as (input: any) => Promise<any>;
 it("reuses normal team turn with isolated private scenario, preserving attribution and rejects other owners", async () => {
   setup();
@@ -32,14 +32,14 @@ it("reuses normal team turn with isolated private scenario, preserving attributi
 });
 it("hosted Start refuses to write until private storage exists", async () => {
   const start = startCustomPractice as unknown as (i: any) => Promise<unknown>;
-  await expect(start({ data: draft, context: { userId: "owner" } })).rejects.toThrow("owner-private storage");
+  await expect(start({ data: { requestId: "11111111-1111-4111-8111-111111111112", draft }, context: { userId: "owner", supabase: { rpc: async () => ({ error: { code: "PGRST202" } }) } } })).rejects.toThrow("owner-private storage");
 });
 it.skipIf(!process.env.RUN_CUSTOM_LIVE)("real AI sample turn through unchanged handler and isolated storage", async () => {
   setup();
   const inputDraftPath = process.env.CUSTOM_DRAFT_PATH;
-  if (inputDraftPath) memory.session.scenarios = practiceScenario(practiceDraftSchema.parse(JSON.parse(readFileSync(inputDraftPath, "utf8"))), "isolated");
+  if (inputDraftPath) memory.session.custom_practice_snapshot = practiceDraftSchema.parse(JSON.parse(readFileSync(inputDraftPath, "utf8")));
   const result = await send({ data: { sessionId: memory.session.id, activityKey: "selected_playbook", coachMessage: "Team, what do we actually know about commuter students, and what remains an assumption?", reference: true }, context: { userId: "owner" } });
   expect(result.messages.length).toBeGreaterThan(0);
-  expect(result.messages.every((m: any) => memory.session.scenarios.stakeholders.some((t: any) => t.name === m.stakeholder_name))).toBe(true);
+  expect(result.messages.every((m: any) => memory.session.custom_practice_snapshot.team.some((t: any) => t.name === m.stakeholder_name))).toBe(true);
   writeFileSync("/tmp/browser/custom-practice/turn.json", JSON.stringify({ session: memory.session, messages: memory.messages }));
 }, 120000);

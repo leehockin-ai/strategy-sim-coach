@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { PRACTICE_START_BLOCKER, practiceDraftSchema, practiceIntakeSchema, sourceUploadSchema } from "./custom-scenario";
+import { practiceIntakeSchema, sourceUploadSchema } from "./custom-scenario";
+import { practiceStartSchema } from "./practice-access";
 
-// Every entry point requires validated signed-in identity. No admin client or
-// durable storage exists in this opt-in preview path.
+// Every entry point requires validated signed-in identity; launch uses owner-RLS RPCs.
 export const extractCustomScenarioSource = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth]).inputValidator(d => sourceUploadSchema.parse(d))
   .handler(async ({ data }) => {
@@ -19,5 +19,14 @@ export const draftCustomScenario = createServerFn({ method: "POST" })
     return { draft: await generatePracticeDraft(data, key), ownerId: context.userId };
   });
 export const startCustomPractice = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth]).inputValidator(d => practiceDraftSchema.parse(d))
-  .handler(async () => { throw new Error(PRACTICE_START_BLOCKER); });
+  .middleware([requireSupabaseAuth]).inputValidator(d => practiceStartSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const { launchPrivatePractice } = await import("./private-practice.server");
+    return launchPrivatePractice(context.supabase, context.userId, data);
+  });
+
+export const customPracticeCapability = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth]).handler(async ({ context }) => {
+    const { privatePracticeAvailable } = await import("./private-practice.server");
+    return { available: await privatePracticeAvailable(context.supabase) };
+  });

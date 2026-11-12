@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { draftCustomScenario, extractCustomScenarioSource, startCustomPractice } from "@/lib/custom-scenario.functions";
+import { draftCustomScenario, extractCustomScenarioSource, startCustomPractice, customPracticeCapability } from "@/lib/custom-scenario.functions";
 import { INTAKE_LIMIT, UPLOAD_LIMIT, PRACTICE_START_BLOCKER, practiceDraftSchema, practiceIntakeSchema, type PracticeDraft, type PracticeIntake } from "@/lib/custom-scenario";
 
 type Props = { generate?: (data: PracticeIntake) => Promise<{ draft: PracticeDraft; ownerId: string }>; extract?: (data: { name: string; type: string; base64: string }) => Promise<{ text: string; truncated: boolean }>; start?: (draft: PracticeDraft) => Promise<void> };
 export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
+  const navigate = useNavigate();
+  const capabilityFn = useServerFn(customPracticeCapability);
+  const [available, setAvailable] = useState(false);
+  const requestId = useRef<string | null>(null);
+  useEffect(() => { if (!start) void capabilityFn().then(r => setAvailable(r.available)).catch(() => setAvailable(false)); }, [capabilityFn, start]);
   const draftFn = useServerFn(draftCustomScenario);
   const extractFn = useServerFn(extractCustomScenarioSource);
   const startFn = useServerFn(startCustomPractice);
@@ -23,6 +29,7 @@ export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
       const data = practiceIntakeSchema.parse({ ...intake, clientSafe: safe });
       const result = await (generate ? generate(data) : draftFn({ data }));
       setDraft(practiceDraftSchema.parse(result.draft));
+      requestId.current = null;
       setIntake(i => ({ ...i, situation: "" }));
       setNotice("Review draft created. Original source is no longer held in this form.");
     } catch (e) { setError(e instanceof Error ? e.message : "Could not create a draft. Your input is retained."); }
@@ -42,7 +49,7 @@ export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
     } catch (e) { setError(e instanceof Error ? e.message : "Could not read the document."); }
     finally { setBusy(false); }
   }
-  function clear() { setDraft(null); setIntake({ situation: "", complexity: "beginner", dynamics: "", outcome: "", constraints: "" }); setSafe(false); setError(""); setNotice(""); setOpen(false); }
+  function clear() { requestId.current = null; setDraft(null); setIntake({ situation: "", complexity: "beginner", dynamics: "", outcome: "", constraints: "" }); setSafe(false); setError(""); setNotice(""); setOpen(false); }
   return <section className="mb-10 border-b border-border pb-8 min-w-0">
     <Button variant="outline" aria-expanded={open} onClick={() => setOpen(!open)}>Create your own scenario to coach</Button>
     {open && <div className="mt-5 max-w-3xl space-y-4">
@@ -61,8 +68,8 @@ export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
         {([['title', 'Title'], ['brief', 'Client brief'], ['tensions', 'Public tensions'], ['scope', 'Scope'], ['outcome', 'Outcome'], ['constraints', 'Constraints'], ['challenge', 'Coaching challenge']] as const).map(([key, label]) => <label key={key} className="block text-sm">{label}<textarea className={field} rows={key === 'brief' ? 5 : 2} maxLength={key === 'title' ? 160 : key === 'brief' ? 5000 : 2000} value={draft[key]} onChange={e => setDraft({ ...draft, [key]: e.target.value })} /></label>)}
         <h3 className="text-base">Client team</h3>
         {draft.team.map((member, idx) => <fieldset key={idx} className="grid gap-2 border-t border-border pt-3"><legend className="text-sm">Team member {idx + 1}</legend>{(['name', 'role', 'description'] as const).map(key => <label key={key} className="block text-sm capitalize">{key}<input className={field} maxLength={key === 'description' ? 1000 : key === 'name' ? 100 : 160} value={member[key]} onChange={e => setDraft({ ...draft, team: draft.team.map((m, i) => i === idx ? { ...m, [key]: e.target.value } : m) })} /></label>)}</fieldset>)}
-        <p role="status" className="text-sm text-muted-foreground">{PRACTICE_START_BLOCKER}</p>
-        <Button disabled={busy || !start} onClick={async () => { setBusy(true); setError(""); try { const d = practiceDraftSchema.parse(draft); if (start) await start(d); else await startFn({ data: d }); } catch (e) { setError(e instanceof Error ? e.message : "Could not start practice."); } finally { setBusy(false); } }}>Start practice · Scope → Approach → Facilitate</Button>
+        <p role="status" className="text-sm text-muted-foreground">{available || start ? "Starting freezes this reviewed scenario and team for private practice. It never counts toward certification." : PRACTICE_START_BLOCKER}</p>
+        <Button disabled={busy || (!start && !available)} onClick={async () => { setBusy(true); setError(""); try { const d = practiceDraftSchema.parse(draft); if (start) await start(d); else { requestId.current ??= crypto.randomUUID(); const result = await startFn({ data: { requestId: requestId.current, draft: d } }); await navigate({ to: "/sessions/$sessionId", params: { sessionId: result.session.id } }); } } catch (e) { setError(e instanceof Error ? e.message : "Could not start practice."); } finally { setBusy(false); } }}>Start practice · Scope → Approach → Facilitate</Button>
       </div>}
       {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive break-words">{error}</p>}

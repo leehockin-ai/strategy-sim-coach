@@ -105,6 +105,7 @@ function AssessmentPage() {
   const hasReviewerDecision = !!evaluation.reviewer_decision;
   const submissionRequestedAt: string | null = session.submission_requested_at ?? null;
   const isSubmittedForReview = !!submissionRequestedAt && !hasReviewerDecision;
+  const isCustomPractice = !!session.custom_practice_snapshot;
   const isPracticeOnly = !submissionRequestedAt && !hasReviewerDecision;
 
   const reviewerDecision: string = evaluation.reviewer_decision ?? "";
@@ -191,7 +192,7 @@ function AssessmentPage() {
                 <p className="text-sm leading-relaxed">
                   {isSubmittedForReview
                     ? "This is your AI-generated rubric. It's been submitted to the Strategyzer reviewer queue. Until a reviewer signs off, this is not a Strategyzer certification assessment."
-                    : "This is your AI-generated rubric — a development tool to help you reflect on your work. It is not a Strategyzer certification assessment. To pursue certification on this scenario, submit your work for Strategyzer reviewer assessment below."}
+                    : isCustomPractice ? "This private custom practice assessment is developmental only. It does not count toward Strategyzer certification and cannot enter the reviewer queue." : "This is your AI-generated rubric — a development tool to help you reflect on your work. It is not a Strategyzer certification assessment. To pursue certification on this scenario, submit your work for Strategyzer reviewer assessment below."}
                 </p>
               </div>
             </>
@@ -325,7 +326,7 @@ function AssessmentPage() {
 
       {/* NEXT STEPS / SUBMISSION CTA */}
       <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline-t">
-        {isPracticeOnly && (
+        {isPracticeOnly && !isCustomPractice && (
           <div className="border border-ink p-8 mb-8" style={{ backgroundColor: "var(--secondary)" }}>
             <div className="grid md:grid-cols-12 gap-6 items-center">
               <div className="md:col-span-8">

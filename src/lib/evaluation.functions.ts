@@ -1,3 +1,4 @@
+import { hydratePracticeSession, assertCertificationSession } from "./practice-access";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { assertReviewerAccess } from "@/lib/reviewer-access";
@@ -435,7 +436,7 @@ export async function prepareEvaluationInput(admin: AdminClient, sessionId: stri
     .select("stakeholder_id, engagement, trust, guardedness, turn_index, reasoning")
     .eq("session_id", sessionId).order("stakeholder_id", { ascending: true }).order("turn_index", { ascending: true });
   if (stateError) throw new Error(stateError.message);
-  const s = session as unknown as SessionForEval & { id: string };
+  const s = hydratePracticeSession(session as any) as unknown as SessionForEval & { id: string };
   s.live_evidence = liveEvidence;
   if (liveEvidence?.runs?.length) {
     // Live-room assessment does not need hidden scenario diagnostics or legacy state calibration.
@@ -585,7 +586,7 @@ function hasAdvancePathway(app: unknown) {
 }
 
 async function ownedSession(context: { supabase: any; userId: string }, sessionId: string) {
-  const r = await context.supabase.from("sessions").select("id,owner_id,scenario_id,playbook_application,created_at").eq("id", sessionId).maybeSingle();
+  const r = await context.supabase.from("sessions").select("*").eq("id", sessionId).maybeSingle();
   if (r.error || !r.data) throw new Error("Session not found");
   assertEvidenceOwner(r.data, context.userId);
   return r.data as { id: string; owner_id: string; scenario_id: string; playbook_application: unknown; created_at: string };
@@ -600,6 +601,8 @@ export const startAssessmentJob = createServerFn({ method: "POST" })
   .inputValidator(sessionInput)
   .handler(async ({ data, context }) => {
     const session = await ownedSession(context, data.sessionId);
+    const { assertEntitlement } = await import("./entitlements.server");
+    await assertEntitlement(context.userId, "full_ai_assessment");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const store = supabaseAssessmentStore(supabaseAdmin);
     const existing = await store.existingEvaluationId(data.sessionId);
@@ -623,6 +626,8 @@ export const advanceAssessmentJob = createServerFn({ method: "POST" })
   .inputValidator(sessionInput)
   .handler(async ({ data, context }) => {
     await ownedSession(context, data.sessionId);
+    const { assertEntitlement } = await import("./entitlements.server");
+    await assertEntitlement(context.userId, "full_ai_assessment");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const store = supabaseAssessmentStore(supabaseAdmin);
     let prepared: PreparedInput | null = null;
@@ -693,6 +698,8 @@ export const setReviewerDecision = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertReviewerAccess(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const target = await supabaseAdmin.from("sessions").select("*").eq("id", data.sessionId).maybeSingle();
+    assertCertificationSession(target.data);
     const { data: evaluation, error } = await supabaseAdmin
       .from("evaluations")
       .update({
@@ -729,6 +736,7 @@ export const listReviewSessions = createServerFn({ method: "GET" })
       .select(
         "id, candidate_name, candidate_email, status, created_at, completed_at, submission_requested_at, scenarios(title, slug, difficulty, industry), evaluations(recommendation, reviewer_decision, reviewer_name, reviewed_at)"
       )
+      .not("scenario_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) throw new Error(error.message);

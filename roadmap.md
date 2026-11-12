@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Approved private practice launch
+- [ ] Frozen owner-private Start, same journey adapters, certification exclusion and separate future entitlement hooks.
+- [ ] Unapplied schema security audit, ownership/idempotency regressions and isolated ordinary-screen browser journey.
+- [ ] Hosted enablement: blocked by permission to install and verify private schema in an isolated backend; shared backend must not be changed.
+
 ## Contextual client-team reactions
 - [x] Shared transcript-grounded interaction rules across scoping, stakeholder, normal Chapter 2 and gated live team; refusal-only artifact guard, no scoring/UI/state contract changes.
 - [x] Mock attribution/history/refusal checks and eight isolated actual AI turns inspected; core regressions/build checked. Observed scoping invented-observation gap documented, not claimed resolved; no shared writes or publish. Details: docs/team-tone-verification.md.

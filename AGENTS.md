@@ -28,3 +28,6 @@
 - Chapter 2 → 3 for the modern Playbook working session requires a concluded team event or a once-written sessions.working_session_skip reason, enforced in updateSession via the shared chapter2-progress rule; non-Playbook pathways, earlier canvas evidence and already-advanced sessions are exempt so legacy sessions keep working.
 - Live-room conclusions carry a public conclusion_mode (early_stop from the working phase, after_synthesis otherwise); early stop never writes a synthesis event, and unmarked historical conclusions read as unspecified, so the record never claims a step the coach did not take.
 - Chapter 3 summary: read-only over the public evidence loader; outcome only from run-bound Scope.
+
+- Private custom practice freezes approved client-visible scenario/roster on ordinary sessions, with restrictive owner policies across evidence and immutable identity; all shared handlers hydrate it so no private catalog or duplicate coaching engine exists.
+- Custom practice is excluded from certification submission, reviewer access and rollups in server handlers and schema guards; future launch, AI assessment and formal review have separate server entitlement hooks preserving current authenticated policy.

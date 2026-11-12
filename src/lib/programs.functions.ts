@@ -107,6 +107,7 @@ export const getProgramRollup = createServerFn({ method: "POST" })
          assignments:assignment_id!inner (program_id),
          evaluations (scores, ai_section_verdicts, recommendation, reviewer_decision)`,
       )
+      .not("scenario_id", "is", null)
       .eq("assignments.program_id", data.programId);
     if (error) throw new Error(error.message);
 

@@ -30,6 +30,7 @@ export const listMyAssignments = createServerFn({ method: "GET" })
       const { data: sess } = await supabaseAdmin
         .from("sessions")
         .select("id, status, created_at, completed_at, assignment_id")
+        .not("scenario_id", "is", null)
         .in("assignment_id", ids)
         .eq("owner_id", context.userId)
         .order("created_at", { ascending: false });
@@ -104,6 +105,7 @@ export const startSessionFromAssignment = createServerFn({ method: "POST" })
       const { data: existing } = await supabaseAdmin
         .from("sessions")
         .select("id, status")
+        .not("scenario_id", "is", null)
         .eq("assignment_id", data.assignmentId)
         .eq("owner_id", context.userId)
         .not(

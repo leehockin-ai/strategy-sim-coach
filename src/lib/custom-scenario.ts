@@ -14,7 +14,7 @@ export const practiceDraftSchema = z.object({
   team: z.array(z.object({ name: z.string().trim().min(1).max(100), role: z.string().trim().min(1).max(160), description: z.string().max(1000) }).strict()).min(2).max(6),
   tensions: z.string().max(2000), scope: z.string().max(2000),
   outcome: z.string().max(2000), constraints: z.string().max(2000), challenge: z.string().max(2000),
-}).strict();
+}).strict().refine(d => new Set(d.team.map(p => p.name.toLowerCase().trim())).size === d.team.length, { message: "Team member names must be distinct" });
 export type PracticeIntake = z.infer<typeof practiceIntakeSchema>;
 export type PracticeDraft = z.infer<typeof practiceDraftSchema>;
 export const PRACTICE_START_BLOCKER = "Starting custom practice is unavailable until owner-private storage is installed and verified. This draft has not been saved; no session has been created.";

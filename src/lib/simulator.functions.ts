@@ -13,6 +13,7 @@ import { SWITCH_PHASE, activeReference, buildSwitchPayload, describeSwitch, swit
 import { boardPrompt, conversationSections, conversationWork, starterBoard, type BoardNote } from "./conversation-work";
 import { screenshotSchema, screenshotContent, SCREENSHOT_NOTICE, SCREENSHOT_RULES, readImageReply } from "./team-attachment";
 import { TEAM_INTERACTION_RULES, withoutRefusalOps } from "./team-interaction";
+import { hydratePracticeSession, assertCertificationSession } from "./practice-access";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -33,12 +34,12 @@ export const suggestPlaybook = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, engagement_brief, dialogue_commitments, playbook_suggestions, scenarios(title, context, summary, ambiguity_factors)")
+      .select("*, scenarios(title, context, summary, ambiguity_factors)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
 
-    const scenario = (session as any).scenarios;
+    const scenario = hydratePracticeSession(session as any).scenarios;
     const playbookCatalog = PLAYBOOKS.map(
       (p) => `- ${p.id} — ${p.name} (${p.diagnosis}): "${p.whenToUse}" · Signals: ${p.signals.join("; ")} · Outcome: ${p.outcome}`,
     ).join("\n");
@@ -285,6 +286,8 @@ export const createSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const catalog = await context.supabase.from("scenarios").select("id").eq("id", data.scenarioId).maybeSingle();
+    if (catalog.error || !catalog.data) throw new Error("Scenario not found");
     const { data: session, error } = await supabaseAdmin
       .from("sessions")
       .insert({
@@ -316,7 +319,7 @@ export const listMySessions = createServerFn({ method: "GET" })
       .eq("owner_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { sessions: data ?? [] };
+    return { sessions: (data ?? []).map(s => hydratePracticeSession(s as any)) };
   });
 
 // ──────────────────────────────────────────────────────────────────
@@ -334,11 +337,15 @@ export const requestSubmissionForAssessment = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existing } = await supabaseAdmin
       .from("sessions")
-      .select("owner_id, submission_requested_at, status")
+      .select("*")
       .eq("id", data.sessionId)
       .single();
     if (!existing) throw new Error("Session not found");
     if ((existing as any).owner_id !== context.userId) throw new Error("Forbidden");
+
+    assertCertificationSession(existing);
+    const { assertEntitlement } = await import("./entitlements.server");
+    await assertEntitlement(context.userId, "formal_certification_assessment");
 
     const { data: ev } = await supabaseAdmin
       .from("evaluations")
@@ -389,6 +396,7 @@ export const getSessionForReviewer = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!session) throw new Error("Session not found");
+    assertCertificationSession(session);
     const { data: messages } = await supabaseAdmin
       .from("messages").select("*").eq("session_id", data.sessionId).order("created_at", { ascending: true });
     const { data: evaluation } = await supabaseAdmin
@@ -422,7 +430,7 @@ export const getSession = createServerFn({ method: "POST" })
     if ((session as any).owner_id !== context.userId) throw new Error("Forbidden");
     // Candidate payloads carry public client context only — never private
     // assessment truth (system_prompt, ambiguity factors, hidden postures).
-    (session as any).scenarios = publicScenario((session as any).scenarios);
+    (session as any).scenarios = publicScenario(hydratePracticeSession(session as any).scenarios);
 
     const { data: messages } = await supabaseAdmin
       .from("messages")
@@ -599,7 +607,7 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
-    const scenario = (session as any).scenarios;
+    const scenario = hydratePracticeSession(session as any).scenarios;
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
     const persona = stakeholders.find((s) => s.name === data.stakeholderName);
     if (!persona) throw new Error("Unknown stakeholder");
@@ -787,7 +795,7 @@ export const sendScopingTurn = createServerFn({ method: "POST" })
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
 
-    const scenario: any = (session as any).scenarios;
+    const scenario: any = hydratePracticeSession(session as any).scenarios;
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture?: string; description?: string }>;
     const roster = stakeholders.map((s) => `- ${s.name} (${s.role}) — character context: ${s.posture ?? s.description ?? "Use role and actual dialogue; no hidden motives supplied."}`).join("\n");
 
@@ -953,7 +961,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, engagement_brief, chosen_intervention_slug, intervention_rationale, playbook_facilitation_plan, playbook_activity_run, methodology_choice, methodology_rationale, application_canvas, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
+      .select("*, scenarios(title, context, summary, stakeholders, ambiguity_factors)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
@@ -973,7 +981,7 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
       .map((m: any) => (m.role === "candidate" ? `Coach: ${m.content}` : `${m.stakeholder_name}: ${m.content}`))
       .join("\n");
 
-    const scenario: any = (session as any).scenarios;
+    const scenario: any = hydratePracticeSession(session as any).scenarios;
     const existing = (session as any).application_canvas ?? {};
     const existingPretty = Object.entries(existing)
       .map(([k, v]) => `- ${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
@@ -1073,7 +1081,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
 
     const { data: session } = await supabaseAdmin
       .from("sessions")
-      .select("framing_notes, engagement_brief, chosen_intervention_slug, intervention_rationale, playbook_facilitation_plan, playbook_activity_run, methodology_choice, application_canvas, scenarios(title, context, stakeholders)")
+      .select("*, scenarios(title, context, stakeholders)")
       .eq("id", data.sessionId)
       .single();
     if (!session) throw new Error("Session not found");
@@ -1083,7 +1091,7 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
     const cell = canvas.cells.find((c) => c.key === data.cellKey);
     if (!cell) throw new Error(`Unknown cell: ${data.cellKey}`);
 
-    const scenario: any = (session as any).scenarios;
+    const scenario: any = hydratePracticeSession(session as any).scenarios;
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
 
     const transcript = [
@@ -1224,7 +1232,7 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
       .single();
     if (!session) throw new Error("Session not found");
 
-    const scenario = (session as any).scenarios;
+    const scenario = hydratePracticeSession(session as any).scenarios;
     const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture?: string; description?: string }>;
 
     const { data: transcript } = await supabaseAdmin
