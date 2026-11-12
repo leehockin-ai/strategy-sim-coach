@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Disabled Gmail assessment transport
+- [x] Prepare server-only OAuth refresh/send transport, exact registered template, durable no-blind-retry boundaries and isolated mocks; no live mail or shared writes.
+- [x] Document one-time Google setup, secure secrets and isolated enablement prerequisites; no temporary mock route found, UI unchanged. Details: docs/assessment-gmail-setup.md.
+- [ ] Gmail activation waits for Lee's Google OAuth/secure Secrets setup, approved isolated outbox installation and dispatcher verification, plus separate approval for first controlled email; sending remains disabled.
+
 ## Assessment email and isolated storage setup
 - [x] Registered assessment-ready template, disabled supported send-route adapter and staged owner-checked outbox claim/settle SQL; 301 tests passed, 5 opt-in tests skipped, preview build OK. Details: docs/assessment-email-storage-setup.md.
 - [x] Create separate staging draft and confirm its own test database; no shared schema/data writes.
