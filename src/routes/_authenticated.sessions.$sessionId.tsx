@@ -77,6 +77,7 @@ function SessionPage() {
   const [activeStep, setActiveStep] = useState<StepKey>(initialStep);
   const [initialized, setInitialized] = useState(false);
   const [scopeDirty, setScopeDirty] = useState(false);
+  const [briefOpen, setBriefOpen] = useState(true);
   useEffect(() => {
     if (data && !initialized) {
       setActiveStep(stepFromStatus((data.session as any).status));
@@ -169,8 +170,8 @@ function SessionPage() {
       <div id="step-main" tabIndex={-1} className="mx-auto max-w-[1400px] px-6 md:px-10 py-10 focus:outline-none">
         {activeChapter !== "scope" && <ChapterBanner chapter={activeChapter} />}
         {activeChapter === "scope" && <div>
-          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div><div className="text-xs uppercase flex flex-wrap gap-3 text-muted-foreground"><span>Meet the client</span><span>→ Refine your view</span><span>→ Clarify the outcome</span><span>→ Choose how to help</span></div></div>
-          <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-7 items-start">
+          <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div></div>
+          <div className={`grid gap-7 items-start ${briefOpen ? "xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "xl:grid-cols-[minmax(0,1fr)_16rem]"}`}>
             <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
               <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>1 · Client & brief</Button>
               <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>2 · Your Approach</Button>
@@ -197,7 +198,7 @@ function SessionPage() {
           <Button onClick={() => { if (scopeDirty) { toast.error("Save your engagement brief first."); return; } setActiveStep("coaching_approach"); focusMain(); }}>Next: Your Approach →</Button>
         </div>}
             </div>
-            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} onReadyToSubmit={goToApproach} />
+            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} onReadyToSubmit={goToApproach} onOpenChange={setBriefOpen} />
           </div>
         </div>}
         {renderKey === "application" && (
