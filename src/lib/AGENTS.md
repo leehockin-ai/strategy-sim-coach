@@ -1,4 +1,5 @@
 # Normal facilitation reference
+- Client-team interaction uses shared semantic prompt rules and actual transcript continuity, never profanity/sentiment scoring; explicit participant refusals remain speech but cannot source new work or disclosures, while other speakers retain independent agency.
 - Assessment notice capture is centralized at new persisted completion, with a staged unique-assessment transactional outbox; report reads never backfill and current unconfigured status never claims delivery.
 - Custom practice source and public editable drafts remain transient and authenticated; hosted Start fails closed until private durable session adapters and practice-only eligibility are approved, never insert custom content into broadly readable standardized scenarios.
 - Workspace content scroll is presentation-only and bounded independently of its heading/tabs/revision selector; only new note IDs while following latest reveal their actual DOM note, never grid-bottom scrolling, view changes, revision edits or historical snapshots.

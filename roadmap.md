@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## Contextual client-team reactions
+- [x] Shared transcript-grounded interaction rules across scoping, stakeholder, normal Chapter 2 and gated live team; refusal-only artifact guard, no scoring/UI/state contract changes.
+- [x] Mock attribution/history/refusal checks and eight isolated actual AI turns inspected; core regressions/build checked. Observed scoping invented-observation gap documented, not claimed resolved; no shared writes or publish. Details: docs/team-tone-verification.md.
+
 ## Assessment notices and private custom practice
 - [x] Central completion notice contract, unapplied outbox design, mock retries and truthful unconfigured status.
 - [x] Private in-memory intake/extraction and editable AI review; hosted Start fails closed.

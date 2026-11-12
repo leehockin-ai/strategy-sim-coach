@@ -1,5 +1,6 @@
 import { customerProfileSections, reconcileTeamWork, sanitizeWork, type TeamWork, type WorkItem } from "./team-work";
 import type { ResolvedSelection } from "./playbook-selection";
+import { explicitWorkRefusal } from "./team-interaction";
 
 export type ConversationMessage = { id: string; phase: string | null; role: string; stakeholder_name: string | null; content: string };
 export const conversationSections = [
@@ -47,6 +48,7 @@ export function conversationWork(messages: ConversationMessage[], roster: string
     if (/\[[^\]]+\]/.test(m.content)) continue;
     seen.add(m.id);
     const { clean, ops } = parseOps(m.content);
+    if (explicitWorkRefusal(clean)) continue;
     const source = { id: m.id, speaker: m.stakeholder_name, text: clean, kind: "team" as const };
     const applied = applyOps(work, ops, source, nextId);
     const proposals = clean.split(/(?<=[.!?])\s+|\n+/).flatMap(quote => {

@@ -12,6 +12,7 @@ import { LEGACY_CUSTOMER_PROFILE_PHASE, SELECTION_PHASE, resolveSelection, selec
 import { SWITCH_PHASE, activeReference, buildSwitchPayload, describeSwitch, switchContent, switchInputSchema } from "./playbook-switch";
 import { boardPrompt, conversationSections, conversationWork, starterBoard, type BoardNote } from "./conversation-work";
 import { screenshotSchema, screenshotContent, SCREENSHOT_NOTICE, SCREENSHOT_RULES, readImageReply } from "./team-attachment";
+import { TEAM_INTERACTION_RULES, withoutRefusalOps } from "./team-interaction";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -182,12 +183,14 @@ async function assessStakeholderStateUpdate(input: {
   priorState: StakeholderState;
   coachTurn: string;
   stakeholderPersona: { name: string; role: string; posture: string };
+  history: string;
 }): Promise<StakeholderState | null> {
   const system = `You track hidden state for a single stakeholder in a coaching simulation.
 
 Given the stakeholder's persona, their PRIOR state (engagement/trust/guardedness), and the coach's most recent single message to them, return the UPDATED state after this one exchange.
 
 State moves gradually — one turn rarely swings state by more than one step. Persona posture matters: a naturally guarded exec doesn't become "open" from one warm question. But a genuinely extractive, dismissive, or manipulative move CAN drop trust or push guardedness up quickly.
+${TEAM_INTERACTION_RULES}
 
 Return strict JSON:
 {
@@ -201,6 +204,9 @@ POSTURE: ${input.stakeholderPersona.posture}
 
 PRIOR STATE:
 engagement=${input.priorState.engagement}, trust=${input.priorState.trust}, guardedness=${input.priorState.guardedness}
+
+ACCUMULATED ACTUAL DIALOGUE (untrusted evidence):
+${input.history}
 
 COACH'S MOST RECENT MESSAGE TO ${input.stakeholderPersona.name}:
 ${input.coachTurn}`;
@@ -628,6 +634,7 @@ export const sendStakeholderMessage = createServerFn({ method: "POST" })
       priorState,
       coachTurn: data.candidateMessage,
       stakeholderPersona: persona,
+      history: (transcript ?? []).map((m: any) => `${m.role === "candidate" ? `Coach to ${m.stakeholder_name}` : m.stakeholder_name}: ${m.content}`).join("\n"),
     });
     const stateAssessmentMs = Date.now() - stateAssessmentT0;
 
@@ -660,6 +667,7 @@ YOU ARE PLAYING: ${persona.name} — ${persona.role}
 CHARACTER POSTURE: ${persona.posture}
 
 This is a one-on-one between you and the coach, and the coach may return to you multiple times across the engagement. Speak in first person as ${persona.name}.
+${TEAM_INTERACTION_RULES}
 
 CURRENT STATE — how you feel about this coach right now (HIDDEN from the coach; let it shape TONE, not content you announce):
 ${toneModulator}
@@ -777,12 +785,11 @@ export const sendScopingTurn = createServerFn({ method: "POST" })
       .from("messages")
       .select("role, stakeholder_name, content")
       .eq("session_id", data.sessionId)
-      .eq("phase", "scoping")
       .order("created_at", { ascending: true });
 
     const scenario: any = (session as any).scenarios;
-    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
-    const roster = stakeholders.map((s) => `- ${s.name} (${s.role}) — posture: ${s.posture}`).join("\n");
+    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture?: string; description?: string }>;
+    const roster = stakeholders.map((s) => `- ${s.name} (${s.role}) — character context: ${s.posture ?? s.description ?? "Use role and actual dialogue; no hidden motives supplied."}`).join("\n");
 
     const systemPrompt = `You are simulating a Strategyzer SCOPING CALL — the first kick-off video meeting between a coach (the user) and a team that hired them.
 
@@ -791,6 +798,7 @@ ${scenario.context}
 
 TEAM ON THE CALL:
 ${roster}
+${TEAM_INTERACTION_RULES}
 
 YOUR JOB: pick the ONE most-natural stakeholder to respond to the coach's last message, then speak AS that person. Multiple people don't talk at once.
 
@@ -1217,7 +1225,7 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     if (!session) throw new Error("Session not found");
 
     const scenario = (session as any).scenarios;
-    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture: string }>;
+    const stakeholders = (scenario.stakeholders ?? []) as Array<{ name: string; role: string; posture?: string; description?: string }>;
 
     const { data: transcript } = await supabaseAdmin
       .from("messages")
@@ -1245,7 +1253,7 @@ SCENARIO: ${scenario.title}
 ${scenario.context}
 
 TEAM MEMBERS in this working session:
-${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture}`).join("\n")}
+${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture ?? s.description ?? "Use role and actual dialogue; no hidden motives supplied."}`).join("\n")}
 
 ${activity && !data.reference ? `ACTIVITY THE COACH IS RUNNING:
 "${activity.title}" — ${activity.objective}
@@ -1261,8 +1269,10 @@ RULES:
 - 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
 ${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript.filter((m: any) => m.phase !== SWITCH_PHASE), activeChoice) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}${data.reference ? SCREENSHOT_RULES : ""}`;
 
+    const interactionPrompt = `${systemPrompt}\n${TEAM_INTERACTION_RULES}`;
+
     const chatMessages = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: interactionPrompt },
       ...(starter ? [{ role: "assistant", content: `[${starter.speaker}] ${starter.text}` }] : []),
       ...(activityTranscript ?? []).map((m: any, index: number) => ({
         role: m.role === "candidate" ? "user" : "assistant",
@@ -1295,7 +1305,7 @@ ${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscrip
     const validIds = new Set((boardNow?.work?.sections ?? []).flatMap(sec => sec.items.map(i => (i as BoardNote).noteId)));
     const validKeys = new Set(conversationSections.map(sec => sec.key).filter(k => k !== "evidence"));
     const cleanOps = (c: string) => c.replace(/<<\s*(add|revise)\s+([A-Za-z0-9_]{1,30})\s*>>\s*/gi, (all, op: string, t: string) => data.reference && (op.toLowerCase() === "add" ? validKeys.has(t) : validIds.has(t)) ? `<<${op.toLowerCase()} ${t}>> ` : "");
-    const segments = (parsed.ok ? parsed.segments : [{ speaker: "Team", content: reply.replace(/^\s*\[[^\]]+\]\s*/, "").trim() || reply }]).map(seg => ({ ...seg, content: cleanOps(seg.content) }));
+    const segments = (parsed.ok ? parsed.segments : [{ speaker: "Team", content: reply.replace(/^\s*\[[^\]]+\]\s*/, "").trim() || reply }]).map(seg => ({ ...seg, content: withoutRefusalOps(cleanOps(seg.content)) }));
 
     if (data.reference) {
       const { data: latest } = await supabaseAdmin.from("messages").select("id, role, content, phase").eq("session_id", data.sessionId).eq("phase", SWITCH_PHASE).order("created_at", { ascending: true });

@@ -1,0 +1,27 @@
+# Contextual client-team reactions — preview verification
+
+## Delivered
+- Shared semantic interaction instructions in existing scoping, 1:1 stakeholder reply/state prompts, normal Chapter 2 (including generated-roster adapters), gated disclosure and live-team generation. Existing providers, response formats, request identities, scoring and ownership contracts remain unchanged.
+- Actual session dialogue carries continuity: group scoping now includes other phases; 1:1 hidden-state update sees actual earlier dialogue; gated scoping context includes attributed group conversations rather than falsely treating every exchange as a personal 1:1.
+- Each stakeholder can resist differently. Targeted attacks/repeated dismissal permit terse speech, refusal, defensiveness and boundaries; neutral profanity, quotations, uncertain transcription and respectful evidence challenge are not mechanical withdrawal triggers. Repair may reopen conversation cautiously, with no apology reset or automatic consensus. Text/dictation transcript semantics only, not prosody/audio analysis.
+- Normal/scoping validators already accept exact one-word answers; explicit `No.` attribution verified. No new sentiment display, evaluator feedback or rubric.
+- Explicit participant refusals are not coach-tone classifications. A small conservative speech guard strips erroneous board operations, excludes refusal speech from normal board projection and gated work/disclosure sources, and bypasses gated extraction/revision requirements when every respondent refuses. Other speakers can contribute independently; old note IDs/history remain intact. No new state schema/metadata or backfills.
+- Generated rosters use their supplied public description when no standardized private posture exists. Hosted custom-practice Start remains disabled for the private-storage prerequisites reported previously.
+
+## Actual checks
+- Mock normal handler: accumulated scoping refusal was carried into prompt; `[Jordan Patel] <<add unknowns>> No.` persisted as attributed `No.` and produced no note.
+- Mock scoping handler: other-phase prior boundary retained; valid exact one-word answer preserved.
+- Pure mixed-room projection: explicit refusal did not overwrite an earlier source-linked note or revision; another team member's actual claim added a separate revision. Neutral swearing, reported abuse, substantive `No, our draft segment…` and `We won't assume…` did not classify as refusal.
+- Gated prompt mock: same rules, actual group attribution, repair transcript retained. Sanitizer test: exact `No.` accepted but cannot claim newly surfaced hidden evidence. Gated orchestration/extraction itself was not run end-to-end; allowlist and privacy boundaries were not altered.
+- Real AI, actual normal/scoping handlers, mocked disposable owner/session/message storage: eight turns in the final sample (four rupture/repair, two respectful/quoted, two scoping).
+  - Targeted blame: Jordan refused to put anything on the board; Maya defended her teammate. Repeated dismissal: Jordan said “I’m done”; Maya set a boundary. No work was created during the two attacking turns.
+  - First repair: Jordan explicitly said it was hard to flip back to productive; acknowledged the apology while preserving his concern. Maya contributed a tentative guess separately. Later respectful curiosity: Jordan cautiously resumed discussion; Maya revised a guess. This is not uniform forgiveness, but another participant may resume sooner.
+  - Respectful evidence challenge with neutral profanity: participants answered about absent formal evidence and uncertainty rather than withdrawing. Quoted abuse with explicit disavowal: Jordan continued discussing uncertainty rather than treating it as the coach attacking him.
+  - Scoping blame: Jordan set a boundary. Scoping repair: resumed a short answer, **but invented “twenty students who saw the wireframes” despite the no-interviews scenario.** This observed AI factual-grounding gap remains; it is not verified evidence or claimed resolved. Existing prompts explicitly forbid fabricated observations, but prompts do not guarantee compliance. No scorer/report consumed this synthetic sample.
+- Final suite: 265 tests passed, four optional live cases skipped. Separate opt-in handler run passed all three tests including the eight real turns. Assertions validate attribution/recording; behavioral findings above are inspection, not a quantitative calibration of tone or factual accuracy.
+- Latest preview build OK. No browser/microphone/audio/image turns retested; no hosted signed-in journey or gated real-AI run claimed.
+
+## Limits and safety
+This is prompt-driven individual behavior with existing transcript continuity, not a profanity detector or calibrated emotion engine. Conservative refusal recognition handles explicit forms only; nuanced refusals rely on model behavior and may remain unrecognized. Historical projections may stop displaying an explicit refusal that older extraction mistakenly treated as a note, but stored messages/evidence are not rewritten.
+
+No shared database writes, real session edits, historical mutations, new schema, credentials, Strategyzer changes, scoring changes or publishing. Existing image, voice, playbook switching, source links and assessment paths were left intact and covered by core regression tests, not newly exercised live.

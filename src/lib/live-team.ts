@@ -1,5 +1,6 @@
 // Live Client Team (Stage 5 POC). Pure helpers shared by server orchestration and tests.
 // Private participant/evidence data never leaves the server; only publicTeamConfig output reaches candidates.
+import { explicitWorkRefusal } from "./team-interaction";
 
 export type Level = "low" | "medium" | "high";
 export type ParticipantState = { engagement: Level; trust: Level; defensiveness: Level; willingness_to_contribute: Level; note?: string };
@@ -43,7 +44,7 @@ export function sanitizeTurn(raw: RawTurn, c: TeamConfig, room: RoomState) {
     .filter(r => r.participant && names.has(r.participant) && typeof r.text === "string" && r.text.trim())
     .slice(0, 3)
     .flatMap(r => typeof r.participant === "string" && typeof r.text === "string" ? [{ participant: r.participant, text: r.text.trim().slice(0, 900) }] : []);
-  const spoke = new Set(responses.map(r => r.participant));
+  const spoke = new Set(responses.filter(r => !explicitWorkRefusal(r.text)).map(r => r.participant));
   const surfaced = (raw.surfaced ?? []).filter(s => {
     const item = c.truth.evidence.find(e => e.id === s.evidence_id);
     // Evidence can only surface through its holder actually speaking this turn, and only once.

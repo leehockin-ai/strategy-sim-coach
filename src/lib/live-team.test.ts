@@ -47,4 +47,9 @@ describe("live client team", () => {
     expect(roomPhase([{ event_type: "system_event", actor_type: "system", metadata: { team_kind: "session_started" } }])).toBe("working");
     expect(roomPhase([{ event_type: "system_event", actor_type: "system", metadata: { team_kind: "session_started" } }, { event_type: "decision", actor_type: "coach", metadata: { team_kind: "concluded" } }])).toBe("concluded");
   });
+  it("gated one-word refusal is valid but cannot claim newly surfaced evidence", () => {
+    const turn = sanitizeTurn({ responses: [{ participant: "Jordan", text: "No." }], surfaced: [{ evidence_id: "poll", by: "Jordan" }] }, config, initialRoom(config, {}));
+    expect(turn.responses).toEqual([{ participant: "Jordan", text: "No." }]);
+    expect(turn.surfaced).toEqual([]);
+  });
 });
