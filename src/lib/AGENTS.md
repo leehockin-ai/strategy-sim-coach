@@ -1,4 +1,5 @@
 # Normal facilitation reference
+- Workspace content scroll is presentation-only and bounded independently of its heading/tabs/revision selector; only new note IDs while following latest reveal their actual DOM note, never grid-bottom scrolling, view changes, revision edits or historical snapshots.
 - Chapter 2 transcript scroll is presentation-only: initial/session open, near-bottom new turns and successful coach sends follow latest; source navigation focuses and scrolls within the labelled native pane without moving the composer or altering stored messages.
 - Chapter 2 visual workspace adapters reuse the same notes and revisions; source origins follow ordered validated reference switches, starters retain Scope origin, legacy rows fall back to unknown, and assumption placement requires both explicitly stated axes rather than inferred certainty.
 - Screenshot references in Chapter 2 are validated inline PNG/JPEG/WebP, streamed through the existing owner-authorized team handler and never stored; only a notice and attributed team speech persist, preventing a public/private attachment store or image-derived evidence claim.
