@@ -1,5 +1,7 @@
 # Assessment notices and custom practice — preview delivery
 
+> Custom practice follow-up: implementation and storage design below are superseded by `private-practice-launch-verification.md` and `unapplied/private-practice-launch.sql`. Hosted Start still fails closed pending isolated schema installation. Email remains unchanged.
+
 ## What works now
 - Scenarios has a collapsed **Create your own scenario to coach** intake. Paste client-safe text or extract PDF/TXT/MD/VTT/SRT in memory; review/edit the brief, team, public tensions, scope, outcome, constraints and coaching challenge generated through authenticated Lovable AI.
 - Limits: 4 MB, PDF 50 pages, selectable text only, first 24,000 characters. No OCR, Word or audio transcription. Source type/content is validated server-side. PDF extraction reuses `unpdf` from the existing authorized playbook extractor, without its storage upload.

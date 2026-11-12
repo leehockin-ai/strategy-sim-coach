@@ -1,8 +1,8 @@
 # Stabilization roadmap
 
 ## Approved private practice launch
-- [ ] Frozen owner-private Start, same journey adapters, certification exclusion and separate future entitlement hooks.
-- [ ] Unapplied schema security audit, ownership/idempotency regressions and isolated ordinary-screen browser journey.
+- [x] Frozen owner-private Start, same journey adapters, certification exclusion and separate future entitlement hooks.
+- [x] Unapplied schema audit and disposable PostgreSQL ownership/idempotency tests; 275 regressions. Isolated ordinary-screen journey through Chapter 3/generating verified with real scoping/team AI; final report run interrupted. See docs/private-practice-launch-verification.md.
 - [ ] Hosted enablement: blocked by permission to install and verify private schema in an isolated backend; shared backend must not be changed.
 
 ## Contextual client-team reactions
@@ -14,7 +14,7 @@
 - [x] Private in-memory intake/extraction and editable AI review; hosted Start fails closed.
 - [x] 248 regressions; separate real AI draft and generated-roster team turn on isolated storage; actual-screen fixture intake/edit/sample desktop/mobile; build OK. Prerequisites in docs/assessment-notices-custom-practice-verification.md.
 - [ ] Enable durable assessment mail: blocked by approved domain/infrastructure setup, outbox migration and dispatcher verification; none applied or sent.
-- [ ] Enable full custom practice journey: blocked by approval to apply owner-private storage and implement/verify session adapters in isolated backend; hosted Start remains disabled.
+- [ ] Enable hosted custom practice: blocked by isolated backend availability, permission to apply private schema and full persisted report verification; adapters are implemented, hosted Start remains disabled.
 
 ## Chapter 2 simple visual workspace
 - [x] One active reference and collapsed Playbooks used; four read-only views share note IDs, history and source-derived origins without changing chat, Scope or storage.
