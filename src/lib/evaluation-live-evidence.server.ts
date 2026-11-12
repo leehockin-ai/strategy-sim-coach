@@ -5,8 +5,9 @@ import { publicStakeholders } from "./scenario-visibility";
 
 // Caller must have checked session ownership or reviewer role. RLS remains the read boundary.
 // No privileged client or private tables are needed to assess public observable behavior.
-export async function loadLiveEvaluationEvidence(client: SupabaseClient<Database>, session: { id: string; owner_id: string | null; scenario_id: string }) {
-  if (!session.owner_id) return { version: "public_live_v1" as const, runs: [], omittedRuns: 0 };
+export async function loadLiveEvaluationEvidence(client: SupabaseClient<Database>, session: { id: string; owner_id: string | null; scenario_id: string | null }) {
+  // Private practice never uses external runs; it has no live run evidence.
+  if (!session.owner_id || !session.scenario_id) return { version: "public_live_v1" as const, runs: [], omittedRuns: 0 };
   const runsResult = await client.from("activity_runs").select("id,session_id,candidate_id,scenario_id,runtime_type,intervention_slug,scope_revision_id,started_at,last_sequence").eq("session_id", session.id).eq("candidate_id", session.owner_id).eq("runtime_type", "strategyzer_external").order("started_at", { ascending: false }).limit(5);
   if (runsResult.error) throw new Error("Live assessment evidence could not be loaded");
   const runs = (runsResult.data ?? []).slice(0, 4);
@@ -42,5 +43,5 @@ export async function loadLiveEvaluationEvidence(client: SupabaseClient<Database
   const scopeIds = runs.flatMap(r => r.scope_revision_id ? [r.scope_revision_id] : []);
   const scopes = scopeIds.length ? await client.from("scope_revisions").select("id,session_id,revision,snapshot").eq("session_id", session.id).in("id", scopeIds) : { data: [], error: null };
   if (scopes.error) throw new Error("Bound Scope assessment evidence could not be loaded");
-  return assembleLiveEvidence({ sessionId: session.id, ownerId: session.owner_id, scenarioId: session.scenario_id, runs, events, revisions, scopes: scopes.data ?? [], identities, omittedRuns: Math.max(0, (runsResult.data?.length ?? 0) - 4) });
+  return assembleLiveEvidence({ sessionId: session.id, ownerId: session.owner_id, scenarioId: session.scenario_id as string, runs, events, revisions, scopes: scopes.data ?? [], identities, omittedRuns: Math.max(0, (runsResult.data?.length ?? 0) - 4) });
 }

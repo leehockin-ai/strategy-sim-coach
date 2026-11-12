@@ -92,6 +92,20 @@
       "when": 1794233283812,
       "tag": "0012_working_session_skip",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794502810635,
+      "tag": "0013_private_practice_launch",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794502838063,
+      "tag": "0014_reviewer_materials",
+      "breakpoints": true
     }
   ]
 }

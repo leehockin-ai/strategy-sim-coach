@@ -1,4 +1,4 @@
--- UNAPPLIED: install atomically only on an approved isolated backend.
+-- APPLIED as drizzle/migrations/0014_reviewer_materials.sql (Lee approved, Nov 2026).
 CREATE TABLE public.reviewer_supplements (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  session_id uuid NOT NULL UNIQUE REFERENCES public.sessions(id),

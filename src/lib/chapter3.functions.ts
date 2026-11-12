@@ -18,7 +18,7 @@ export const getChapter3Summary = createServerFn({ method: "POST" })
     const { data: allowed } = await context.supabase.rpc("activity_runtime_test_allowed", { _session: session.id, _candidate: context.userId });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: config } = await supabaseAdmin.from("team_activity_configs").select("poc,methodology_approved")
-      .eq("scenario_id", session.scenario_id).eq("intervention_slug", session.chosen_intervention_slug ?? "").eq("status", "active")
+      .eq("scenario_id", session.scenario_id ?? "00000000-0000-0000-0000-000000000000").eq("intervention_slug", session.chosen_intervention_slug ?? "").eq("status", "active")
       .order("version", { ascending: false }).limit(1).maybeSingle();
     return buildChapter3Summary({ evidence, skip: session.working_session_skip, roomUnavailable: session.chosen_intervention_slug ? roomEligibility(config ?? null, !!allowed) : null, latestScopeRevision: session.scope_revision ?? null });
   });

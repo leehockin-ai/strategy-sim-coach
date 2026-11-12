@@ -954,6 +954,54 @@ export type Database = {
         }
         Relationships: []
       }
+      reviewer_supplements: {
+        Row: {
+          evaluation_id: string
+          files: Json
+          id: string
+          note: string
+          owner_id: string
+          request_id: string
+          session_id: string
+          submitted_at: string
+        }
+        Insert: {
+          evaluation_id: string
+          files?: Json
+          id?: string
+          note: string
+          owner_id: string
+          request_id: string
+          session_id: string
+          submitted_at?: string
+        }
+        Update: {
+          evaluation_id?: string
+          files?: Json
+          id?: string
+          note?: string
+          owner_id?: string
+          request_id?: string
+          session_id?: string
+          submitted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviewer_supplements_evaluation_id_fkey"
+            columns: ["evaluation_id"]
+            isOneToOne: false
+            referencedRelation: "evaluations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviewer_supplements_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scenarios: {
         Row: {
           ambiguity_factors: string[]
@@ -1095,6 +1143,8 @@ export type Database = {
           chosen_intervention_slug: string | null
           completed_at: string | null
           created_at: string
+          custom_practice_request: string | null
+          custom_practice_snapshot: Json | null
           decision: string | null
           dialogue_commitments: string | null
           engagement_brief: Json
@@ -1115,7 +1165,7 @@ export type Database = {
           playbook_interpretation: Json | null
           playbook_pdf_path: string | null
           playbook_suggestions: Json
-          scenario_id: string
+          scenario_id: string | null
           scope_revision: number
           status: string
           submission_requested_at: string | null
@@ -1130,6 +1180,8 @@ export type Database = {
           chosen_intervention_slug?: string | null
           completed_at?: string | null
           created_at?: string
+          custom_practice_request?: string | null
+          custom_practice_snapshot?: Json | null
           decision?: string | null
           dialogue_commitments?: string | null
           engagement_brief?: Json
@@ -1150,7 +1202,7 @@ export type Database = {
           playbook_interpretation?: Json | null
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
-          scenario_id: string
+          scenario_id?: string | null
           scope_revision?: number
           status?: string
           submission_requested_at?: string | null
@@ -1165,6 +1217,8 @@ export type Database = {
           chosen_intervention_slug?: string | null
           completed_at?: string | null
           created_at?: string
+          custom_practice_request?: string | null
+          custom_practice_snapshot?: Json | null
           decision?: string | null
           dialogue_commitments?: string | null
           engagement_brief?: Json
@@ -1185,7 +1239,7 @@ export type Database = {
           playbook_interpretation?: Json | null
           playbook_pdf_path?: string | null
           playbook_suggestions?: Json
-          scenario_id?: string
+          scenario_id?: string | null
           scope_revision?: number
           status?: string
           submission_requested_at?: string | null
@@ -1426,6 +1480,8 @@ export type Database = {
         Args: { _program_id: string; _user_id: string }
         Returns: boolean
       }
+      private_practice_access: { Args: { _session: string }; Returns: boolean }
+      private_practice_capability: { Args: never; Returns: number }
       record_strategyzer_launch: {
         Args: { _request: string; _run: string }
         Returns: string
@@ -1438,15 +1494,32 @@ export type Database = {
         Args: { _run: string; _state: Json }
         Returns: Json
       }
+      reviewer_materials_capability: { Args: never; Returns: number }
       session_progress_rank: { Args: { _status: string }; Returns: number }
+      standardized_session: { Args: { _session: string }; Returns: boolean }
       start_activity_run: {
         Args: { _definition: string; _request: string; _session: string }
         Returns: string
+      }
+      start_private_practice: {
+        Args: { _draft: Json; _request: string }
+        Returns: Json
       }
       start_strategyzer_run: {
         Args: { _request: string; _session: string }
         Returns: string
       }
+      submit_reviewer_materials: {
+        Args: {
+          _files: Json
+          _note: string
+          _owner: string
+          _request: string
+          _session: string
+        }
+        Returns: Json
+      }
+      valid_private_practice_draft: { Args: { d: Json }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "reviewer" | "user"

@@ -1,4 +1,4 @@
--- UNAPPLIED: approved source only. Do not install on the shared backend.
+-- APPLIED as drizzle/migrations/0013_private_practice_launch.sql (Lee approved, Nov 2026).
 -- Additive private context on ordinary sessions; no custom rows in scenarios.
 ALTER TABLE public.sessions ADD COLUMN custom_practice_snapshot jsonb;
 ALTER TABLE public.sessions ADD COLUMN custom_practice_request uuid;

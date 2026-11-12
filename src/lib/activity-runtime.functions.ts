@@ -31,7 +31,7 @@ export const getActivityRuntime = createServerFn({ method: "POST" })
     const briefOutcomes = Object.fromEntries((runs ?? []).map(r => [r.id, boundScopeOutcome(revisions.data?.find(v => v.id === r.scope_revision_id))]));
     // Only eligibility leaves the server, never private team configuration.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: config, error: configError } = await supabaseAdmin.from("team_activity_configs").select("poc,methodology_approved").eq("scenario_id", session.scenario_id).eq("intervention_slug", session.chosen_intervention_slug ?? "").eq("status", "active").order("version", { ascending: false }).limit(1).maybeSingle();
+    const { data: config, error: configError } = await supabaseAdmin.from("team_activity_configs").select("poc,methodology_approved").eq("scenario_id", session.scenario_id ?? "00000000-0000-0000-0000-000000000000").eq("intervention_slug", session.chosen_intervention_slug ?? "").eq("status", "active").order("version", { ascending: false }).limit(1).maybeSingle();
     if (configError) throw new Error("Working session availability could not be checked");
     return { session, intervention, testAllowed: !!testAllowed, roomUnavailableReason: roomEligibility(config, !!testAllowed), definitions: (definitions.data ?? []).filter(d => d.test_only ? !!testAllowed : d.methodology_approved), runs: runs ?? [], events: events.data ?? [], artifacts: artifacts.data ?? [], briefOutcomes };
   });
