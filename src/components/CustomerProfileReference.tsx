@@ -5,10 +5,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { sendPlaybookTeamTurn } from "@/lib/simulator.functions";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
-import { conversationWork, teamOpening } from "@/lib/conversation-work";
+import { OPENING_ID, conversationWork, starterBoard, stripOps } from "@/lib/conversation-work";
 import { TeamWorkingWall } from "@/components/TeamWorkingWall";
 
-const strip = (c: string) => c.replace(/^\[(playbook_selection_v1|customer_profile_ai_reference_v1)\] /, "");
+const strip = (c: string) => stripOps(c.replace(/^\[(playbook_selection_v1|customer_profile_ai_reference_v1)\] /, ""));
 
 /** Chapter 2: shows the playbook decision inherited from Scope. No reselection here. */
 export function CustomerProfileReference({ session, messages, onSaved }: {
@@ -23,9 +23,9 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
   const turns = messages.filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE);
   const roster = (session.scenarios?.stakeholders ?? []).map((s: { name: string }) => s.name);
-  const wall = conversationWork(turns, roster);
+  const opening = starterBoard(session.scenarios ?? {}, sel);
+  const wall = conversationWork(turns, roster, opening);
   const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;
-  const opening = teamOpening(session.scenarios ?? {}, session.engagement_brief?.success);
   function showSource(id: string) {
     setSourceId(id);
     const node = document.getElementById(`team-turn-${id}`);
@@ -41,7 +41,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
   }
   const first = turns.length === 0;
   const outcome = session.engagement_brief?.success;
-  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{opening && <li className="py-3 text-sm"><p className="font-medium">{opening.speaker} <span className="text-xs font-normal text-muted-foreground">· Opening scene</span></p><p className="whitespace-pre-wrap mt-1">{opening.text}</p></li>}{turns.map(m => <li id={`team-turn-${m.id}`} tabIndex={-1} key={m.id} className={`py-3 text-sm break-words ${sourceId === m.id ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
+  const transcript = <ol className="divide-y divide-border" aria-label="Conversation with the team">{opening && <li id={`team-turn-${OPENING_ID}`} tabIndex={-1} className={`py-3 text-sm ${sourceId === OPENING_ID ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{opening.speaker} <span className="text-xs font-normal text-muted-foreground">· Opening update · simulated, not scored</span></p><p className="whitespace-pre-wrap mt-1">{opening.text}</p></li>}{turns.map(m => <li id={`team-turn-${m.id}`} tabIndex={-1} key={m.id} className={`py-3 text-sm break-words ${sourceId === m.id ? "bg-brand-yellow/15 outline outline-1 outline-border" : ""}`}><p className="font-medium">{m.role === "candidate" ? "Coach" : m.stakeholder_name ?? "Team"}</p><p className="whitespace-pre-wrap mt-1">{strip(m.content)}</p></li>)}</ol>;
   return <section className="border border-ink p-5 mb-6 space-y-4 bg-paper" aria-labelledby="ws-heading">
     <h2 id="ws-heading" className="text-xl">Working session with the client team</h2>
     {sel.kind === "selected" && <>
@@ -64,6 +64,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
       {sel.kind === "undecided" && <p className="text-xs text-muted-foreground">To use a playbook, choose it in your Scope brief.</p>}
     </div>}
     <p className="text-sm" aria-label="Where to start">{sel.kind === "selected" ? "Open the playbook beside this conversation. Ask the team where they are, guide them through the next activity, and challenge what is still an assumption." : "Ask the team where they are, agree what to explore next, and challenge what is still an assumption."}</p>
+    <p className="text-sm text-muted-foreground" aria-label="Working with the board">The team has put its starting drafts on the board. Ask them to explain, test or revise any note — when they change their minds, the note updates with who said it.</p>
     <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
       <div className="min-w-0 space-y-4">
         {transcript}

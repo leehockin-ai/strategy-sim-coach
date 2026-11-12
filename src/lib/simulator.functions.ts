@@ -8,7 +8,8 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { PLAYBOOKS, CANVASES, canvasForPlaybook } from "@/lib/playbooks";
 import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import { notify } from "@/lib/notifications.functions";
-import { SELECTION_PHASE, resolveSelection, selectedPlaybookTeamContext } from "./playbook-selection";
+import { LEGACY_CUSTOMER_PROFILE_PHASE, SELECTION_PHASE, resolveSelection, selectedPlaybookTeamContext } from "./playbook-selection";
+import { boardPrompt, conversationSections, conversationWork, starterBoard, type BoardNote } from "./conversation-work";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1213,9 +1214,13 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
 
     const { data: transcript } = await supabaseAdmin
       .from("messages")
-      .select("role, stakeholder_name, content, phase")
+      .select("id, role, stakeholder_name, content, phase")
       .eq("session_id", data.sessionId)
       .order("created_at", { ascending: true });
+
+    // The team sees its own current board (starter drafts + attributed live notes) so it can build on it.
+    const starter = data.reference ? starterBoard(scenario, referenceChoice) : null;
+    const boardNow = data.reference ? conversationWork(((transcript ?? []) as any[]).filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE), stakeholders.map(s => s.name), starter) : null;
 
     const priorTranscript = data.reference ? (transcript ?? []) : (transcript ?? []).filter(m => m.phase === phase);
     const activityTranscript = [...priorTranscript, { role: "candidate", stakeholder_name: "(team)", content: coachRow.content, phase }];
@@ -1242,10 +1247,11 @@ RULES:
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
 - Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
 - 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
-${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript) : ""}`;
+${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
+      ...(starter ? [{ role: "assistant", content: `[${starter.speaker}] ${starter.text}` }] : []),
       ...(activityTranscript ?? []).map((m: any) => ({
         role: m.role === "candidate" ? "user" : "assistant",
         content: m.role === "candidate" ? `[Coach]: ${m.content}` : m.content,
@@ -1274,7 +1280,11 @@ ${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscrip
       throw new Error("The team reply could not be attributed to a scenario team member, so nothing was saved. Your message is still in the box — send it again.");
     }
     // Legacy activity rooms keep their previous lenient fallback when a reply is untagged.
-    const segments = parsed.ok ? parsed.segments : [{ speaker: "Team", content: reply.replace(/^\s*\[[^\]]+\]\s*/, "").trim() || reply }];
+    // Board markers that name an unknown note or block are removed before saving.
+    const validIds = new Set((boardNow?.work?.sections ?? []).flatMap(sec => sec.items.map(i => (i as BoardNote).noteId)));
+    const validKeys = new Set(conversationSections.map(sec => sec.key).filter(k => k !== "evidence"));
+    const cleanOps = (c: string) => c.replace(/<<\s*(add|revise)\s+([A-Za-z0-9_]{1,30})\s*>>\s*/gi, (all, op: string, t: string) => data.reference && (op.toLowerCase() === "add" ? validKeys.has(t) : validIds.has(t)) ? `<<${op.toLowerCase()} ${t}>> ` : "");
+    const segments = (parsed.ok ? parsed.segments : [{ speaker: "Team", content: reply.replace(/^\s*\[[^\]]+\]\s*/, "").trim() || reply }]).map(seg => ({ ...seg, content: cleanOps(seg.content) }));
 
     // Explicit, strictly increasing timestamps keep coach → speaker order stable on reload.
     const base = Date.now();
