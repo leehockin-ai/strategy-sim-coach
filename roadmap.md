@@ -1,5 +1,11 @@
 # Stabilization roadmap
 
+## Assessment email and isolated storage setup
+- [x] Registered assessment-ready template, disabled supported send-route adapter and staged owner-checked outbox claim/settle SQL; 301 tests passed, 5 opt-in tests skipped, preview build OK. Details: docs/assessment-email-storage-setup.md.
+- [x] Create separate staging draft and confirm its own test database; no shared schema/data writes.
+- [ ] Finish sending setup: blocked by Lee's sender-domain choice and isolated queue/scaffold installation; no real sends authorized.
+- [ ] Install private schemas and verify hosted storage in the staging draft: requires work in that draft after preview changes are saved and refreshed there.
+
 ## Reviewer materials and real-path parity
 - [x] Preview/published read-only checks and 64-case isolated entry matrix; historical transcript visibility and stale external conclusion parity corrected without history writes.
 - [x] Optional private reviewer note/files at explicit formal submit, staged schema only, scoring separation and ownership/role checks.
