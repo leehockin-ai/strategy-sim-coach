@@ -17,11 +17,14 @@ export default defineConfig({
       // Server values remain in process.env; never inject into client defines.
       Object.assign(process.env, loadEnv(mode, process.cwd(), ""));
     },
-  }], resolve: { alias: {
-    "entities/lib/decode.js": fileURLToPath(new URL("./node_modules/entities/lib/decode.js", import.meta.url)),
-    "entities/lib/encode.js": fileURLToPath(new URL("./node_modules/entities/lib/encode.js", import.meta.url)),
-    "entities": fileURLToPath(new URL("./node_modules/entities", import.meta.url)),
-  } } },
+  }], resolve: { alias: [
+    // Match exact imports: a directory-prefix alias turns entities/decode into
+    // a nonexistent path. Modern and legacy parsers share the pinned ESM copy.
+    { find: /^entities\/(?:lib\/decode\.js|decode)$/, replacement: fileURLToPath(new URL("./node_modules/entities/lib/esm/decode.js", import.meta.url)) },
+    { find: /^entities\/(?:lib\/encode\.js|encode)$/, replacement: fileURLToPath(new URL("./node_modules/entities/lib/esm/encode.js", import.meta.url)) },
+    { find: /^entities\/(?:lib\/escape\.js|escape)$/, replacement: fileURLToPath(new URL("./node_modules/entities/lib/esm/escape.js", import.meta.url)) },
+    { find: /^entities$/, replacement: fileURLToPath(new URL("./node_modules/entities/lib/esm/index.js", import.meta.url)) },
+  ] } },
   tanstackStart: {
     server: { entry: "server" },
   },
