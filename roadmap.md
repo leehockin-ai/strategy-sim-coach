@@ -3,7 +3,8 @@
 ## Assessment email and isolated storage setup
 - [x] Registered assessment-ready template, disabled supported send-route adapter and staged owner-checked outbox claim/settle SQL; 301 tests passed, 5 opt-in tests skipped, preview build OK. Details: docs/assessment-email-storage-setup.md.
 - [x] Create separate staging draft and confirm its own test database; no shared schema/data writes.
-- [ ] Finish sending setup: blocked by Lee's sender-domain choice and isolated queue/scaffold installation; no real sends authorized.
+- [x] Configure notify.strategyzer.com managed sender, template helper and protected preview; no platform queues or shared database changes. DNS verification pending; no real sends or publishing.
+- [ ] Enable automatic assessment notices: blocked by isolated completion/idempotency verification and separate approval to activate sends; completion stays disabled.
 - [ ] Install private schemas and verify hosted storage in the staging draft: requires work in that draft after preview changes are saved and refreshed there.
 
 ## Reviewer materials and real-path parity

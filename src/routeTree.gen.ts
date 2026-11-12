@@ -18,6 +18,7 @@ import { Route as AuthenticatedSessionsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedSessionsSessionIdRouteImport } from './routes/_authenticated.sessions.$sessionId'
 import { Route as AuthenticatedSessionsSessionIdActivitiesRouteImport } from './routes/_authenticated.sessions.$sessionId_.activities'
 import { Route as AuthenticatedSessionsSessionIdReportRouteImport } from './routes/_authenticated.sessions.$sessionId_.report'
+import { Route as LovableEmailTransactionalPreviewRouteImport } from './routes/lovable/email/transactional/preview'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -67,6 +68,12 @@ const AuthenticatedSessionsSessionIdReportRoute =
     path: '/sessions/$sessionId/report',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const LovableEmailTransactionalPreviewRoute =
+  LovableEmailTransactionalPreviewRouteImport.update({
+    id: '/lovable/email/transactional/preview',
+    path: '/lovable/email/transactional/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -77,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/sessions/': typeof AuthenticatedSessionsIndexRoute
   '/sessions/$sessionId/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -87,6 +95,7 @@ export interface FileRoutesByTo {
   '/sessions': typeof AuthenticatedSessionsIndexRoute
   '/sessions/$sessionId/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/sessions/$sessionId/report': typeof AuthenticatedSessionsSessionIdReportRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -99,6 +108,7 @@ export interface FileRoutesById {
   '/_authenticated/sessions/': typeof AuthenticatedSessionsIndexRoute
   '/_authenticated/sessions/$sessionId_/activities': typeof AuthenticatedSessionsSessionIdActivitiesRoute
   '/_authenticated/sessions/$sessionId_/report': typeof AuthenticatedSessionsSessionIdReportRoute
+  '/lovable/email/transactional/preview': typeof LovableEmailTransactionalPreviewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/sessions/'
     | '/sessions/$sessionId/activities'
     | '/sessions/$sessionId/report'
+    | '/lovable/email/transactional/preview'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/sessions'
     | '/sessions/$sessionId/activities'
     | '/sessions/$sessionId/report'
+    | '/lovable/email/transactional/preview'
   id:
     | '__root__'
     | '/'
@@ -132,12 +144,14 @@ export interface FileRouteTypes {
     | '/_authenticated/sessions/'
     | '/_authenticated/sessions/$sessionId_/activities'
     | '/_authenticated/sessions/$sessionId_/report'
+    | '/lovable/email/transactional/preview'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   LoginRoute: typeof LoginRoute
+  LovableEmailTransactionalPreviewRoute: typeof LovableEmailTransactionalPreviewRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -205,6 +219,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSessionsSessionIdReportRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/lovable/email/transactional/preview': {
+      id: '/lovable/email/transactional/preview'
+      path: '/lovable/email/transactional/preview'
+      fullPath: '/lovable/email/transactional/preview'
+      preLoaderRoute: typeof LovableEmailTransactionalPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -236,6 +257,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   LoginRoute: LoginRoute,
+  LovableEmailTransactionalPreviewRoute: LovableEmailTransactionalPreviewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

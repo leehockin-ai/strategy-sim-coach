@@ -3,26 +3,22 @@ import { assessmentNotice } from "./assessment-notice";
 export const ASSESSMENT_MAIL_ENABLED = false;
 // Deployment-controlled allowlist, never a browser Host/Origin or request body.
 export const REPORT_ORIGINS = ["https://strategy-sim-coach.lovable.app"] as const;
-export interface MailConfig { enabled: boolean; origin: string; serviceCredential: string; transport: typeof fetch }
+export interface MailConfig {
+  enabled: boolean;
+  origin: string;
+  send?: (name: string, recipient: string, options: { templateData: Record<string, unknown>; idempotencyKey: string }) => Promise<{ sent: true } | { sent: false; reason: "recipient_suppressed" }>;
+}
 
-/** Only the supported authenticated send route enqueues mail. It owns suppression,
- * footer and provider handling; this adapter never calls a provider directly. */
+/** Managed sending owns suppression, footer and delivery retries. The existing
+ * function name is retained for compatibility with the staged feature outbox. */
 export async function enqueueAssessmentMail(notice: ReturnType<typeof assessmentNotice>, config: MailConfig) {
-  if (!config.enabled || !config.serviceCredential || !REPORT_ORIGINS.includes(config.origin as typeof REPORT_ORIGINS[number])) throw Object.assign(new Error("Email setup is incomplete"), { status: 403 });
-  const response = await config.transport(`${config.origin}/lovable/email/transactional/send`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.serviceCredential}` },
-    body: JSON.stringify({ templateName: "assessment-ready", recipientEmail: notice.recipientEmail, idempotencyKey: notice.idempotencyKey, templateData: notice.templateData }),
-    redirect: "error",
+  if (!config.enabled || !REPORT_ORIGINS.includes(config.origin as typeof REPORT_ORIGINS[number])) throw Object.assign(new Error("Email setup is incomplete"), { status: 403 });
+  const send = config.send ?? (await import("./email-templates/send-email")).sendTemplateEmail;
+  const result = await send("assessment-ready", notice.recipientEmail, {
+    idempotencyKey: notice.idempotencyKey,
+    templateData: notice.templateData,
   });
-  if (!response.ok) {
-    const retry = response.headers.get("Retry-After");
-    const seconds = retry && /^\d+$/.test(retry) ? Number(retry) : retry ? Math.ceil((Date.parse(retry) - Date.now()) / 1000) : 60;
-    throw Object.assign(new Error("Email queue did not accept the notice"), { status: response.status, retrySeconds: Number.isFinite(seconds) ? Math.max(60, seconds) : 60 });
-  }
-  const result = await response.json() as { status?: string; state?: string; queued?: boolean };
-  // Must match the eventual scaffold response, verified before enablement.
-  if (!(result.queued === true || result.status === "queued" || result.state === "queued")) throw Object.assign(new Error("Email queue acceptance was not confirmed"), { status: 503 });
+  if (!result.sent) throw Object.assign(new Error("Recipient is suppressed"), { status: 403 });
 }
 
 /** Runs ONLY for an already-persisted assessment. RPCs cannot manufacture notices
