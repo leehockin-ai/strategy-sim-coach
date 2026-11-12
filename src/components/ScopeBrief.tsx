@@ -30,9 +30,9 @@ const FIELD_EXAMPLES: Record<string, string> = {
 };
 type Message = { id: string; phase: string; role: string; stakeholder_name: string | null; content: string };
 type Revision = { id: string; revision: number; snapshot: unknown; evidence_message_ids: string[]; created_at: string };
-export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyChange }: {
+export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyChange, onReadyToSubmit }: {
   session: { id: string; engagement_brief?: unknown; framing_notes?: string | null; chosen_intervention_slug?: string | null; intervention_rationale?: string | null; scope_revision?: number };
-  messages: Message[]; revisions: Revision[]; onRefresh: () => void; onDirtyChange: (dirty: boolean) => void;
+  messages: Message[]; revisions: Revision[]; onRefresh: () => void; onDirtyChange: (dirty: boolean) => void; onReadyToSubmit?: () => void;
 }) {
   const [brief, setBrief] = useState(() => readEngagementBrief(session.engagement_brief));
   const [dirty, setDirty] = useState(false);
@@ -135,5 +135,6 @@ export function ScopeBrief({ session, messages, revisions, onRefresh, onDirtyCha
       const previous = readEngagementBrief(snapshot.engagement_brief);
       return <details key={r.id} className="border-t border-input pt-2"><summary className="text-xs cursor-pointer">Revision {r.revision} · {new Date(r.created_at).toLocaleString()}</summary><p className="text-xs my-2 whitespace-pre-wrap">{previous.revision_note}</p><dl className="text-xs space-y-2">{BRIEF_FIELDS.filter(f => previous[f.key]).map(f => <div key={f.key}><dt className="font-medium">{f.label}</dt><dd className="whitespace-pre-wrap">{previous[f.key]}</dd></div>)}<div><dt className="font-medium">Intervention</dt><dd>{snapshot.chosen_intervention_slug ?? "Not selected"} · {snapshot.intervention_rationale}</dd></div><div><dt className="font-medium">Playbook choice</dt><dd>{(() => { const p = resolveSelection(snapshot.engagement_brief); return p.kind === "selected" ? `${p.title} · ${p.url}` : p.source === "none" ? "Not recorded" : p.kind; })()}</dd></div><div><dt className="font-medium">Proposed sequence</dt><dd>{previous.intervention_sequence.map(s => `${s.slug}: ${s.rationale}`).join(" → ") || "None"}</dd></div><div><dt className="font-medium">Framing / commitments</dt><dd className="whitespace-pre-wrap">{snapshot.framing_notes}<br />{snapshot.dialogue_commitments}</dd></div></dl><div className="text-xs mt-2">{r.evidence_message_ids.length} conversation messages preserved at this revision</div></details>;
     })}</div>}
+    {onReadyToSubmit && <div className="border-t border-ink pt-4 mt-4"><button type="button" onClick={onReadyToSubmit} className="text-sm font-medium underline underline-offset-4 text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">I’m ready to submit my approach for coaching</button></div>}
   </aside>;
 }

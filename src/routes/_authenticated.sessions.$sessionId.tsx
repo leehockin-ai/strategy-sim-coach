@@ -125,6 +125,15 @@ function SessionPage() {
     focusMain();
   }
 
+  function goToApproach() {
+    if (scopeDirty) { toast.error("Save your engagement brief first."); return; }
+    setActiveStep("coaching_approach");
+    // Wait for the Your Approach panel to render, then focus its heading.
+    let tries = 0;
+    const focus = () => { const el = document.getElementById("your-approach-heading"); if (el) { el.scrollIntoView({ block: "start", behavior: "smooth" }); el.focus({ preventScroll: true }); } else if (tries++ < 20) requestAnimationFrame(focus); };
+    requestAnimationFrame(focus);
+  }
+
   function focusMain() {
     requestAnimationFrame(() => { const el = document.getElementById("step-main"); window.scrollTo({ top: 0, behavior: "smooth" }); el?.focus({ preventScroll: true }); });
   }
@@ -184,7 +193,7 @@ function SessionPage() {
           <Button onClick={() => { if (scopeDirty) { toast.error("Save your engagement brief first."); return; } setActiveStep("coaching_approach"); focusMain(); }}>Next: Your Approach →</Button>
         </div>}
             </div>
-            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} />
+            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} onReadyToSubmit={goToApproach} />
           </div>
         </div>}
         {renderKey === "application" && (
@@ -380,11 +389,11 @@ function ChapterBanner({ chapter }: { chapter: ChapterKey }) {
   );
 }
 
-function StepShell({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function StepShell({ title, hint, children, headingId }: { title: string; hint: string; children: React.ReactNode; headingId?: string }) {
   return (
     <div className="grid md:grid-cols-12 gap-10">
       <div className="md:col-span-4">
-        <h2 className="text-2xl tracking-tight mb-3">{title}</h2>
+        <h2 id={headingId} tabIndex={headingId ? -1 : undefined} className="text-2xl tracking-tight mb-3 focus:outline-none">{title}</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">{hint}</p>
       </div>
       <div className="md:col-span-8 min-w-0">{children}</div>
@@ -887,6 +896,7 @@ function MethodStep({
 
   return (
     <StepShell
+      headingId="your-approach-heading"
       title="Your approach"
       hint="Builds on your saved Scope. Choose how you'll facilitate and why, then submit to open the working session."
     >
