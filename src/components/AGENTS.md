@@ -1,0 +1,2 @@
+# Launch boundaries
+- New scenario forms share ScenarioPreflight before their existing create/start action; resume bypasses it, and a synchronous in-flight guard prevents repeated Continue clicks without changing server ownership or idempotency.

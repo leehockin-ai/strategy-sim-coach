@@ -8,6 +8,9 @@ import { listScenarios } from "@/lib/scenarios.functions";
 import { createSession } from "@/lib/simulator.functions";
 import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
 import { CustomScenarioIntake } from "@/components/CustomScenarioIntake";
+import { ScenarioPreflight } from "@/components/ScenarioPreflight";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/scenarios")({
   head: () => ({ meta: [
@@ -81,23 +84,24 @@ function ScenarioCard({ scenario, index }: { scenario: any; index: number }) {
         <p className="text-xs text-muted-foreground uppercase tracking-[0.12em] mb-3">{scenario.industry}</p>
         <p className="text-sm text-muted-foreground leading-relaxed mb-6 flex-1">{scenario.summary}</p>
         <div className="mb-6" />
-        <button
+        <Button
           onClick={() => setOpen(true)}
           className="self-start inline-flex items-center gap-2 bg-ink text-paper px-4 py-2 text-sm font-medium rounded-sm hover:opacity-90"
         >
           Start session <span aria-hidden>→</span>
-        </button>
+        </Button>
       </article>
       {open && <StartDialog scenario={scenario} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void }) {
+export function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void }) {
   const navigate = useNavigate();
   const create = useServerFn(createSession);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [preflight, setPreflight] = useState(false);
 
   useEffect(() => {
     import("@/integrations/supabase/client").then(({ supabase }) =>
@@ -123,20 +127,22 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
   });
 
   return (
-    <div className="fixed inset-0 bg-ink/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-paper border border-ink max-w-lg w-full p-8" onClick={(e) => e.stopPropagation()}>
+    <>
+    {!preflight && <Dialog open onOpenChange={open => { if (!open && !mut.isPending) onClose(); }}>
+      <DialogContent className="bg-paper border-ink w-[calc(100%-2rem)] max-h-[90svh] overflow-y-auto rounded-sm">
         <span className="chip mb-3 inline-flex">{scenario.industry}</span>
-        <h2 className="text-2xl mb-2">{scenario.title}</h2>
-        <p className="text-sm text-muted-foreground mb-6">{scenario.summary}</p>
+        <DialogTitle className="text-2xl mb-2">{scenario.title}</DialogTitle>
+        <DialogDescription className="mb-6">{scenario.summary}</DialogDescription>
 
         <form
-          onSubmit={(e) => { e.preventDefault(); if (!name || !email) return; mut.mutate(); }}
+          onSubmit={(e) => { e.preventDefault(); if (!name || !email || mut.isPending) return; setPreflight(true); }}
           className="space-y-4"
         >
           <div>
-            <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Candidate name</label>
+            <label htmlFor={`candidate-name-${scenario.id}`} className="text-xs uppercase tracking-[0.12em] mb-1 block">Candidate name</label>
             <div className="relative">
               <input
+                id={`candidate-name-${scenario.id}`}
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -148,8 +154,9 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
             </div>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-[0.12em] mb-1 block">Your email address</label>
+            <label htmlFor={`candidate-email-${scenario.id}`} className="text-xs uppercase tracking-[0.12em] mb-1 block">Your email address</label>
             <input
+              id={`candidate-email-${scenario.id}`}
               required
               type="email"
               value={email}
@@ -162,17 +169,22 @@ function StartDialog({ scenario, onClose }: { scenario: any; onClose: () => void
             </p>
           </div>
           <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-ink text-sm rounded-sm">Cancel</button>
-            <button
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button
               type="submit"
               disabled={mut.isPending}
               className="px-4 py-2 bg-ink text-paper text-sm rounded-sm disabled:opacity-50"
             >
               {mut.isPending ? "Starting…" : "Enter scenario →"}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>}
+    {preflight && <ScenarioPreflight open onBack={() => setPreflight(false)} onContinue={async () => {
+      if (mut.isPending) return false;
+      try { await mut.mutateAsync(); return true; } catch { return false; }
+    }} />}
+    </>
   );
 }

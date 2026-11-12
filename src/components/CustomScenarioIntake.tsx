@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { ScenarioPreflight } from "@/components/ScenarioPreflight";
 import { draftCustomScenario, extractCustomScenarioSource, startCustomPractice, customPracticeCapability } from "@/lib/custom-scenario.functions";
 import { INTAKE_LIMIT, UPLOAD_LIMIT, PRACTICE_START_BLOCKER, practiceDraftSchema, practiceIntakeSchema, type PracticeDraft, type PracticeIntake } from "@/lib/custom-scenario";
 
@@ -20,6 +21,8 @@ export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
   const [safe, setSafe] = useState(false);
   const [draft, setDraft] = useState<PracticeDraft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [preflight, setPreflight] = useState(false);
+  const starting = useRef(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const field = "w-full min-w-0 border border-input bg-background p-3 text-sm rounded-sm";
@@ -69,11 +72,26 @@ export function CustomScenarioIntake({ generate, extract, start }: Props = {}) {
         <h3 className="text-base">Client team</h3>
         {draft.team.map((member, idx) => <fieldset key={idx} className="grid gap-2 border-t border-border pt-3"><legend className="text-sm">Team member {idx + 1}</legend>{(['name', 'role', 'description'] as const).map(key => <label key={key} className="block text-sm capitalize">{key}<input className={field} maxLength={key === 'description' ? 1000 : key === 'name' ? 100 : 160} value={member[key]} onChange={e => setDraft({ ...draft, team: draft.team.map((m, i) => i === idx ? { ...m, [key]: e.target.value } : m) })} /></label>)}</fieldset>)}
         <p role="status" className="text-sm text-muted-foreground">{available || start ? "Starting freezes this reviewed scenario and team for private practice. It never counts toward certification." : PRACTICE_START_BLOCKER}</p>
-        <Button disabled={busy || (!start && !available)} onClick={async () => { setBusy(true); setError(""); try { const d = practiceDraftSchema.parse(draft); if (start) await start(d); else { requestId.current ??= crypto.randomUUID(); const result = await startFn({ data: { requestId: requestId.current, draft: d } }); await navigate({ to: "/sessions/$sessionId", params: { sessionId: result.session.id } }); } } catch (e) { setError(e instanceof Error ? e.message : "Could not start practice."); } finally { setBusy(false); } }}>Start practice · Scope → Approach → Facilitate</Button>
+        <Button disabled={busy || (!start && !available)} onClick={() => { setError(""); try { practiceDraftSchema.parse(draft); setPreflight(true); } catch (e) { setError(e instanceof Error ? e.message : "Check your draft."); } }}>Start practice · Scope → Approach → Facilitate</Button>
       </div>}
       {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
       {error && <p role="alert" className="text-sm text-destructive break-words">{error}</p>}
       <Button variant="ghost" disabled={busy} onClick={clear}>Discard and close</Button>
     </div>}
+    <ScenarioPreflight open={preflight} onBack={() => setPreflight(false)} onContinue={async () => {
+      if (starting.current || !draft || (!start && !available)) return false;
+      starting.current = true; setBusy(true); setError("");
+      try {
+        const d = practiceDraftSchema.parse(draft);
+        if (start) await start(d);
+        else {
+          requestId.current ??= crypto.randomUUID();
+          const result = await startFn({ data: { requestId: requestId.current, draft: d } });
+          await navigate({ to: "/sessions/$sessionId", params: { sessionId: result.session.id } });
+        }
+        setPreflight(false); return true;
+      } catch (e) { setError(e instanceof Error ? e.message : "Could not start practice."); return false; }
+      finally { starting.current = false; setBusy(false); }
+    }} />
   </section>;
 }

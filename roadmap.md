@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## New-scenario preflight
+- [x] Shared accessible brief on seeded/custom explicit new starts; preserve draft/retry/resume and prevent creation before Continue.
+- [x] Isolated desktop/mobile/keyboard and duplicate-start verification, regressions/build; no shared writes or publish. Details: docs/scenario-preflight-verification.md.
+
 ## Disabled Gmail assessment transport
 - [x] Prepare server-only OAuth refresh/send transport, exact registered template, durable no-blind-retry boundaries and isolated mocks; no live mail or shared writes.
 - [x] Document one-time Google setup, secure secrets and isolated enablement prerequisites; no temporary mock route found, UI unchanged. Details: docs/assessment-gmail-setup.md.
