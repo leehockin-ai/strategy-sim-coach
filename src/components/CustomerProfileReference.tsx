@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ExternalLink, Send } from "lucide-react";
+import { ExternalLink, Send, ImagePlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { sendPlaybookTeamTurn } from "@/lib/simulator.functions";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
 import { OPENING_ID, conversationWork, starterBoard, stripOps } from "@/lib/conversation-work";
 import { TeamWorkingWall } from "@/components/TeamWorkingWall";
+import { VoiceInput, appendTranscript } from "@/components/VoiceInput";
+import { TeamReplyAudio } from "@/components/TeamReplyAudio";
+import { MAX_SCREENSHOT_BYTES, validateScreenshot } from "@/lib/team-attachment";
 
 const strip = (c: string) => stripOps(c.replace(/^\[(playbook_selection_v1|customer_profile_ai_reference_v1)\] /, ""));
 
@@ -18,6 +21,24 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
 }) {
   const send = useServerFn(sendPlaybookTeamTurn);
   const [busy, setBusy] = useState(false), [draft, setDraft] = useState("");
+  const [attachment, setAttachment] = useState<{ dataUrl: string } | null>(null);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [error, setError] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+  async function attach(file: File) {
+    if (busy || attachmentBusy) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || !file.size || file.size > MAX_SCREENSHOT_BYTES) { setError("Choose a PNG, JPEG or WebP screenshot, no larger than 4 MB."); return; }
+    setAttachmentBusy(true); setError("");
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result) : reject(new Error("Could not open screenshot")); reader.onerror = () => reject(new Error("Could not open screenshot")); reader.readAsDataURL(file); });
+      validateScreenshot(dataUrl);
+      const image = new Image(); image.src = dataUrl; await image.decode();
+      if (image.naturalWidth * image.naturalHeight > 20_000_000) throw new Error("Screenshot dimensions are too large (maximum 20 megapixels).");
+      setAttachment({ dataUrl });
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not open screenshot"); }
+    finally { setAttachmentBusy(false); }
+  }
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
@@ -33,10 +54,10 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     node?.focus({ preventScroll: true });
   }
   async function say() {
-    if (!draft.trim() || busy) return;
-    setBusy(true);
-    try { await send({ data: { sessionId: session.id, activityKey: "selected_playbook", coachMessage: draft.trim(), reference: true } }); setDraft(""); onSaved(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "The team could not reply"); onSaved(); }
+    if (!draft.trim() || busy || attachmentBusy || listening) return;
+    setBusy(true); setError("");
+    try { await send({ data: { sessionId: session.id, activityKey: "selected_playbook", coachMessage: draft.trim(), reference: true, ...(attachment ? { attachment } : {}) } }); setDraft(""); setAttachment(null); onSaved(); }
+    catch (e) { const message = e instanceof Error ? e.message : "The team could not reply"; setError(message); toast.error(message); onSaved(); }
     finally { setBusy(false); }
   }
   const first = turns.length === 0;
@@ -68,8 +89,13 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)]">
       <div className="min-w-0 space-y-4">
         {transcript}
-        <label className="block text-sm font-medium">Your coaching turn<textarea aria-label="Coach the client team" placeholder={first ? "Where are you with the work, and what remains uncertain?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onChange={e => setDraft(e.target.value)} /></label>
-        <Button disabled={busy || !draft.trim()} onClick={say}><Send />{busy ? "Team responding…" : "Send to team"}</Button>
+        <label className="block text-sm font-medium">Your coaching turn<textarea aria-label="Coach the client team" maxLength={4000} placeholder={first ? "Where are you with the work, and what remains uncertain?" : ""} className="block mt-2 min-h-24 w-full border border-input bg-background p-3" value={draft} disabled={busy} onPaste={e => { const image = Array.from(e.clipboardData.files).find(f => f.type.startsWith("image/")); if (image) { e.preventDefault(); void attach(image); } }} onChange={e => setDraft(e.target.value)} /></label>
+        {attachment && <figure className="space-y-2"><img src={attachment.dataUrl} alt="Screenshot draft" className="max-h-60 max-w-full object-contain border border-border" /><figcaption className="text-xs text-muted-foreground">Coach-provided reference · not verified evidence. Pixels are used only for this turn, not saved; the image will be unavailable after refresh.</figcaption><Button type="button" variant="outline" disabled={busy} onClick={() => setAttachment(null)} aria-label="Remove screenshot"><X />Remove screenshot</Button></figure>}
+        <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" aria-label="Attach screenshot" onChange={e => { const file = e.target.files?.[0]; if (file) void attach(file); e.target.value = ""; }} />
+        <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="outline" title="Attach a screenshot (PNG, JPEG or WebP; up to 4 MB)" disabled={busy || attachmentBusy} onClick={() => fileInput.current?.click()}><ImagePlus />{attachmentBusy ? "Opening screenshot…" : "Attach screenshot"}</Button><VoiceInput singleTurn showFallback disabled={busy} onListeningChange={setListening} onTranscript={c => setDraft(p => appendTranscript(p, c))} /><Button disabled={busy || attachmentBusy || listening || !draft.trim()} onClick={say}><Send />{busy ? "Team responding…" : "Send to team"}</Button></div>
+        <p className="text-xs text-muted-foreground">Dictation uses your browser's speech service only when started. Review the text before sending. Unsent questions and screenshots are not saved across refresh.</p>
+        <TeamReplyAudio messages={turns} roster={roster} busy={busy || listening} />
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       </div>
       <aside className="min-w-0 lg:sticky lg:top-4 self-start"><TeamWorkingWall compact work={shownWork} revision={wall.revision} history={wall.history} selectedRevision={selectedRevision} onRevision={setSelectedRevision} onSource={showSource} /></aside>
     </div>

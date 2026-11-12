@@ -10,6 +10,7 @@ import { STRATEGYZER_INTELLIGENCE } from "@/lib/strategyzer-methodology";
 import { notify } from "@/lib/notifications.functions";
 import { LEGACY_CUSTOMER_PROFILE_PHASE, SELECTION_PHASE, resolveSelection, selectedPlaybookTeamContext } from "./playbook-selection";
 import { boardPrompt, conversationSections, conversationWork, starterBoard, type BoardNote } from "./conversation-work";
+import { screenshotSchema, screenshotContent, SCREENSHOT_NOTICE, SCREENSHOT_RULES, readImageReply } from "./team-attachment";
 
 export const suggestPlaybook = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1169,17 +1170,21 @@ import { parseTeamReply } from "@/lib/team-speakers";
 
 export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { sessionId: string; activityKey: string; coachMessage: string; reference?: boolean }) =>
+  .inputValidator((d: { sessionId: string; activityKey: string; coachMessage: string; reference?: boolean; attachment?: { dataUrl: string } }) =>
     z.object({
       sessionId: z.string().uuid(),
       activityKey: z.string().min(1).max(64),
       coachMessage: z.string().min(1).max(4000),
       reference: z.boolean().optional(),
+      attachment: screenshotSchema.optional(),
     }).parse(d)
   )
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertSessionOwner(data.sessionId, context.userId);
+    // Validate again at the execution boundary as well as the RPC validator.
+    const attachment = data.attachment ? screenshotSchema.parse(data.attachment) : null;
+    if (attachment && !data.reference) throw new Error("Screenshot sharing is available in the Scope-linked working session.");
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
 
@@ -1198,7 +1203,7 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
       session_id: data.sessionId,
       role: "candidate",
       stakeholder_name: "(team)",
-      content: data.reference ? `[playbook_selection_v1] ${data.coachMessage}` : data.coachMessage,
+      content: (data.reference ? `[playbook_selection_v1] ${data.coachMessage}` : data.coachMessage) + (attachment ? `\n\n${SCREENSHOT_NOTICE}` : ""),
       phase,
     };
 
@@ -1247,14 +1252,14 @@ RULES:
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
 - Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
 - 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
-${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}`;
+${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}${data.reference ? SCREENSHOT_RULES : ""}`;
 
     const chatMessages = [
       { role: "system", content: systemPrompt },
       ...(starter ? [{ role: "assistant", content: `[${starter.speaker}] ${starter.text}` }] : []),
-      ...(activityTranscript ?? []).map((m: any) => ({
+      ...(activityTranscript ?? []).map((m: any, index: number) => ({
         role: m.role === "candidate" ? "user" : "assistant",
-        content: m.role === "candidate" ? `[Coach]: ${m.content}` : m.content,
+        content: attachment && index === activityTranscript.length - 1 ? screenshotContent(`[Coach]: ${m.content}`, attachment.dataUrl) : m.role === "candidate" ? `[Coach]: ${m.content}` : m.content,
       })),
     ];
 
@@ -1264,15 +1269,14 @@ ${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscrip
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: chatMessages,
+        ...(attachment ? { stream: true } : {}),
       }),
     });
     if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limit — try again shortly.");
-      if (res.status === 402) throw new Error("AI credits exhausted.");
-      throw new Error(`AI gateway error: ${res.status}`);
+      const failure = await res.json().catch(() => null);
+      throw new Error(failure?.error?.message || failure?.message || `The team could not respond (${res.status}). Your draft is retained.`);
     }
-    const json = await res.json();
-    const reply: string = json.choices?.[0]?.message?.content ?? "...";
+    const reply: string = attachment ? await readImageReply(res) : (await res.json()).choices?.[0]?.message?.content ?? "...";
 
     const parsed = parseTeamReply(reply, stakeholders.map((s) => s.name));
     if (data.reference && !parsed.ok) {

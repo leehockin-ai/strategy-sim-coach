@@ -1,0 +1,19 @@
+import { beforeEach, afterEach, it, expect, vi } from "vitest";
+const state = vi.hoisted(() => ({ rows: [] as any[], owner: "owner", bodies: [] as any[], status: 200, reply: "[Maya Chen] The screenshot says 12 students, but that is still a proposed group, not interview evidence." }));
+vi.mock("@tanstack/react-start", () => ({ createServerFn: () => { const c: any = { middleware: () => c, inputValidator: () => c, handler: (fn: unknown) => fn }; return c; } }));
+vi.mock("@/integrations/supabase/auth-middleware", () => ({ requireSupabaseAuth: {} }));
+vi.mock("@/lib/notifications.functions", () => ({ notify: vi.fn() }));
+vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: () => {
+  const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { owner_id: state.owner } }), single: async () => ({ data: { owner_id: state.owner, engagement_brief: {}, scenarios: { title: "The Student Founder", context: "A meal-planning app with no interviews.", stakeholders: [{ name: "Maya Chen", role: "Founder" }] } } }), order: async () => ({ data: state.rows }), insert: (rows: any[]) => { const saved = rows.map((r, i) => ({ ...r, id: `m${state.rows.length+i}` })); state.rows.push(...saved); return { select: async () => ({ data: saved }) }; } }; return q;
+} } }));
+import { sendPlaybookTeamTurn } from "./simulator.functions";
+import { SCREENSHOT_NOTICE } from "./team-attachment";
+const send = sendPlaybookTeamTurn as unknown as (i: any) => Promise<any>;
+const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jOaYAAAAASUVORK5CYII=";
+const input = (image = true) => ({ data: { sessionId: "s", activityKey: "selected_playbook", reference: true, coachMessage: "What remains untested?", ...(image ? { attachment: { dataUrl: png } } : {}) }, context: { userId: "owner" } });
+beforeEach(() => { state.rows = []; state.bodies = []; state.owner = "owner"; state.status = 200; vi.stubEnv("LOVABLE_API_KEY", "test"); vi.stubGlobal("fetch", vi.fn(async (_url, init) => { const body = JSON.parse(init.body); state.bodies.push(body); if (state.status !== 200) return new Response(JSON.stringify({ message: "Access denied for this request" }), { status: state.status }); return body.stream ? new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: state.reply } }] })}\n\ndata: [DONE]\n\n`) : new Response(JSON.stringify({ choices: [{ message: { content: state.reply } }] })); })); });
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+it("sends pixels only for the current question and saves only a notice with attributed speech", async () => { await send(input()); expect(state.bodies[0].messages.at(-1).content[1].image_url.url).toBe(png); expect(state.bodies[0].stream).toBe(true); expect(state.rows[0].content).toContain(SCREENSHOT_NOTICE); expect(JSON.stringify(state.rows)).not.toContain("base64"); expect(state.rows[1].stakeholder_name).toBe("Maya Chen"); await send(input(false)); expect(JSON.stringify(state.bodies[1])).not.toContain("base64"); expect(state.bodies[1].messages.at(-1).content).toContain("What remains untested"); });
+it("a denied request retains zero rows and retry is explicit, not automatic", async () => { state.status = 403; await expect(send(input())).rejects.toThrow("Access denied"); expect(state.rows).toHaveLength(0); expect(state.bodies).toHaveLength(1); state.status = 200; await send(input()); expect(state.rows).toHaveLength(2); });
+it("ownership is checked before pixels are sent", async () => { state.owner = "other"; await expect(send(input())).rejects.toThrow("Forbidden"); expect(state.bodies).toHaveLength(0); expect(state.rows).toHaveLength(0); });
+it("spoofed image bytes are rejected before a model call", async () => { const i = input(); i.data.attachment = { dataUrl: png.replace("image/png", "image/webp") }; await expect(send(i)).rejects.toThrow("contents"); expect(state.bodies).toHaveLength(0); });

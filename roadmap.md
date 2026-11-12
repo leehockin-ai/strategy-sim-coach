@@ -1,5 +1,10 @@
 # Stabilization roadmap
 
+## Chapter 2 screenshot and spoken turns
+- [x] Added in-memory screenshot attach/paste, preview/remove and owner-authorized image-aware team replies; only reference notice and attributed speech persist, never pixels.
+- [x] Reused opt-in single-turn dictation and stakeholder read-aloud with editable text/browser fallback in one composer; no ambient recording or automatic submission.
+- [x] Real AI through actual team handler with isolated browser persistence verified image-specific answer, failed draft/retry, explicit board addition/revision and source/reload. Styled desktop/mobile and simulated voice APIs passed; 218 regressions passed. Hosted save, physical microphone and paid speech playback unverified; no shared writes or publishing. Details in docs/chapter2-screenshot-voice-verification.md.
+
 ## Chapter 2 live coaching and source-linked sticky notes
 - [x] Added one selected/none/defer conversation, stable view-only scene-setting opening, and compact exact-quote work projection from attributed persisted messages; no new store or shared writes.
 - [x] 206 regressions and isolated desktop/mobile components passed; six actual AI turns produced 13 attributed team messages, rendered locally with source notes. Hosted persistence/full route assessment not exercised; coverage and retry limits in docs/chapter2-live-notes-verification.md.

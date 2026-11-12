@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type Props = {
   onTranscript: (chunk: string) => void;
   className?: string;
   title?: string;
+  disabled?: boolean;
+  onListeningChange?: (listening: boolean) => void;
+  singleTurn?: boolean;
+  showFallback?: boolean;
 };
 
 // Minimal typing for the Web Speech API
@@ -25,15 +30,19 @@ function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
-export function VoiceInput({ onTranscript, className, title }: Props) {
+export function VoiceInput({ onTranscript, className, title, disabled, onListeningChange, singleTurn = false, showFallback = false }: Props) {
   const [listening, setListening] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [error, setError] = useState("");
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const finalsRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     setSupported(!!getRecognitionCtor());
+    return () => { const rec = recRef.current; if (rec) { rec.onresult = null; rec.onend = null; rec.onerror = null; rec.stop(); } };
   }, []);
+  useEffect(() => { onListeningChange?.(listening); }, [listening, onListeningChange]);
+  useEffect(() => { if (disabled) recRef.current?.stop(); }, [disabled]);
 
   const toggle = () => {
     if (listening) {
@@ -42,8 +51,9 @@ export function VoiceInput({ onTranscript, className, title }: Props) {
     }
     const Ctor = getRecognitionCtor();
     if (!Ctor) return;
+    setError("");
     const rec = new Ctor();
-    rec.continuous = true;
+    rec.continuous = !singleTurn;
     rec.interimResults = false;
     rec.lang = navigator.language || "en-US";
     finalsRef.current = new Set();
@@ -57,7 +67,7 @@ export function VoiceInput({ onTranscript, className, title }: Props) {
         }
       }
     };
-    rec.onerror = () => setListening(false);
+    rec.onerror = () => { setListening(false); setError("Dictation unavailable. You can type your question."); };
     rec.onend = () => setListening(false);
     recRef.current = rec;
     try {
@@ -68,11 +78,13 @@ export function VoiceInput({ onTranscript, className, title }: Props) {
     }
   };
 
-  if (!supported) return null;
+  if (!supported) return showFallback ? <span className="text-xs text-muted-foreground">Dictation unavailable — type instead.</span> : null;
 
   return (
-    <button
+    <span className="inline-flex items-center gap-2"><Button
       type="button"
+      variant="outline"
+      disabled={disabled}
       onClick={toggle}
       title={title ?? (listening ? "Stop dictation" : "Dictate")}
       aria-label={listening ? "Stop dictation" : "Start dictation"}
@@ -83,7 +95,7 @@ export function VoiceInput({ onTranscript, className, title }: Props) {
       }
     >
       {listening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-    </button>
+    </Button>{error && <span role="status" className="text-xs text-muted-foreground">{error}</span>}</span>
   );
 }
 
