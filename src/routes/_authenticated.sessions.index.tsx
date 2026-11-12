@@ -1,8 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
-import { listMySessions } from "@/lib/simulator.functions";
+import { listMySessions, archiveMySession } from "@/lib/simulator.functions";
+import { groupSessions, lastActivity } from "@/lib/session-list";
+import { stripPracticeDraft } from "@/lib/coach-report-text";
 import { stepFromStatus, chapterForStep } from "@/lib/chapters";
 
 export const Route = createFileRoute("/_authenticated/sessions/")({
@@ -26,12 +30,27 @@ const CHAPTER_IN_PROGRESS_LABELS: Record<string, string> = {
 // Reviewer-decision statuses → "Assessment ready" (the sign-off has landed).
 const DECIDED_STATUSES = new Set(["approved", "conditional", "not_approved", "retry", "escalated"]);
 
+function when(iso: string) {
+  return iso ? new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+}
+
 function MySessionsPage() {
   const fetchMine = useServerFn(listMySessions);
+  const archive = useServerFn(archiveMySession);
+  const qc = useQueryClient();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const { data, isLoading } = useQuery({
     queryKey: ["my-sessions"],
     queryFn: () => fetchMine(),
   });
+  const archiving = useMutation({
+    mutationFn: (id: string) => archive({ data: { sessionId: id, archived: true } }),
+    onSuccess: () => { toast.success("Attempt archived."); qc.invalidateQueries({ queryKey: ["my-sessions"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const rows = (data?.sessions ?? []).map((s: any) => ({ ...s, title: stripPracticeDraft(s.scenarios?.title) || "Scenario" }));
+  const canArchive = rows.some((s: any) => "archived_at" in s);
+  const groups = groupSessions(rows);
 
   return (
     <Shell>
@@ -53,7 +72,7 @@ function MySessionsPage() {
       <section className="mx-auto max-w-[1400px] px-6 md:px-10 py-10">
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading…</div>
-        ) : !data?.sessions?.length ? (
+        ) : !groups.length ? (
           <div className="border border-ink p-10 text-center">
             <p className="text-sm text-muted-foreground mb-4">No sessions yet.</p>
             <Link to="/scenarios" className="bg-ink text-paper px-4 py-2 text-sm rounded-sm">
@@ -61,10 +80,19 @@ function MySessionsPage() {
             </Link>
           </div>
         ) : (
-          <div className="border border-ink divide-y divide-ink">
-            {data.sessions.map((s: any) => {
-              // evaluations has a one-to-one FK on session_id, so PostgREST
-              // returns it as a single object (or null), not an array.
+          <div className="space-y-8">
+            {groups.map((g) => {
+              const open = !!expanded[g.key];
+              const shown = open ? g.attempts : g.attempts.slice(0, 1);
+              const earlier = g.attempts.length - 1;
+              return (
+                <section key={g.key} aria-label={g.title}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+                    <h2 className="text-xl">{g.title}</h2>
+                    <span className="text-xs text-muted-foreground">{g.attempts.length} attempt{g.attempts.length === 1 ? "" : "s"} · {g.attempts[0].scenarios?.industry}</span>
+                  </div>
+                  <div className="border border-ink divide-y divide-ink">
+            {shown.map((s: any) => {
               const ev = Array.isArray(s.evaluations) ? s.evaluations[0] : s.evaluations;
               const hasAIRubric = !!ev;
               const hasReviewerDecision = !!ev?.reviewer_decision || DECIDED_STATUSES.has(s.status);
@@ -88,41 +116,35 @@ function MySessionsPage() {
               } else {
                 stateLabel = CHAPTER_IN_PROGRESS_LABELS[chapterForStep(stepFromStatus(s.status))] ?? "In progress";
               }
-
               const linkLabel = nextActionText ?? "Resume →";
-              const reportTo = "/sessions/$sessionId/report" as const;
-              const liveTo = "/sessions/$sessionId" as const;
-
+              const archivable = canArchive && !s.submission_requested_at && !hasReviewerDecision;
               return (
-                <div
-                  key={s.id}
-                  className="grid grid-cols-12 gap-4 px-6 py-5 hover:bg-secondary transition-colors items-center"
-                >
-                  <span className="marker-num text-xs text-muted-foreground col-span-1">
-                    {new Date(s.created_at).toLocaleDateString(undefined, { month: "short", day: "2-digit" })}
-                  </span>
-                  <div className="col-span-6">
-                    <div className="text-sm font-medium">{s.scenarios?.title ?? "Scenario"}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{s.scenarios?.industry}</div>
-                  </div>
+                <div key={s.id} className="flex flex-wrap gap-x-4 gap-y-2 px-5 py-4 hover:bg-secondary transition-colors items-center">
                   <span
-                    className="col-span-3 text-[10px] uppercase tracking-[0.12em] border border-ink px-2 py-1 inline-flex justify-center"
+                    className="text-[10px] uppercase tracking-[0.12em] border border-ink px-2 py-1"
                     style={stateColor ? { backgroundColor: stateColor } : undefined}
                   >
                     {stateLabel}
                   </span>
-                  <span className="col-span-2 text-right text-sm">
+                  <span className="text-xs text-muted-foreground flex-1 min-w-[10rem]">Last activity {when(lastActivity(s))}</span>
+                  {archivable && <button type="button" className="text-xs underline text-muted-foreground" disabled={archiving.isPending} onClick={() => archiving.mutate(s.id)}>Archive</button>}
+                  <span className="text-sm">
                     {nextActionText ? (
-                      <Link to={reportTo} params={{ sessionId: s.id }}>
-                        {linkLabel}
-                      </Link>
+                      <Link to="/sessions/$sessionId/report" params={{ sessionId: s.id }}>{linkLabel}</Link>
                     ) : (
-                      <Link to={liveTo} params={{ sessionId: s.id }}>
-                        {linkLabel}
-                      </Link>
+                      <Link to="/sessions/$sessionId" params={{ sessionId: s.id }}>{linkLabel}</Link>
                     )}
                   </span>
                 </div>
+              );
+            })}
+                  </div>
+                  {earlier > 0 && (
+                    <button type="button" aria-expanded={open} className="mt-2 text-xs underline" onClick={() => setExpanded({ ...expanded, [g.key]: !open })}>
+                      {open ? "Hide earlier attempts" : `Show ${earlier} earlier attempt${earlier === 1 ? "" : "s"}`}
+                    </button>
+                  )}
+                </section>
               );
             })}
           </div>

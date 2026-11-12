@@ -84,8 +84,7 @@ function Hero() {
               <HeroCell color="var(--brand-cyan)" fg="var(--ink)" label="Assess" />
             </div>
             <div className="border-t border-ink px-5 py-4 text-[13px] text-muted-foreground leading-[1.5]">
-              Nine competency dimensions. Multiple coaching paths can be valid. The reasoning is
-              what's assessed.
+              Three chapters, one engagement, then an assessment.
             </div>
           </div>
         </div>
@@ -196,9 +195,7 @@ function PlaybookBlock() {
               tools — designed to be run over one or several sessions with the team.
             </p>
             <p className="text-[17px] leading-[1.65]" style={{ color: "rgba(255,255,255,0.85)" }}>
-              Coach Compass covers the full Strategyzer Playbook library. When you commit to a
-              Playbook in a scenario, you'll plan how you'd sequence the activities, facilitate one
-              live with the team, and interpret what emerged before recommending next steps.
+              Coach Compass covers the full Strategyzer Playbook library.
             </p>
             <p className="text-[17px] leading-[1.65]" style={{ color: "rgba(255,255,255,0.85)" }}>
               The instrument doesn't test whether you picked <em>the</em> Playbook a reviewer would
@@ -270,23 +267,6 @@ const DIMENSIONS = [
   { n: "09", t: "Intervention execution", d: "Rigor and coaching posture in delivery, regardless of intervention chosen." },
 ];
 
-const LOOK_FOR = [
-  "Clarifies before prescribing",
-  "Reframes assumptions as testable hypotheses",
-  "Redirects ownership to the team",
-  "Simplifies next steps",
-  "Identifies evidence gaps",
-  "Matches intervention to diagnosis",
-];
-
-const DISQUALIFIES = [
-  "Solution-jumping without context",
-  "Overfacilitating, dominating dialogue",
-  "Prescribing playbooks reflexively",
-  "Expanding scope unnecessarily",
-  "Consulting theater over progress",
-  "Forcing an intervention the team isn't ready for",
-];
 
 function Rubric() {
   return (
@@ -299,9 +279,8 @@ function Rubric() {
           dimensions.
         </SectionH2>
         <p className="mt-6 max-w-[720px] text-[17px] leading-[1.6] text-muted-foreground mb-14">
-          Every session is scored against the same criteria Strategyzer applies to its own coaches
-          and esteemed partners. Reviewers see the full breakdown. You see the developmental
-          narrative that emerges from it.
+          Multiple coaching paths can be valid. What's scored is your reasoning: clarifying before
+          prescribing, matching the intervention to the diagnosis, and leaving ownership with the team.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 border border-ink">
           {DIMENSIONS.map((d, i) => {
@@ -325,46 +304,11 @@ function Rubric() {
             );
           })}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 border border-t-0 border-ink">
-          <PhilosophyCol title="What we look for" color="var(--brand-lime)" items={LOOK_FOR} bordered />
-          <PhilosophyCol title="What disqualifies" color="var(--brand-red)" items={DISQUALIFIES} />
-        </div>
       </div>
     </section>
   );
 }
 
-function PhilosophyCol({
-  title,
-  color,
-  items,
-  bordered,
-}: {
-  title: string;
-  color: string;
-  items: string[];
-  bordered?: boolean;
-}) {
-  return (
-    <div className={`p-8 ${bordered ? "md:border-r border-ink" : ""}`}>
-      <h4 className="text-xs uppercase tracking-[0.12em] font-medium mb-5 flex items-center gap-2.5">
-        <span
-          className="inline-block w-3 h-3 border border-ink"
-          style={{ backgroundColor: color }}
-        />
-        {title}
-      </h4>
-      <ul className="space-y-1.5">
-        {items.map((i) => (
-          <li key={i} className="text-sm leading-[1.4] flex gap-2.5">
-            <span className="text-muted-foreground">—</span>
-            <span>{i}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 /* ---------------------------- ASSESSMENT ------------------------------ */
 
@@ -378,13 +322,7 @@ function Assessment() {
           <br />
           A Strategyzer reviewer signs.
         </SectionH2>
-        <p className="mt-6 max-w-[720px] text-[17px] leading-[1.6] text-muted-foreground mb-14">
-          Every completed session generates an AI-drafted rubric report — yours to read, reflect
-          on, and revisit. When you submit for review, a Strategyzer reviewer reads your work
-          personally, calibrates against the AI rubric, and signs off with their name and their
-          notes.
-        </p>
-        <div className="grid md:grid-cols-2 gap-8 md:gap-14 items-start">
+        <div className="mt-10 grid md:grid-cols-2 gap-8 md:gap-14 items-start">
           <AssessmentCard
             label="First — automatic"
             title="AI rubric"

@@ -7,7 +7,7 @@ import { SECTION_RUBRIC } from "@/lib/evaluation.functions";
 import { toast } from "sonner";
 import { AssessmentGenerator } from "@/components/AssessmentGenerator";
 import React from "react";
-import { coachText, coachList, coachDisplayTitle, COACH_SECTION_DESCRIPTION } from "@/lib/coach-report-text";
+import { coachText, coachList, coachDisplayTitle, coachSummary, COACH_SECTION_DESCRIPTION } from "@/lib/coach-report-text";
 import { SessionUnavailable } from "@/components/SessionUnavailable";
 import { AssessmentEmailMock } from "@/components/AssessmentEmailMock";
 import { Button } from "@/components/ui/button";
@@ -131,6 +131,7 @@ function AssessmentPage() {
   const reviewerNotes: string = evaluation.reviewer_notes ?? "";
   const coachFeedback: string = evaluation.coach_feedback ?? raw.coach_feedback_draft ?? "";
   const reviewedAt: string | null = evaluation.reviewed_at ?? null;
+  const summary = coachSummary(evaluation);
 
   return (
     <Shell>
@@ -192,7 +193,8 @@ function AssessmentPage() {
                 <div className="md:col-span-8">
                   <h1 className="text-4xl md:text-5xl tracking-tight mb-3">{coachDisplayTitle(session.candidate_name, scenario?.title)}</h1>
                   <p className="text-muted-foreground">{session.candidate_email}</p>
-                  <p className="mt-6 text-lg leading-relaxed max-w-2xl">{coachText(evaluation.overall_summary)}</p>
+                  <div className="mt-6 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Overall reading</div>
+                  <p className="mt-2 text-lg leading-relaxed max-w-2xl">{summary.overall}</p>
                 </div>
                 <div className="md:col-span-4">
                   <div className="border border-ink p-6" style={{ backgroundColor: "var(--secondary)" }}>
@@ -220,24 +222,20 @@ function AssessmentPage() {
         </div>
       </section>
 
-      {/* COACH-FACING FEEDBACK */}
-      {coachFeedback && (
-        <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline-b">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">
-            {hasReviewerDecision ? "Developmental feedback" : "Draft developmental feedback (AI)"}
-          </div>
-          <h2 className="text-2xl mb-6">What this means for your practice</h2>
-          <div className="prose prose-sm max-w-3xl">
-            <MarkdownLight source={coachText(coachFeedback)} />
-          </div>
-        </section>
-      )}
+      {/* SHORT SUMMARY */}
+      <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline-b" aria-label="Summary">
+        {hasReviewerDecision && summary.overall && <><h2 className="text-2xl mb-3">Overall reading</h2><p className="text-base leading-relaxed max-w-3xl mb-8">{summary.overall}</p></>}
+        <div className="grid md:grid-cols-2 gap-px bg-ink border border-ink">
+          <div className="bg-paper p-6"><h2 className="chip mb-3 inline-flex" style={{ backgroundColor: "var(--brand-lime)" }}>Keep doing</h2><p className="text-base leading-relaxed">{summary.keep || "—"}</p></div>
+          <div className="bg-paper p-6"><h2 className="chip mb-3 inline-flex" style={{ backgroundColor: "var(--brand-red)", color: "var(--paper)", borderColor: "var(--brand-red)" }}>Change next time</h2><p className="text-base leading-relaxed">{summary.change || "—"}</p></div>
+        </div>
+      </section>
 
       {/* PER-SECTION RUBRIC */}
       <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12">
         <div className="flex items-baseline justify-between mb-2">
-          <h2 className="text-2xl">Section-by-section rubric</h2>
-          <span className="text-xs text-muted-foreground">Each section is scored independently.</span>
+          <h2 className="text-2xl">Scores by dimension</h2>
+          <span className="text-xs text-muted-foreground">Open a dimension for evidence, strengths and gaps.</span>
         </div>
         <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
           The evidence column quotes your actual work. Strengths and gaps are specific — use them as a checklist for what to repeat and what to change next time.
@@ -249,9 +247,9 @@ function AssessmentPage() {
             if (!sx) return null;
             const verdict = sx.verdict ?? null;
             return (
-              <article key={sec.key} className="border border-ink bg-paper">
-                <header
-                  className="hairline-b p-5 flex flex-wrap items-center justify-between gap-4"
+              <details key={sec.key} className="border border-ink bg-paper">
+                <summary
+                  className="cursor-pointer list-none p-5 flex flex-wrap items-center justify-between gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   style={{ backgroundColor: "var(--secondary)" }}
                 >
                   <div>
@@ -270,8 +268,8 @@ function AssessmentPage() {
                     )}
                     <ScoreBar score={sx.score ?? 0} />
                   </div>
-                </header>
-                <div className="p-5 grid md:grid-cols-3 gap-6">
+                </summary>
+                <div className="p-5 grid md:grid-cols-3 gap-6 hairline-t">
                   <div className="md:col-span-1">
                     <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">Evidence</div>
                     <p className="text-sm leading-relaxed">{coachText(sx.evidence) || "—"}</p>
@@ -293,11 +291,25 @@ function AssessmentPage() {
                     </ul>
                   </div>
                 </div>
-              </article>
+              </details>
             );
           })}
         </div>
       </section>
+
+      <details className="mx-auto max-w-[1200px] px-6 md:px-10 py-8 hairline-t">
+        <summary className="cursor-pointer text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Full narrative feedback</summary>
+      {coachFeedback && (
+        <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline-b">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">
+            {hasReviewerDecision ? "Developmental feedback" : "Draft developmental feedback (AI)"}
+          </div>
+          <h2 className="text-2xl mb-6">What this means for your practice</h2>
+          <div className="prose prose-sm max-w-3xl">
+            <MarkdownLight source={coachText(coachFeedback)} />
+          </div>
+        </section>
+      )}
 
       {/* SOFT SKILLS */}
       {Array.isArray(evaluation.soft_skills) && evaluation.soft_skills.length > 0 && (
@@ -343,6 +355,8 @@ function AssessmentPage() {
           </div>
         </div>
       </section>
+
+      </details>
 
       {/* NEXT STEPS / SUBMISSION CTA */}
       <section className="mx-auto max-w-[1200px] px-6 md:px-10 py-12 hairline-t">

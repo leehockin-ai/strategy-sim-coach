@@ -6,6 +6,7 @@ import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
+import { stripPracticeDraft } from "@/lib/coach-report-text";
 import { SessionUnavailable } from "@/components/SessionUnavailable";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
@@ -246,8 +247,13 @@ function ScenarioHeader({ scenario, session }: { scenario: any; session: any }) 
           <span className="text-xs uppercase tracking-[0.14em] opacity-70">{scenario.industry}</span>
         </div>
         {session.custom_practice_snapshot && <p className="text-sm text-muted-foreground">Private custom practice · not certification</p>}
-              <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{scenario.title}</h1>
-        <p className="max-w-3xl opacity-90 leading-relaxed">{scenario.context}</p>
+              <h1 className="text-3xl md:text-5xl tracking-tight font-medium mb-4">{stripPracticeDraft(scenario.title)}</h1>
+        <p className="max-w-3xl opacity-90 leading-relaxed whitespace-pre-line">{session.custom_practice_snapshot ? (session.custom_practice_snapshot.brief ?? scenario.summary) : scenario.context}</p>
+        {session.custom_practice_snapshot && (session.custom_practice_snapshot.scope || session.custom_practice_snapshot.challenge || session.custom_practice_snapshot.tensions) && (
+          <details className="mt-3 max-w-3xl text-sm opacity-90"><summary className="cursor-pointer">Your setup notes (only you see these)</summary>
+            <dl className="mt-2 space-y-1">{([["Team tensions", "tensions"], ["Scope", "scope"], ["Coaching focus", "challenge"]] as const).map(([l, k]) => session.custom_practice_snapshot[k] ? <div key={k}><dt className="inline font-medium">{l}: </dt><dd className="inline">{session.custom_practice_snapshot[k]}</dd></div> : null)}</dl>
+          </details>
+        )}
 
         {(scenario.success_definition || scenario.success_pressure) && (
           <div className="mt-6 grid md:grid-cols-2 gap-4 max-w-4xl">

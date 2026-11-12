@@ -322,7 +322,19 @@ export const listMySessions = createServerFn({ method: "GET" })
       .eq("owner_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { sessions: (data ?? []).map(s => hydratePracticeSession(s as any)) };
+    const { isSeededTestSession } = await import("./session-list");
+    return { sessions: (data ?? []).filter(s => !isSeededTestSession(s.id)).map(s => hydratePracticeSession(s as any)) };
+  });
+
+// Archive (hide) an abandoned attempt. Requires the staged
+// docs/unapplied/session-archive.sql; fails closed until it is installed.
+export const archiveMySession = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { sessionId: string; archived: boolean }) => z.object({ sessionId: z.string().uuid(), archived: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await (context.supabase as any).rpc("set_my_session_archived", { _session_id: data.sessionId, _archived: data.archived });
+    if (error) throw new Error("Archiving isn't available yet.");
+    return { ok: true };
   });
 
 // ──────────────────────────────────────────────────────────────────

@@ -272,6 +272,9 @@ type SynthesisOut = {
   recommendation: "pass" | "conditional_pass" | "human_review_required" | "retry_recommended" | "not_yet_certified";
   recommendation_rationale: string;
   coach_feedback_draft: string;
+  overall_reading: string;
+  keep_doing: string;
+  change_next_time: string;
 };
 
 async function synthesizeFinal(
@@ -359,6 +362,9 @@ Return strict JSON:
   "confidence": "low" | "medium" | "high",
   "recommendation": "pass" | "conditional_pass" | "human_review_required" | "retry_recommended" | "not_yet_certified",
   "recommendation_rationale": "<1-2 sentences tying recommendation to the section scores you saw>",
+  "overall_reading": "<2-3 short plain sentences to the coach (you): the overall reading of this session>",
+  "keep_doing": "<ONE specific thing you should keep doing, one sentence>",
+  "change_next_time": "<ONE specific thing to change next time, one sentence>",
   "coach_feedback_draft": "<Developmental coach-facing feedback in markdown. Use headings: ## What you did well / ## Where to improve / ## Methodology guidance / ## Facilitation guidance / ## Recommended next step. Quote section evidence; do not invent new specifics.>"
 }`;
 
@@ -397,6 +403,9 @@ Return strict JSON:
       : "human_review_required",
     recommendation_rationale: String(parsed.recommendation_rationale ?? ""),
     coach_feedback_draft: String(parsed.coach_feedback_draft ?? ""),
+    overall_reading: String(parsed.overall_reading ?? ""),
+    keep_doing: String(parsed.keep_doing ?? ""),
+    change_next_time: String(parsed.change_next_time ?? ""),
   };
 }
 
