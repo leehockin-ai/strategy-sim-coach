@@ -1,4 +1,6 @@
 # Normal facilitation reference
+- All committed Chapter 2 approaches use one shared conversation selector, including historical methodology-only sessions; alternative planning is supplementary and prior canvas evidence is read-only to prevent partial feature sets and duplicate rooms.
+- Formative compatibility guidance requires explicit practice identity in UI and server responses; unmarked historical sessions default to certification, while private scenario identity excludes title-matched curated starter facts and hydrates all prompt context.
 - Client-team interaction uses shared semantic prompt rules and actual transcript continuity, never profanity/sentiment scoring; explicit participant refusals remain speech but cannot source new work or disclosures, while other speakers retain independent agency.
 - Assessment notice capture is centralized at new persisted completion, with a staged unique-assessment transactional outbox; report reads never backfill and current unconfigured status never claims delivery.
 - Custom intake stays transient until Start; an owner-RLS idempotent RPC freezes the approved draft on ordinary sessions, and all scenario consumers hydrate that snapshot rather than inserting private catalog rows; absent capability fails closed.

@@ -13,7 +13,7 @@ vi.mock("@/lib/notifications.functions", () => ({ notify: vi.fn() }));
 vi.mock("@/integrations/supabase/client.server", () => ({ supabaseAdmin: { from: (table: string) => {
   const query: any = { select: () => query, eq: () => query, order: async () => ({ data: mocks.messages }), maybeSingle: async () => ({ data: mocks.session }), single: async () => ({ data: table === "sessions" ? mocks.session : mocks.messages.at(-1) }), insert: (m: any) => { const rows = (Array.isArray(m) ? m : [m]).map((r: any) => ({ created_at: "2026-11-11T13:30:00Z", ...r, id: `m${mocks.messages.length}` })); rows.forEach((r: any, i: number) => { r.id = `m${mocks.messages.length + i}`; }); mocks.messages.push(...rows); return { select: async () => ({ data: rows }), single: async () => ({ data: rows.at(-1) }), then: (f: any) => f({ data: rows }) }; } }; return query;
 } } }));
-import { sendPlaybookTeamTurn } from "./simulator.functions";
+import { sendPlaybookTeamTurn, suggestCanvasCell, respondAsTeamCell } from "./simulator.functions";
 import { executeEvaluationStep } from "./evaluation.functions";
 const send = sendPlaybookTeamTurn as unknown as (input: any) => Promise<any>;
 const clients = [
@@ -64,4 +64,32 @@ it("unspecified historical Scope can converse without claiming a playbook was se
 it("normal unmarked assessment never receives new reference requirements", () => {
   const s: any = { scenarios: { title: "Legacy", summary: "Existing" }, scope_revisions: [] };
   for (const key of SECTION_KEYS) expect(buildSectionInput(key, s, [])).not.toContain(ref.url);
+});
+
+it("legacy certification responses strip formative guidance at the server boundary", async () => {
+  mocks.session = { owner_id: "owner", methodology_choice: "competing_on_business_models", scenarios: { ...clients[0], stakeholders: clients[0].names.map(name => ({ name, role: "Client" })) } };
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    mocks.requests.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ team_says: "We are unsure.", team_reply: "[Maya Chen] No.", probing_questions: ["Try this question"], evidence_gaps: ["Private coaching signal"], reframe: "Do this instead", contradiction: "Signal", facilitation_flag: "recovered", coach_signal: "Good coaching" }) } }] }) };
+  }));
+  const open = suggestCanvasCell as unknown as (i: any) => Promise<any>;
+  const reply = respondAsTeamCell as unknown as (i: any) => Promise<any>;
+  const input = { data: { sessionId: "s", cellKey: "customer_segments", history: [], coachMove: "What is uncertain?" }, context: { userId: "owner" } };
+  expect(await open(input)).toMatchObject({ team_says: "We are unsure.", probing_questions: [], evidence_gaps: [], reframe: "", contradiction: null });
+  expect(await reply(input)).toMatchObject({ team_reply: "[Maya Chen] No.", facilitation_flag: null, coach_signal: "" });
+  expect(mocks.requests[1].messages[0].content).toContain("Targeted swearing");
+});
+
+it("private team and playbook context both hydrate the approved roster without seeded starter facts", async () => {
+  mocks.session = { id: "private", owner_id: "owner", custom_practice_snapshot: { title: "The Student Founder", brief: "A fictional ceramics team needs to choose a kiln upgrade.", team: [{ name: "Alex", role: "Maker", description: "Careful with investment" }, { name: "Pat", role: "Operations", description: "Worries about delays" }], tensions: "Upgrade cost", scope: "Kiln decision", outcome: "Choose a next test", constraints: "Limited funding", challenge: "Uncertain demand" }, scenarios: null, engagement_brief: { playbook_selection: { choice: "selected", library: "strategyzer_library", reference_kind: "library_listing", listing_id: "18", canonical_url: ref.url, title: "Customer Profile", reason: "Explore demand" } } };
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    mocks.requests.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({ choices: [{ message: { content: "[Alex] Our assumption is that the kiln upgrade is needed." } }] }) };
+  }));
+  await send({ data: { sessionId: "private", activityKey: "selected_playbook", reference: true, coachMessage: "What remains uncertain?" }, context: { userId: "owner" } });
+  const prompt = mocks.requests[0].messages[0].content;
+  expect(prompt).toContain("ceramics");
+  expect(prompt).toContain('"name":"Alex"');
+  expect(prompt).not.toContain("wireframes");
+  expect(mocks.requests[0].messages.filter((m: any) => m.role === "assistant").map((m: any) => m.content).join(" ")).not.toContain("six weeks");
 });

@@ -1,3 +1,4 @@
+import { formativeGuidanceAllowed } from "./working-session";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { canvasSchema, sessionStatusSchema } from "@/lib/session-compatibility";
@@ -700,7 +701,7 @@ What you CAN do:
 
 Hard rules:
 - Do NOT coach the candidate. Do NOT break character. Do NOT name Strategyzer frameworks.
-${data.phase?.startsWith("alignment:") ? selectedPlaybookTeamContext(session as any, transcript) : ""}`;
+${data.phase?.startsWith("alignment:") ? selectedPlaybookTeamContext(hydratePracticeSession(session as any), transcript) : ""}`;
 
 
 
@@ -991,8 +992,10 @@ export const suggestCanvasCell = createServerFn({ method: "POST" })
 
 ${STRATEGYZER_INTELLIGENCE}
 
+${TEAM_INTERACTION_RULES}
+
 Your job is NOT to draft polished cell content. Your job is to give the coach the messy, realistic raw material of a live working session so they can practice facilitation.
-${selectedPlaybookTeamContext(session as any, transcript)}
+${selectedPlaybookTeamContext(hydratePracticeSession(session as any), transcript)}
 
 Return STRICT JSON with this exact shape:
 {
@@ -1045,10 +1048,10 @@ ${existingPretty || "(empty)"}`;
     return {
       cellKey: cell.key,
       team_says: parsed.team_says ?? "",
-      probing_questions: Array.isArray(parsed.probing_questions) ? parsed.probing_questions : [],
-      evidence_gaps: Array.isArray(parsed.evidence_gaps) ? parsed.evidence_gaps : [],
-      reframe: parsed.reframe ?? "",
-      contradiction: parsed.contradiction ?? null,
+      probing_questions: formativeGuidanceAllowed(session as any) && Array.isArray(parsed.probing_questions) ? parsed.probing_questions : [],
+      evidence_gaps: formativeGuidanceAllowed(session as any) && Array.isArray(parsed.evidence_gaps) ? parsed.evidence_gaps : [],
+      reframe: formativeGuidanceAllowed(session as any) ? parsed.reframe ?? "" : "",
+      contradiction: formativeGuidanceAllowed(session as any) ? parsed.contradiction ?? null : null,
     };
   });
 
@@ -1103,8 +1106,10 @@ export const respondAsTeamCell = createServerFn({ method: "POST" })
 
 ${STRATEGYZER_INTELLIGENCE}
 
+${TEAM_INTERACTION_RULES}
+
 Reply AS ONE TEAM MEMBER reacting to the coach's last move. Prefix with "[Name]". Stay in character — busy, slightly defensive, half-formed, sometimes solution-jumping, sometimes confused, sometimes pushing back. NOT polished. NOT consultant-speak.
-${selectedPlaybookTeamContext(session as any, data.history)}
+${selectedPlaybookTeamContext(hydratePracticeSession(session as any), data.history)}
 
 Then return STRICT JSON with this exact shape:
 {
@@ -1120,7 +1125,7 @@ Rules:
 - Never use Strategyzer jargon unless the coach introduced it.
 
 TEAM MEMBERS:
-${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture}`).join("\n")}
+${stakeholders.map((s) => `- ${s.name} (${s.role}) — ${s.posture ?? (s as any).description ?? "Use actual dialogue and role."}`).join("\n")}
 
 SCENARIO: ${scenario.title}
 ${scenario.context}
@@ -1151,8 +1156,8 @@ ${transcript}`;
     return {
       cellKey: cell.key,
       team_reply: parsed.team_reply ?? "",
-      facilitation_flag: parsed.facilitation_flag ?? "still_vague",
-      coach_signal: parsed.coach_signal ?? "",
+      facilitation_flag: formativeGuidanceAllowed(session as any) ? parsed.facilitation_flag ?? "still_vague" : null,
+      coach_signal: formativeGuidanceAllowed(session as any) ? parsed.coach_signal ?? "" : "",
     };
   });
 
@@ -1247,7 +1252,7 @@ export const sendPlaybookTeamTurn = createServerFn({ method: "POST" })
     const active = activeReference(referenceChoice, transcript as any[]);
     if (data.reference && data.expectedReferenceId && data.expectedReferenceId !== active.id) throw new Error("The active playbook changed before this message was sent. Nothing was saved — check the current playbook and send again.");
     const activeChoice = active.selection;
-    const starter = data.reference ? starterBoard(scenario, referenceChoice) : null;
+    const starter = data.reference ? starterBoard(scenario, referenceChoice, !!(session as any).custom_practice_snapshot) : null;
     const boardNow = data.reference ? conversationWork(((transcript ?? []) as any[]).filter(m => m.phase === SELECTION_PHASE || m.phase === LEGACY_CUSTOMER_PROFILE_PHASE), stakeholders.map(s => s.name), starter) : null;
 
     const priorTranscript = data.reference ? (transcript ?? []) : (transcript ?? []).filter(m => m.phase === phase);
@@ -1275,7 +1280,7 @@ RULES:
 - Do NOT use Strategyzer jargon. Don't say "jobs to be done", "pains", "gains", "value proposition" unless the coach has already explained it. Use plain language.
 - Do NOT coach the coach. If the coach asks a vague or leading question, answer it but show the team getting a bit stuck — that's the coach's cue to reframe.
 - 2-5 sentences. One speaker per turn unless a quick back-and-forth between two members genuinely fits.
-${data.reference ? selectedPlaybookTeamContext(session as any, activityTranscript.filter((m: any) => m.phase !== SWITCH_PHASE), activeChoice) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}${data.reference ? SCREENSHOT_RULES : ""}`;
+${data.reference ? selectedPlaybookTeamContext(hydratePracticeSession(session as any), activityTranscript.filter((m: any) => m.phase !== SWITCH_PHASE), activeChoice) : ""}${data.reference ? boardPrompt(boardNow?.work ?? null) : ""}${data.reference ? SCREENSHOT_RULES : ""}`;
 
     const interactionPrompt = `${systemPrompt}\n${TEAM_INTERACTION_RULES}`;
 

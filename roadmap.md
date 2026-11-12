@@ -1,5 +1,9 @@
 # Stabilization roadmap
 
+## App-wide functionality coverage
+- [x] Unify modern/historical Chapter 2 entry, preserve alternative approaches and legacy evidence, suppress certification-only hints, validate seeded/custom scenario context and shared controls.
+- [x] 282 tests passed; 12 isolated ordinary-screen desktop/mobile cases passed send/reload and shared controls. Hosted custom-launch and email remain blocked by their documented setup prerequisites; no shared writes. See docs/app-wide-functionality-coverage.md.
+
 ## Approved private practice launch
 - [x] Frozen owner-private Start, same journey adapters, certification exclusion and separate future entitlement hooks.
 - [x] Unapplied schema audit and disposable PostgreSQL ownership/idempotency tests; 275 regressions. Isolated ordinary-screen journey through Chapter 3/generating verified with real scoping/team AI; final report run interrupted. See docs/private-practice-launch-verification.md.

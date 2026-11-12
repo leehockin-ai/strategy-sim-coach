@@ -125,9 +125,9 @@ const STARTERS: Record<string, Facts> = {
 
 /** View-only opening scene with team-owned starting notes. Never persisted or scored;
  * every note is an exact sentence of the visible, attributed opening. */
-export function starterBoard(scenario: { title?: string; stakeholders?: Array<{ name: string }> }, sel: ResolvedSelection) {
+export function starterBoard(scenario: { title?: string; slug?: string; stakeholders?: Array<{ name: string }> }, sel: ResolvedSelection, privatePractice = false) {
   const speaker = scenario.stakeholders?.[0]?.name;
-  const f = STARTERS[scenario.title ?? ""];
+  const f = privatePractice || scenario.slug?.startsWith("custom-") ? undefined : STARTERS[scenario.title ?? ""];
   if (!speaker) return null;
   const format = boardFormat(sel);
   if (!f) return { speaker, format, text: "We're ready to talk about our work. Where would you like us to begin?", notes: [] as Array<{ key: string; text: string; noteId: string }> };

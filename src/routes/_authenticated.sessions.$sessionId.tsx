@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { getActivityRuntime } from "@/lib/activity-runtime.functions";
 import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
-import { chapter2Surface } from "@/lib/working-session";
+import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed } from "@/lib/working-session";
 import { CustomerProfileReference } from "@/components/CustomerProfileReference";
 import { PROVENANCE_LABEL, resolveSelection } from "@/lib/playbook-selection";
 import { readEngagementBrief } from "@/lib/scope-brief";
@@ -1416,13 +1416,12 @@ function Chapter2Container({
 
   return (
     <div>
-      {pathwayType === "playbook" && session.chosen_intervention_slug ? <>
+      {chapter2Layout(pathwayType) === "shared_only" ? <>
         <PlaybookWorkingSurface session={session} messages={messages} onSaved={onSaved} />
         {session.application_canvas && Object.keys(session.application_canvas).length > 0 && <details className="border-t border-border mt-8 py-4 text-sm"><summary className="cursor-pointer font-medium">Earlier working-session evidence · read-only</summary><pre className="whitespace-pre-wrap break-words mt-4 text-xs">{JSON.stringify(canvasForEditing(session.application_canvas).cells, null, 2)}</pre></details>}
       </> : <>
         <CustomerProfileReference session={session} messages={messages} onSaved={onSaved} />
         {!suppressBanner && banner}
-        <ActivityRuntimeEntry sessionId={session.id} />
         {body}
       </>}
     </div>
@@ -3108,6 +3107,7 @@ function PlaybookInterpret({
 }
 
 function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => void }) {
+  const showGuidance = formativeGuidanceAllowed(session);
 
 
 
@@ -3231,7 +3231,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
         <div className="flex items-baseline justify-between gap-2 mb-1">
           <label className="text-[11px] uppercase tracking-[0.12em] font-medium">{cell.label}</label>
           <div className="flex items-center gap-1">
-            {lastFlag && FLAG_LABEL[lastFlag] && (
+            {showGuidance && lastFlag && FLAG_LABEL[lastFlag] && (
               <span
                 className="text-[9px] uppercase tracking-[0.1em] border border-ink px-1.5 py-0.5"
                 style={{ backgroundColor: FLAG_LABEL[lastFlag].color }}
@@ -3264,7 +3264,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
                   <div className={`inline-block max-w-[92%] px-2 py-1 leading-snug ${t.role === "coach" ? "bg-ink text-paper" : "bg-paper border border-ink/40"}`}>
                     <div className="text-[8px] uppercase tracking-[0.12em] opacity-70 mb-0.5">{t.role === "coach" ? "Coach" : "Team"}</div>
                     <div className="whitespace-pre-wrap italic">{t.content}</div>
-                    {t.role === "team" && t.coach_signal && (
+                    {showGuidance && t.role === "team" && t.coach_signal && (
                       <div className="text-[9px] mt-1 not-italic opacity-80 border-t border-ink/20 pt-1">
                         ↳ {t.coach_signal}
                       </div>
@@ -3336,7 +3336,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
         </div>
 
         {/* Assist panel (reframe / gaps / contradiction) */}
-        {a && (
+        {showGuidance && a && (
           <div className="mt-2 border-t border-ink/30 pt-2 space-y-2">
             {a.probing_questions.length > 0 && (
               <div>

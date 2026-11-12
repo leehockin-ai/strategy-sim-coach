@@ -20,7 +20,24 @@ describe("restricted working session", () => {
     expect(boundScopeOutcome(null)).toEqual({ revision: null, success: "", decision_to_enable: "", decision_maker: "" });
   });
 });
-import { chapter2Surface } from "./working-session";
+import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed } from "./working-session";
+describe("app-wide facilitation compatibility", () => {
+  it("modern and historical playbook approaches use only the shared working surface", () => {
+    expect(chapter2Layout("playbook")).toBe("shared_only");
+  });
+  it("alternative approaches retain their own planning beside one shared conversation", () => {
+    for (const type of ["pre_playbook", "evidence_gathering", "deliberate_pause"]) expect(chapter2Layout(type)).toBe("shared_with_approach");
+  });
+  it("certification and unmarked historical sessions cannot receive in-session formative signals", () => {
+    expect(formativeGuidanceAllowed({})).toBe(false);
+    expect(formativeGuidanceAllowed({ practice_only: false })).toBe(false);
+    expect(formativeGuidanceAllowed({ practice_only: "true" })).toBe(false);
+  });
+  it("explicit private practice can receive formative guidance", () => {
+    expect(formativeGuidanceAllowed({ custom_practice_snapshot: { title: "Private" } })).toBe(true);
+    expect(formativeGuidanceAllowed({ practice_only: true })).toBe(true);
+  });
+});
 describe("chapter2Surface", () => {
   it("a saved Scope playbook always uses the in-app session, even with allowlist and stale external runs", () => {
     expect(chapter2Surface({ scopeChoice: "selected", testAllowed: true })).toBe("in_app");

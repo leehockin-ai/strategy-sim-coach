@@ -75,7 +75,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
     finally { setSwitching(false); }
   }
   const roster = (session.scenarios?.stakeholders ?? []).map((s: { name: string }) => s.name);
-  const opening = starterBoard(session.scenarios ?? {}, scopeSel);
+  const opening = starterBoard(session.scenarios ?? {}, scopeSel, !!session.custom_practice_snapshot);
   const wall = conversationWork(turns, roster, opening);
   const origins = sourceOrigins(scopeSel, messages);
   const shownWork = selectedRevision === null ? wall.work : wall.history.find(h => h.revision === selectedRevision)?.work ?? wall.work;

@@ -4,6 +4,13 @@ import { resolveSelection } from "./playbook-selection";
 const roster = ["Maya Chen", "Jordan Patel", "Sofia Ramirez"];
 const turn = (id: string, content: string, speaker = "Maya Chen", role = "stakeholder"): ConversationMessage => ({ id, phase: "playbook:selection:v1", role, content, stakeholder_name: speaker });
 describe("read-only conversation notes", () => {
+  it("private practice with a seeded title never inherits seeded starting facts", () => {
+    const selected = resolveSelection({ playbook_selection: { choice: "none", reason: "", reference_kind: "library_listing" } });
+    const privateCase = { slug: "custom-private", title: "The Student Founder", stakeholders: [{ name: "Private teammate" }] };
+    expect(starterBoard(privateCase, selected)?.notes).toEqual([]);
+    expect(starterBoard({ ...privateCase, slug: undefined }, selected, true)?.notes).toEqual([]);
+    expect(starterBoard(privateCase, selected)?.text).not.toContain("wireframes");
+  });
   it("extracts job, assumption and BMC resource only from exact attributed team quotes", () => {
     const messages = [turn("job", "The customer job is to plan affordable meals."), turn("assumption", "Our assumption is that students want AI recommendations."), turn("resource", "Our key resources are the prototype and our developer.", "Jordan Patel"), turn("coach", "Our key resources are unlimited funding.", "Coach", "candidate"), turn("stranger", "Pain: cooking takes too long.", "Unknown"), turn("chat", "Thanks, I agree."), turn("question", "Should we list a customer job?")];
     const result = conversationWork(messages, roster);

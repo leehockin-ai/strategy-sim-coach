@@ -29,3 +29,12 @@ export function chapter2Surface(input: { scopeChoice: "selected" | "none" | "def
   // None/defer are deliberate coaching decisions; an external Playbook room would contradict them.
   return input.scopeChoice === "undecided" && input.testAllowed ? "external_test_room" : "in_app";
 }
+
+// Missing mode is historical certification, not permission to expose formative feedback.
+export function formativeGuidanceAllowed(session: { custom_practice_snapshot?: unknown; practice_only?: unknown }): boolean {
+  return !!session.custom_practice_snapshot || session.practice_only === true;
+}
+
+export function chapter2Layout(pathwayType: string): "shared_only" | "shared_with_approach" {
+  return pathwayType === "playbook" ? "shared_only" : "shared_with_approach";
+}
