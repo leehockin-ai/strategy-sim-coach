@@ -50,10 +50,13 @@ export const playbookSelectionSchema = z.object({
   library: short(80), listing_id: short(12), canonical_url: short(300), title: short(200),
   reference_kind: z.enum(["library_listing", "project_run"]).default("library_listing"),
   project_id: short(120), run_id: short(120),
+  /** Optional catalog (interventions) slug when chosen from the in-app list; a link is then optional. */
+  catalog_slug: short(80),
   reason: short(1500),
   working_brief: z.object({ purpose: short(1000), activities: short(1500), expected_output: short(1000) }).default({ purpose: "", activities: "", expected_output: "" }),
 }).superRefine((v, ctx) => {
   if (v.choice !== "selected") return;
+  if (v.catalog_slug && !v.canonical_url) { if (!v.title.trim()) ctx.addIssue({ code: "custom", path: ["title"], message: "Missing playbook name" }); return; }
   const parsed = parsePlaybookUrl(v.canonical_url);
   if (!parsed) ctx.addIssue({ code: "custom", path: ["canonical_url"], message: PLAYBOOK_LINK_GUIDANCE });
   else if (parsed.referenceKind !== v.reference_kind || (parsed.referenceKind === "library_listing"
@@ -64,14 +67,15 @@ export const playbookSelectionSchema = z.object({
   if (!v.title.trim()) ctx.addIssue({ code: "custom", path: ["title"], message: "Add the playbook title shown on the Library listing or project playbook run" });
 });
 export type PlaybookSelection = z.infer<typeof playbookSelectionSchema>;
-export const EMPTY_SELECTION: PlaybookSelection = { choice: "undecided", reference_kind: "library_listing", project_id: "", run_id: "", library: "", listing_id: "", canonical_url: "", title: "", reason: "", working_brief: { purpose: "", activities: "", expected_output: "" } };
+export const EMPTY_SELECTION: PlaybookSelection = { choice: "undecided", catalog_slug: "", reference_kind: "library_listing", project_id: "", run_id: "", library: "", listing_id: "", canonical_url: "", title: "", reason: "", working_brief: { purpose: "", activities: "", expected_output: "" } };
 
 /** Normalizes user input into a stored selection (canonical URL + derived listing ID). */
-export function buildSelection(input: { choice: PlaybookSelection["choice"]; url?: string; title?: string; reason?: string; working_brief?: Partial<PlaybookSelection["working_brief"]> }): PlaybookSelection {
+export function buildSelection(input: { choice: PlaybookSelection["choice"]; url?: string; title?: string; reason?: string; catalogSlug?: string; working_brief?: Partial<PlaybookSelection["working_brief"]> }): PlaybookSelection {
   const wb = { purpose: input.working_brief?.purpose ?? "", activities: input.working_brief?.activities ?? "", expected_output: input.working_brief?.expected_output ?? "" };
   if (input.choice !== "selected") return { ...EMPTY_SELECTION, choice: input.choice, reason: input.reason ?? "" };
   const parsed = parsePlaybookUrl(input.url ?? "");
-  return { choice: "selected", reference_kind: parsed?.referenceKind ?? "library_listing", project_id: parsed?.referenceKind === "project_run" ? parsed.projectId : "", run_id: parsed?.referenceKind === "project_run" ? parsed.runId : "", library: parsed?.referenceKind === "library_listing" ? parsed.library : "", listing_id: parsed?.referenceKind === "library_listing" ? parsed.listingId : "", canonical_url: parsed?.canonicalUrl ?? (input.url ?? "").trim(), title: (input.title ?? "").trim(), reason: input.reason ?? "", working_brief: wb };
+  if (input.catalogSlug && !(input.url ?? "").trim()) return { ...EMPTY_SELECTION, choice: "selected", catalog_slug: input.catalogSlug, title: (input.title ?? "").trim(), reason: input.reason ?? "", working_brief: wb };
+  return { choice: "selected", catalog_slug: input.catalogSlug ?? "", reference_kind: parsed?.referenceKind ?? "library_listing", project_id: parsed?.referenceKind === "project_run" ? parsed.projectId : "", run_id: parsed?.referenceKind === "project_run" ? parsed.runId : "", library: parsed?.referenceKind === "library_listing" ? parsed.library : "", listing_id: parsed?.referenceKind === "library_listing" ? parsed.listingId : "", canonical_url: parsed?.canonicalUrl ?? (input.url ?? "").trim(), title: (input.title ?? "").trim(), reason: input.reason ?? "", working_brief: wb };
 }
 
 export type ResolvedSelection =
@@ -88,7 +92,7 @@ export function resolveSelection(brief: unknown, legacyPlan?: unknown): Resolved
     const verified = s.reference_kind === "library_listing" ? verifiedFor(s.library, s.listing_id) : null;
     const wb = s.working_brief;
     const hasBrief = !!(wb.purpose.trim() || wb.activities.trim() || wb.expected_output.trim());
-    return { kind: "selected", referenceKind: s.reference_kind, projectId: s.project_id, runId: s.run_id, title: s.title, url: s.canonical_url, listingId: s.listing_id, reason: s.reason, verified, coachBrief: hasBrief ? wb : null, provenance: verified ? "verified_metadata" : hasBrief ? "coach_working_brief" : "link_only", source: "scope" };
+    return { kind: "selected", referenceKind: s.reference_kind, projectId: s.project_id, runId: s.run_id, title: s.title, url: s.canonical_url || LIBRARY_BROWSE_URL, listingId: s.listing_id, reason: s.reason, verified, coachBrief: hasBrief ? wb : null, provenance: verified ? "verified_metadata" : hasBrief ? "coach_working_brief" : "link_only", source: "scope" };
   }
   // Historical Chapter 2 Customer Profile opt-in remains honored read-only.
   const legacy = legacyPlan && typeof legacyPlan === "object" ? (legacyPlan as any).customer_profile_reference : null;
@@ -103,6 +107,12 @@ export const PROVENANCE_LABEL = {
   verified_metadata: "Verified from the public Library listing preview",
   coach_working_brief: "Coach-supplied working brief (playbook content not loaded or verified)",
   link_only: "Link only — playbook content not loaded",
+} as const;
+/** Plain coach-facing wording; the precise labels above stay for evaluator/reviewer context. */
+export const COACH_PROVENANCE_LABEL = {
+  verified_metadata: "Summary from the public Library listing",
+  coach_working_brief: "With your notes on how you'll run it",
+  link_only: "Strategyzer Library playbook",
 } as const;
 
 const TEAM_RULES = `Use ONLY this current scenario's actors, context, saved scope and dialogue. Let the coach introduce, adapt, defer or stop; do not force all steps or rescue weak coaching. Team owns decisions and proposed work; a coach suggestion alone is not team agreement. Keep attribution, uncertainty, contradictions and gaps explicit. Never claim Strategyzer was opened, used or updated. Any worked example is an example only, not this client. Fictional observations are simulated reports, not verified research. Do not invent completed homework, interviews or consensus. Productive disagreement and justified restraint are legitimate. No coach tips or scoring feedback.`;

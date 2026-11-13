@@ -6,7 +6,7 @@ import { GraduationCap, SquarePen, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Shell } from "@/components/Shell";
 import { ScopeBrief } from "@/components/ScopeBrief";
-import { stripPracticeDraft } from "@/lib/coach-report-text";
+import { stripPracticeDraft, PLAYBOOK_DISPLAY_NAMES, playbookDisplayName } from "@/lib/coach-report-text";
 import { SessionUnavailable } from "@/components/SessionUnavailable";
 import { ActivityRuntimeEntry } from "@/components/ActivityRuntime";
 import { ParticipantIdentity } from "@/components/ParticipantIdentity";
@@ -16,7 +16,7 @@ import { chapter3Readiness, hasConcludedEvent } from "@/lib/chapter2-progress";
 import { Chapter3Summary } from "@/components/Chapter3Summary";
 import { chapter2Surface, chapter2Layout, formativeGuidanceAllowed, applicableExternalConclusion } from "@/lib/working-session";
 import { CustomerProfileReference } from "@/components/CustomerProfileReference";
-import { PROVENANCE_LABEL, resolveSelection } from "@/lib/playbook-selection";
+import { resolveSelection, buildSelection, parsePlaybookUrl, LIBRARY_BROWSE_URL, type PlaybookSelection } from "@/lib/playbook-selection";
 import { readEngagementBrief } from "@/lib/scope-brief";
 import { recordWorkingSessionSkip, getSession, updateSession, sendStakeholderMessage, suggestPlaybook, sendScopingTurn, extractFraming, suggestCanvasCell, saveCanvas, sendPlaybookTeamTurn, respondAsTeamCell, listInterventions } from "@/lib/simulator.functions";
 import { synthesizeVoice } from "@/lib/voice.functions";
@@ -80,12 +80,19 @@ function SessionPage() {
   const [initialized, setInitialized] = useState(false);
   const [scopeDirty, setScopeDirty] = useState(false);
   const [briefOpen, setBriefOpen] = useState(true);
+  const [approachFocusKey, setApproachFocusKey] = useState(0);
   useEffect(() => {
     if (data && !initialized) {
       setActiveStep(stepFromStatus((data.session as any).status));
       setInitialized(true);
     }
   }, [data, initialized]);
+  // The approach now lives at the end of the working view; legacy entry points land there.
+  useEffect(() => {
+    if (activeStep !== "coaching_approach") return;
+    setActiveStep("framing");
+    setApproachFocusKey((k) => k + 1);
+  }, [activeStep]);
 
   if (isError || (!isLoading && !data?.session)) return <SessionUnavailable />;
   if (isLoading || !data) {
@@ -132,15 +139,6 @@ function SessionPage() {
     focusMain();
   }
 
-  function goToApproach() {
-    if (scopeDirty) { toast.error("Save your engagement brief first."); return; }
-    setActiveStep("coaching_approach");
-    // Wait for the Your Approach panel to render, then focus its heading.
-    let tries = 0;
-    const focus = () => { const el = document.getElementById("your-approach-heading"); if (el) { el.scrollIntoView({ block: "start", behavior: "smooth" }); el.focus({ preventScroll: true }); } else if (tries++ < 20) requestAnimationFrame(focus); };
-    requestAnimationFrame(focus);
-  }
-
   function focusMain() {
     requestAnimationFrame(() => { const el = document.getElementById("step-main"); window.scrollTo({ top: 0, behavior: "smooth" }); el?.focus({ preventScroll: true }); });
   }
@@ -174,33 +172,18 @@ function SessionPage() {
         {activeChapter === "scope" && <div>
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5 mb-6"><div><div className="text-xs uppercase text-muted-foreground">01 · Scope the Engagement</div><h2 className="text-2xl mt-2">Understand the client, then decide how to help</h2></div></div>
           <div className={`grid gap-7 items-start ${briefOpen ? "xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]" : "xl:grid-cols-[minmax(0,1fr)_16rem]"}`}>
-            <div className="min-w-0"><div role="tablist" aria-label="Scope workspace" className="flex flex-wrap gap-1 border-b border-ink pb-3 mb-6">
-              <Button role="tab" aria-selected={activeStep === "framing" || activeStep === "stakeholder_workspace"} variant={activeStep === "framing" || activeStep === "stakeholder_workspace" ? "default" : "ghost"} onClick={() => setActiveStep("framing")}>1 · Client & brief</Button>
-              <Button role="tab" aria-selected={activeStep === "coaching_approach"} variant={activeStep === "coaching_approach" ? "default" : "ghost"} onClick={() => setActiveStep("coaching_approach")}>2 · Your Approach</Button>
-            </div>
-        {(renderKey === "framing" || renderKey === "dialogue") && (
+            <div className="min-w-0">
+        {(renderKey === "framing" || renderKey === "dialogue" || renderKey === "method") && (
           <div className="flex flex-wrap gap-4 mb-5 text-xs uppercase tracking-[0.12em]">
-            <button onClick={() => setActiveStep("framing")} className={`pb-1 border-b-2 transition-colors ${renderKey === "framing" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>Scoping call</button>
+            <button onClick={() => setActiveStep("framing")} className={`pb-1 border-b-2 transition-colors ${renderKey !== "dialogue" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>Scoping call</button>
             <button onClick={() => setActiveStep("stakeholder_workspace")} className={`pb-1 border-b-2 transition-colors ${renderKey === "dialogue" ? "border-ink text-ink" : "border-transparent text-muted-foreground hover:text-ink"}`}>1:1 conversations</button>
           </div>
         )}
-        {renderKey === "framing" && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
-        {renderKey === "method" && (
-          <MethodStep
-            session={session}
-            scopeDirty={scopeDirty}
-            onSaved={refreshOnly}
-            onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined}
-            nextChapterLabel={nextChapter ? `Chapter ${nextChapter.index} — ${nextChapter.label}` : undefined}
-          />
-        )}
+        {(renderKey === "framing" || renderKey === "method") && <FramingStep session={session} messages={data.messages} onSaved={refreshOnly} onRefresh={refetch} />}
         {renderKey === "dialogue" && <DialogueStep session={session} messages={data.messages} onRefresh={refetch} onContinue={refreshOnly} />}
-        {renderKey !== "method" && <div className="mt-8 border-t border-ink pt-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">Brief and playbook choice saved? Plan how you'll facilitate.</p>
-          <Button onClick={() => { if (scopeDirty) { toast.error("Save your engagement brief first."); return; } setActiveStep("coaching_approach"); focusMain(); }}>Next: Your Approach →</Button>
-        </div>}
             </div>
-            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} onReadyToSubmit={goToApproach} onOpenChange={setBriefOpen} />
+            <ScopeBrief session={session} messages={data.messages} revisions={data.scopeRevisions} onRefresh={refreshOnly} onDirtyChange={setScopeDirty} onOpenChange={setBriefOpen} focusApproachKey={approachFocusKey}
+              renderApproach={(onSelectionChange) => <MethodStep session={session} scopeDirty={scopeDirty} onSaved={refreshOnly} onSelectionChange={onSelectionChange} onCommitAndAdvance={nextChapter ? () => goToChapter(nextChapter.key) : undefined} />} />
           </div>
         </div>}
         {renderKey === "application" && (
@@ -764,33 +747,20 @@ const PHASE_LABEL: Record<string, string> = {
   test: "Test",
 };
 
-function ScopeSummary({ session }: { session: any }) {
-  const b = readEngagementBrief(session.engagement_brief);
-  const sel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
-  const rows: Array<[string, string]> = [["Client situation", b.client_situation], ["Desired outcome", b.success], ["Decision to enable", b.decision_to_enable], ["Constraints / scope", [b.scope, b.out_of_scope && `Out: ${b.out_of_scope}`, b.dependencies].filter(Boolean).join(" · ")]];
-  return <section aria-label="From your Scope" className="mb-6 border border-ink p-4 bg-paper">
-    <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">From your saved Scope · revision {session.scope_revision ?? 0}</div>
-    <dl className="grid md:grid-cols-2 gap-x-6 gap-y-2 text-sm">{rows.map(([k, v]) => <div key={k}><dt className="text-xs text-muted-foreground">{k}</dt><dd className="line-clamp-3">{v?.trim() || "—"}</dd></div>)}</dl>
-    <div className="mt-3 pt-3 border-t border-input text-sm" data-testid="approach-playbook">
-      <span className="text-xs text-muted-foreground block">Playbook</span>
-      {sel.kind === "selected" ? <><a className="underline font-medium" href={sel.url} target="_blank" rel="noopener noreferrer">{sel.title}</a> <span className="text-xs text-muted-foreground">· {sel.referenceKind === "project_run" ? "project playbook run" : "Library listing"} · {PROVENANCE_LABEL[sel.provenance]}</span></>
-        : <span>{sel.kind === "none" ? "None — coach without a playbook" : sel.kind === "defer" ? "Deferred" : "Not decided — choose in the brief"}{sel.reason ? ` · ${sel.reason}` : ""}</span>}
-    </div>
-    <p className="text-[11px] text-muted-foreground mt-2">Edit these in the Engagement Brief.</p>
-  </section>;
-}
-
 function MethodStep({
   session,
   scopeDirty = false,
   onSaved,
   onCommitAndAdvance,
+  onSelectionChange,
 }: {
   session: any;
   scopeDirty?: boolean;
   onSaved: () => void;
   onCommitAndAdvance?: () => void | Promise<void>;
   nextChapterLabel?: string;
+  /** Pushes the matching playbook decision into the versioned Engagement Brief. */
+  onSelectionChange?: (s: PlaybookSelection) => void;
 }) {
   const fetchInterventions = useServerFn(listInterventions);
   const { data: iData } = useQuery({
@@ -810,8 +780,11 @@ function MethodStep({
   const alignmentWs: Record<string, unknown> = (session.alignment_workspace ?? {}) as Record<string, unknown>;
   const storedBespoke: string = (alignmentWs["bespoke_alignment_description"] as string) ?? "";
 
+  const savedSel = resolveSelection(session.engagement_brief, session.playbook_facilitation_plan);
+  const rawSel = (readEngagementBrief(session.engagement_brief) as any).playbook_selection as PlaybookSelection | undefined;
   const initialPathway: PathwayType | "" = (() => {
-    if (!storedSlug) return "";
+    // No committed intervention yet: map an earlier brief-only decision to the closest card (view only).
+    if (!storedSlug) return savedSel.kind === "selected" ? "playbook" : savedSel.kind === "none" ? "pre_playbook" : savedSel.kind === "defer" ? "deliberate_pause" : "";
     if (storedSlug === "bespoke_alignment") return "pre_playbook";
     const row = (iData?.interventions ?? []).find((r: InterventionRow) => r.slug === storedSlug);
     return (row?.pathway_type as PathwayType) ?? "";
@@ -820,7 +793,11 @@ function MethodStep({
   const [pathway, setPathway] = useState<PathwayType | "">(initialPathway);
   const [slug, setSlug] = useState<string>(storedSlug);
   const [bespokeText, setBespokeText] = useState<string>(storedBespoke);
-  const [rationale, setRationale] = useState<string>(session.intervention_rationale ?? session.methodology_rationale ?? "");
+  const [rationale, setRationale] = useState<string>(session.intervention_rationale || session.methodology_rationale || savedSel.reason || "");
+  const [runLink, setRunLink] = useState<string>(rawSel?.reference_kind === "project_run" ? rawSel.canonical_url : "");
+  const [query, setQuery] = useState("");
+  const touchedRef = useRef(false);
+  const touch = () => { touchedRef.current = true; };
   const [suggestion, setSuggestion] = useState<any>(null);
 
   // Re-derive pathway once interventions load (needed when initial render had no rows).
@@ -833,6 +810,30 @@ function MethodStep({
 
   const save = useServerFn(updateSession);
   const suggest = useServerFn(suggestPlaybook);
+  const parsedRun = runLink.trim() ? parsePlaybookUrl(runLink) : null;
+  const runInvalid = !!runLink.trim() && parsedRun?.referenceKind !== "project_run";
+
+  // One decision, two compatible stores: intervention fields on the session and the
+  // playbook choice inside the brief (Chapter 2 / assessment read both unchanged).
+  function selectionFor(): PlaybookSelection | null {
+    if (!pathway) return null;
+    if (pathway !== "playbook") return buildSelection({ choice: pathway === "pre_playbook" ? "none" : "defer", reason: rationale });
+    if (!slug) return null;
+    // Preserve an earlier hand-entered Library link until the coach picks a catalog playbook.
+    if (rawSel?.choice === "selected" && !rawSel.catalog_slug && rawSel.reference_kind === "library_listing" && slug === storedSlug && !runLink.trim()) return { ...rawSel, reason: rationale };
+    const label = interventions.find((r) => r.slug === slug)?.label ?? slug;
+    const title = playbookDisplayName(slug) !== slug ? PLAYBOOK_DISPLAY_NAMES[slug] ?? label : label;
+    const url = parsedRun?.referenceKind === "project_run" ? parsedRun.canonicalUrl : slug === "map_out_customer_profile_with_ai" ? `${LIBRARY_BROWSE_URL}/listings/18` : "";
+    return buildSelection({ choice: "selected", catalogSlug: slug, url, title, reason: rationale });
+  }
+  useEffect(() => {
+    if (!touchedRef.current || runInvalid) return;
+    const sel = selectionFor();
+    if (sel) onSelectionChange?.(sel);
+    if (!pathway) return;
+    const t = setTimeout(() => { save({ data: buildSaveData(false) as any }).then(onSaved).catch((e: any) => toast.error(e?.message ?? "Save failed")); }, 1200);
+    return () => clearTimeout(t);
+  }, [pathway, slug, rationale, bespokeText, runLink]);
 
   // Backward-compat: keep methodology_choice populated so Chapter 2/3 keep working.
   function backcompatMethodology(): string {
@@ -876,7 +877,7 @@ function MethodStep({
         (slug === "bespoke_alignment" && bespokeText.trim().length > 0)
       )) ||
       (pathway === "playbook" && !!slug)
-    );
+    ) && !runInvalid;
 
   function buildSaveData(commit: boolean) {
     const effectiveSlug = pathway === "evidence_gathering"
@@ -898,12 +899,6 @@ function MethodStep({
     };
   }
 
-  const saveDraftMut = useMutation({
-    mutationFn: () => save({ data: buildSaveData(false) as any }),
-    onSuccess: () => { toast.success("Draft saved"); onSaved(); },
-    onError: (e: any) => toast.error(e.message ?? "Save failed"),
-  });
-
   const qcMethod = useQueryClient();
   const commitMut = useMutation({
     mutationFn: () => save({ data: buildSaveData(true) as any }),
@@ -920,34 +915,32 @@ function MethodStep({
   const playbookRows = interventions.filter((r) => r.pathway_type === "playbook");
   const byPhase: Record<string, InterventionRow[]> = {};
   for (const r of playbookRows) {
-    const p = r.phase ?? "other";
+    const p = PHASE_LABEL[r.phase ?? ""] ? (r.phase as string) : "other";
     (byPhase[p] ??= []).push(r);
   }
   const teamAlignment = interventions.find((r) => r.slug === "team_alignment_map");
 
   return (
-    <StepShell
-      headingId="your-approach-heading"
-      title="Your approach"
-      hint="Builds on your saved Scope. Choose how you'll facilitate and why, then submit to open the working session."
-    >
-      <ScopeSummary session={session} />
-      {/* Pathway cards */}
-      <div className="grid md:grid-cols-2 gap-3 mb-6">
+    <section aria-labelledby="your-approach-heading" className="border-t border-ink pt-4">
+      <h3 id="your-approach-heading" tabIndex={-1} className="text-sm mb-1 focus:outline-none">How you'll help and why</h3>
+      <p className="text-xs text-muted-foreground mb-3">Choose one approach. You can change it until you submit.</p>
+      <div role="radiogroup" aria-label="How you'll help" className="grid gap-2 mb-4">
         {PATHWAY_CARDS.map((c) => {
           const active = pathway === c.type;
           return (
             <button
               key={c.type}
               type="button"
+              role="radio"
+              aria-checked={active}
               onClick={() => {
+                touch();
                 setPathway(c.type);
-                // Reset second-level selection when pathway changes.
                 if (c.type === "evidence_gathering") setSlug("evidence_gathering");
                 else if (c.type === "deliberate_pause") setSlug("deliberate_pause");
-                else setSlug("");
+                else setSlug(c.type === pathway ? slug : "");
               }}
-              className={`text-left border border-ink p-4 transition-colors ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
+              className={`text-left border border-ink p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
             >
               <div className="text-sm font-medium mb-1">{c.title}</div>
               <p className="text-xs opacity-80 leading-relaxed">{c.descriptor}</p>
@@ -956,178 +949,117 @@ function MethodStep({
         })}
       </div>
 
-      {/* AI second opinion */}
-      <div className="mb-6 p-4 border border-ink flex items-start justify-between gap-4" style={{ backgroundColor: "var(--brand-yellow)" }}>
-        <div className="text-sm">
-          <div className="font-medium mb-1">
-            {hasDraft ? "Pressure-test your thinking" : "AI second opinion"}
-          </div>
-          <div className="text-xs opacity-80">
-            {hasDraft
-              ? "You've drafted your own reasoning. Compare it with an AI second opinion before you commit."
-              : "Draft your own approach and rationale first, then pressure-test it with an AI second opinion."}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={() => suggestMut.mutate()}
-          disabled={suggestMut.isPending || !hasDraft}
-          className="bg-ink text-paper px-3 py-1.5 text-xs rounded-sm disabled:opacity-50 shrink-0"
-        >
-          {suggestMut.isPending ? "Thinking…" : hasDraft ? "Compare" : "Suggest"}
-        </button>
-      </div>
-
-      {suggestion && (
-        <div className="mb-6 border border-ink p-4 bg-secondary">
-          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI second opinion</div>
-          {suggestion.playbookId && (
-            <div className="font-medium mb-1">
-              → {interventions.find((r) => r.slug === suggestion.playbookId)?.label ?? PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? suggestion.playbookId}
-            </div>
-          )}
-          {suggestion.rationale && <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>}
-          {Array.isArray(suggestion.evidence_moves) && suggestion.evidence_moves.length > 0 && (
-            <ul className="text-sm list-disc pl-4 space-y-0.5">
-              {suggestion.evidence_moves.map((m: string, i: number) => <li key={i}>{m}</li>)}
-            </ul>
-          )}
-          {Array.isArray(suggestion.watchouts) && suggestion.watchouts.length > 0 && (
-            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">
-              {suggestion.watchouts.map((w: string, i: number) => <li key={i}>{w}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {/* Second level: specific intervention picker */}
       {pathway === "pre_playbook" && (
-        <div className="mb-6 space-y-3">
-          <label className="text-xs uppercase tracking-[0.12em] block">Pick an alignment intervention</label>
+        <div className="mb-4 space-y-2">
+          <div className="text-xs">Pick an alignment intervention</div>
           {teamAlignment && (
-            <button
-              type="button"
-              onClick={() => setSlug("team_alignment_map")}
-              className={`w-full text-left border border-ink p-4 ${slug === "team_alignment_map" ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-            >
-              <div className="flex items-center justify-between mb-1">
-                <div className="font-medium text-sm">Team Alignment Map</div>
-                <span className="text-[10px] uppercase tracking-[0.14em] opacity-70 px-1.5 py-0.5 border border-current">Suggested default</span>
-              </div>
+            <button type="button" aria-pressed={slug === "team_alignment_map"} onClick={() => { touch(); setSlug("team_alignment_map"); }} className={`w-full text-left border border-ink p-3 ${slug === "team_alignment_map" ? "bg-ink text-paper" : "hover:bg-secondary"}`}>
+              <div className="font-medium text-sm mb-1">Team Alignment Map</div>
               <p className="text-xs opacity-80">{teamAlignment.short_description}</p>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setSlug("bespoke_alignment")}
-            className={`w-full text-left border border-ink p-4 ${slug === "bespoke_alignment" ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-          >
-            <div className="font-medium text-sm mb-1">Or describe a different alignment intervention you'd propose</div>
-            <p className="text-xs opacity-80">Write your own alignment approach — sponsor commitment work, scope renegotiation, stakeholder mapping, whatever fits.</p>
+          <button type="button" aria-pressed={slug === "bespoke_alignment"} onClick={() => { touch(); setSlug("bespoke_alignment"); }} className={`w-full text-left border border-ink p-3 ${slug === "bespoke_alignment" ? "bg-ink text-paper" : "hover:bg-secondary"}`}>
+            <div className="font-medium text-sm mb-1">Or describe a different alignment intervention</div>
+            <p className="text-xs opacity-80">Sponsor commitment work, scope renegotiation, stakeholder mapping — whatever fits.</p>
           </button>
           {slug === "bespoke_alignment" && (
-            <textarea
-              value={bespokeText}
-              onChange={(e) => setBespokeText(e.target.value)}
-              rows={4}
-              placeholder="Describe the alignment work you'd propose. Who's in the room, what you're producing, what has to be true when you leave."
-              className="w-full border border-ink bg-paper p-3 text-sm focus:outline-none focus:bg-secondary"
-            />
+            <textarea aria-label="Describe your alignment intervention" value={bespokeText} onChange={(e) => { touch(); setBespokeText(e.target.value); }} rows={3} placeholder="Who's in the room, what you're producing, what has to be true when you leave." className="w-full border border-input bg-background p-2 text-sm" />
           )}
         </div>
       )}
 
       {pathway === "playbook" && (
-        <div className="mb-6 space-y-4">
-          <label className="text-xs uppercase tracking-[0.12em] block">Facilitation format</label>
-          <p className="text-[11px] text-muted-foreground -mt-2">The Library playbook comes from your Scope. Pick the closest format for the session.</p>
-          {(["discovery", "design", "test"] as const).map((phase) => {
-            const rows = byPhase[phase] ?? [];
-            if (rows.length === 0) return null;
-            return (
-              <div key={phase}>
-                <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-2">{PHASE_LABEL[phase]}</div>
-                <div className="grid md:grid-cols-2 gap-2">
-                  {rows.map((r) => {
-                    const active = slug === r.slug;
-                    return (
-                      <button
-                        key={r.slug}
-                        type="button"
-                        onClick={() => setSlug(r.slug)}
-                        className={`text-left border border-ink p-3 ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}
-                      >
-                        <div className="flex items-center justify-between mb-1 gap-2">
-                          <span className="text-sm font-medium">{r.label}</span>
-                          {r.is_deep_vertical && (
-                            <span className="text-[9px] uppercase tracking-[0.14em] px-1.5 py-0.5 border border-current shrink-0">Multi-session</span>
-                          )}
-                        </div>
-                        <p className="text-xs opacity-80 leading-relaxed">{r.short_description}</p>
-                      </button>
-                    );
-                  })}
+        <div className="mb-4 space-y-2">
+          <label htmlFor="playbook-search" className="text-xs block">Choose a Library playbook</label>
+          <input id="playbook-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search playbooks" className="w-full border border-input bg-background p-2 text-sm" />
+          <div role="radiogroup" aria-label="Library playbooks" className="max-h-72 overflow-y-auto space-y-3 border border-input p-2">
+            {(["discovery", "design", "test", "other"] as const).map((phase) => {
+              const q = query.trim().toLowerCase();
+              const rows = (byPhase[phase] ?? []).filter((r) => !q || `${PLAYBOOK_DISPLAY_NAMES[r.slug] ?? r.label} ${r.short_description ?? ""}`.toLowerCase().includes(q));
+              if (rows.length === 0) return null;
+              return (
+                <div key={phase}>
+                  <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-1">{PHASE_LABEL[phase] ?? "Other"}</div>
+                  <div className="space-y-1">
+                    {rows.map((r) => {
+                      const active = slug === r.slug;
+                      return (
+                        <button key={r.slug} type="button" role="radio" aria-checked={active} onClick={() => { touch(); setSlug(r.slug); }} className={`w-full text-left border border-ink p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "bg-ink text-paper" : "hover:bg-secondary"}`}>
+                          <span className="text-sm font-medium">{PLAYBOOK_DISPLAY_NAMES[r.slug] ?? r.label}</span>
+                          {r.is_deep_vertical && <span className="ml-2 text-[9px] uppercase tracking-[0.14em] px-1 border border-current">Multi-session</span>}
+                          <span className="block text-xs opacity-80 leading-relaxed">{r.short_description}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {(pathway === "evidence_gathering" || pathway === "deliberate_pause") && (
-        <div className="mb-6 border border-ink p-4" style={{ backgroundColor: "var(--brand-lime)" }}>
-          <div className="text-xs uppercase tracking-[0.12em] font-medium mb-1">
-            {pathway === "evidence_gathering" ? "Restraint through evidence" : "Restraint through pause"}
+              );
+            })}
           </div>
-          <p className="text-sm leading-relaxed">
-            No specific picker here — commit to the pathway and use the rationale below to spell out what evidence you need
-            or what would have to be true before you re-engage.
-          </p>
+          {rawSel?.choice === "selected" && !rawSel.catalog_slug && rawSel.reference_kind === "library_listing" && slug === storedSlug && (
+            <p className="text-xs text-muted-foreground">Saved Library link: <a className="underline" href={rawSel.canonical_url} target="_blank" rel="noopener noreferrer">{rawSel.title}</a></p>
+          )}
+          <details className="text-xs" open={!!runLink}>
+            <summary className="cursor-pointer">Add a playbook run link (optional)</summary>
+            <input aria-label="Playbook run link" value={runLink} onChange={(e) => { touch(); setRunLink(e.target.value); }} placeholder="https://platform.strategyzer.com/projects/p/…/playbook_runs/…" className="mt-2 w-full border border-input bg-background p-2 text-sm" />
+            {runInvalid && <p role="alert" className="text-destructive mt-1">Paste the link of a playbook run from your Strategyzer project, or leave this empty.</p>}
+          </details>
         </div>
       )}
 
-      {/* Rationale */}
-      <label className="text-xs uppercase tracking-[0.12em] mb-2 block">
-        Your facilitation plan and rationale <span className="text-red-600">*</span>
-      </label>
-      <p className="text-[11px] text-muted-foreground mb-2 -mt-1">
-        Ground your reasoning in your conversations and your Engagement Brief — the outcome, the evidence, the sequencing, and what would change your mind.
-      </p>
+      <label htmlFor="approach-reason" className="text-xs block mb-1">Why this choice?</label>
       <div className="relative">
         <textarea
+          id="approach-reason"
           value={rationale}
-          onChange={(e) => setRationale(e.target.value)}
-          rows={5}
-          placeholder="Sequencing, scope, evidence focus, restraint. What sequencing matters. What would change your mind."
-          className="w-full border border-ink bg-paper p-4 pr-12 text-sm focus:outline-none focus:bg-secondary"
+          onChange={(e) => { touch(); setRationale(e.target.value); }}
+          rows={4}
+          placeholder="What in the conversation points to this? What would change your mind?"
+          className="w-full border border-input bg-background p-2 pr-12 text-sm"
         />
         <div className="absolute top-2 right-2">
-          <VoiceInput onTranscript={(c) => setRationale((p) => appendTranscript(p, c))} />
+          <VoiceInput onTranscript={(c) => { touch(); setRationale((p) => appendTranscript(p, c)); }} />
         </div>
       </div>
 
-      <div className="mt-6 flex justify-between items-center gap-3">
-        <button
-          type="button"
-          onClick={() => saveDraftMut.mutate()}
-          disabled={saveDraftMut.isPending || !pathway}
-          className="border border-ink px-4 py-2 text-sm rounded-sm hover:bg-secondary disabled:opacity-50"
-        >
-          {saveDraftMut.isPending ? "Saving…" : "Save draft"}
-        </button>
-        {onCommitAndAdvance && (
-          <button
+      {suggestion && (
+        <div className="mt-3 border border-ink p-3 bg-secondary">
+          <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-2">AI second opinion</div>
+          {suggestion.playbookId && (
+            <div className="font-medium mb-1 text-sm">→ {PLAYBOOK_DISPLAY_NAMES[suggestion.playbookId] ?? interventions.find((r) => r.slug === suggestion.playbookId)?.label ?? PLAYBOOKS.find((p) => p.id === suggestion.playbookId)?.name ?? playbookDisplayName(suggestion.playbookId)}</div>
+          )}
+          {suggestion.rationale && <p className="text-sm leading-relaxed mb-2">{suggestion.rationale}</p>}
+          {Array.isArray(suggestion.evidence_moves) && suggestion.evidence_moves.length > 0 && (
+            <ul className="text-sm list-disc pl-4 space-y-0.5">{suggestion.evidence_moves.map((m: string, i: number) => <li key={i}>{m}</li>)}</ul>
+          )}
+          {Array.isArray(suggestion.watchouts) && suggestion.watchouts.length > 0 && (
+            <ul className="text-xs text-muted-foreground list-disc pl-4 space-y-0.5 mt-2">{suggestion.watchouts.map((w: string, i: number) => <li key={i}>{w}</li>)}</ul>
+          )}
+        </div>
+      )}
+
+      {onCommitAndAdvance && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <Button
             type="button"
             onClick={() => commitMut.mutate()}
             disabled={commitMut.isPending || !canCommit || scopeDirty}
-            className="bg-ink text-paper px-5 py-2 text-sm rounded-sm disabled:opacity-50"
-            title={scopeDirty ? "Save your engagement brief first." : !canCommit ? "Choose an approach and write your reasoning first." : undefined}
+            title={scopeDirty ? "Saving your working view…" : !canCommit ? "Choose an approach and write why first." : undefined}
           >
-            {commitMut.isPending ? "Submitting…" : "Submit approach & start working session →"}
+            {commitMut.isPending ? "Submitting…" : "Submit my approach"}
+          </Button>
+          <button
+            type="button"
+            onClick={() => suggestMut.mutate()}
+            disabled={suggestMut.isPending || !hasDraft}
+            title={!hasDraft ? "Choose an approach and write a few sentences of reasoning first." : undefined}
+            className="text-xs underline underline-offset-4 disabled:opacity-50 disabled:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {suggestMut.isPending ? "Thinking…" : "Get an AI second opinion"}
           </button>
-        )}
-      </div>
-    </StepShell>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -1339,14 +1271,14 @@ function Chapter2Container({
       <div className="border border-ink p-6 bg-paper max-w-2xl">
         <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No approach committed yet</div>
         <p className="text-sm mb-4">
-          You haven't committed to an approach yet — return to Scope the Engagement → Your Approach
+          You haven't committed to an approach yet — return to Scope the Engagement → How you'll help and why
           before starting the working session.
         </p>
         <button
           onClick={onChangeIntervention}
           className="bg-ink text-paper px-4 py-2 text-sm rounded-sm hover:opacity-90"
         >
-          Go to Your Approach →
+          Choose your approach →
         </button>
       </div>
     );
@@ -3247,7 +3179,7 @@ function ApplicationStep({ session, onSaved }: { session: any; onSaved: () => vo
             <div className="text-xs uppercase tracking-[0.12em] font-medium mb-2">No canvas yet — by design</div>
             <p className="text-sm leading-relaxed">
               You chose to gather more evidence before activating a playbook. Stay with your conversations,
-              then return to Your Approach when you're ready to commit. Knowing when not
+              then return to your approach when you're ready to commit. Knowing when not
               to run a playbook is part of the craft.
             </p>
           </div>

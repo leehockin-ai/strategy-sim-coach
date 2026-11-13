@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { sendPlaybookTeamTurn, switchPlaybookReference } from "@/lib/simulator.functions";
 import { PlaybookSwitcher } from "@/components/PlaybookSwitcher";
 import { SWITCH_PHASE, activeReference, describeSwitch } from "@/lib/playbook-switch";
-import { LEGACY_CUSTOMER_PROFILE_PHASE, PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
+import { LEGACY_CUSTOMER_PROFILE_PHASE, COACH_PROVENANCE_LABEL, SELECTION_PHASE, resolveSelection } from "@/lib/playbook-selection";
 import { OPENING_ID, conversationWork, starterBoard, stripOps, isWorkingConversation } from "@/lib/conversation-work";
 import { TeamWorkspace } from "@/components/TeamWorkspace";
 import { sourceOrigins } from "@/lib/workspace-view";
@@ -114,7 +114,7 @@ export function CustomerProfileReference({ session, messages, onSaved }: {
           {outcome && <p><strong>Outcome:</strong> {String(outcome)}</p>}
           {sel.verified && <><p><strong>Playbook goal:</strong> {sel.verified.goal}</p><p><strong>Output:</strong> {sel.verified.outputs.join("; ")}</p></>}
           {!sel.verified && sel.coachBrief && <><p><strong>Purpose:</strong> {sel.coachBrief.purpose || "—"}</p><p><strong>Expected output:</strong> {sel.coachBrief.expected_output || "—"}</p></>}
-          <p className="text-xs text-muted-foreground">{PROVENANCE_LABEL[sel.provenance]}. Coach Compass doesn't read the linked playbook.{sel.source === "chapter2_switch" ? " Added during this session; your Scope decision is unchanged." : ""}</p>
+          <p className="text-xs text-muted-foreground">{COACH_PROVENANCE_LABEL[sel.provenance]}.{sel.source === "chapter2_switch" ? " Added during this session; your Scope decision is unchanged." : ""}</p>
         </div>
       </details>}
     </>}
